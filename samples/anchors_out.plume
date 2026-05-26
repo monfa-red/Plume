@@ -3,14 +3,14 @@
 // EXCLUDING out-* children so they don't push themselves further out.
 
 scene padding=60 {
-  base :rect w=160 h=100 fill=#eee {
-    :rect "out-T"  w=20 h=14 fill=orange at=out-top
-    :rect "out-B"  w=20 h=14 fill=orange at=out-bottom
-    :rect "out-L"  w=20 h=14 fill=orange at=out-left
-    :rect "out-R"  w=20 h=14 fill=orange at=out-right
-    :rect "TL"     w=18 h=14 fill=purple at=out-top-left
-    :rect "TR"     w=18 h=14 fill=purple at=out-top-right
-    :rect "BL"     w=18 h=14 fill=purple at=out-bottom-left
-    :rect "BR"     w=18 h=14 fill=purple at=out-bottom-right
+  base :rect size=(160, 100) fill=#eee {
+    :rect "out-T" size=(20, 14) fill=orange at=out-top
+    :rect "out-B" size=(20, 14) fill=orange at=out-bottom
+    :rect "out-L" size=(20, 14) fill=orange at=out-left
+    :rect "out-R" size=(20, 14) fill=orange at=out-right
+    :rect "TL"    size=(18, 14) fill=purple at=out-top-left
+    :rect "TR"    size=(18, 14) fill=purple at=out-top-right
+    :rect "BL"    size=(18, 14) fill=purple at=out-bottom-left
+    :rect "BR"    size=(18, 14) fill=purple at=out-bottom-right
   }
 }

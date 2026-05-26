@@ -224,10 +224,13 @@ impl<'a> Parser<'a> {
             }
             TokKind::LParen => self.parse_tuple_value(),
             TokKind::LBracket => self.parse_list_value(),
-            TokKind::RawCssVar(_) => Err(Error::at(
-                tok.span,
-                "raw CSS variable ('--name') only valid as an argument to var()",
-            )),
+            TokKind::RawCssVar(name) => {
+                // SPEC §11.2: `--name` resolves to var(--plume-name) — the only
+                // CSS-var reference syntax in v1.
+                let v = name.clone();
+                self.pos += 1;
+                Ok(Value::RawCssVar(v))
+            }
             other => Err(Error::at(
                 tok.span,
                 format!("expected value, found {}", tok_desc(other)),
@@ -253,26 +256,8 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_call_arg(&mut self, fn_name: &str) -> Result<Value, Error> {
-        // Inside var(), allow `--name` raw CSS var.
-        if let Some(Token {
-            kind: TokKind::RawCssVar(s),
-            span,
-        }) = self.peek()
-        {
-            if fn_name != "var" {
-                return Err(Error::at(
-                    *span,
-                    format!(
-                        "raw CSS variable only valid inside var(), not {}()",
-                        fn_name
-                    ),
-                ));
-            }
-            let v = s.clone();
-            self.pos += 1;
-            return Ok(Value::RawCssVar(v));
-        }
+    fn parse_call_arg(&mut self, _fn_name: &str) -> Result<Value, Error> {
+        // `--name` is a top-level value in v1; `parse_value` handles it directly.
         self.parse_value()
     }
 
@@ -312,10 +297,38 @@ impl<'a> Parser<'a> {
             match self.peek_kind() {
                 Some(TokKind::Dot) => items.push(AttrItem::Style(self.parse_style_ref()?)),
                 Some(TokKind::Ident(_)) => items.push(AttrItem::Attr(self.parse_attr()?)),
+                Some(TokKind::Newline) => {
+                    // SPEC §2 line continuation: a newline mid-declaration is
+                    // ignored when the next significant token starts a continuation
+                    // (key=value, .style, bare attr, or `{`).
+                    let mut peek = self.pos + 1;
+                    while matches!(self.toks.get(peek).map(|t| &t.kind), Some(TokKind::Newline)) {
+                        peek += 1;
+                    }
+                    if self.is_continuation_start(peek) {
+                        self.pos = peek;
+                    } else {
+                        break;
+                    }
+                }
                 _ => break,
             }
         }
         Ok(items)
+    }
+
+    fn is_continuation_start(&self, pos: usize) -> bool {
+        // SPEC §2: a non-blank line continues the previous declaration if it
+        // starts with `key=value`, `.style`, or `{`.
+        match self.toks.get(pos).map(|t| &t.kind) {
+            Some(TokKind::Dot) => true,
+            Some(TokKind::LBrace) => true,
+            Some(TokKind::Ident(_)) => matches!(
+                self.toks.get(pos + 1).map(|t| &t.kind),
+                Some(TokKind::Equals)
+            ),
+            _ => false,
+        }
     }
 
     fn parse_style_ref(&mut self) -> Result<StyleRef, Error> {
@@ -329,16 +342,19 @@ impl<'a> Parser<'a> {
 
     fn parse_attr(&mut self) -> Result<Attr, Error> {
         let (name, name_span) = self.expect_ident()?;
-        let value = if matches!(self.peek_kind(), Some(TokKind::Equals)) {
-            self.pos += 1;
-            Some(self.parse_value()?)
-        } else {
-            None
-        };
+        // SPEC v1: every attr is `name=value`. No bare attrs.
+        if !matches!(self.peek_kind(), Some(TokKind::Equals)) {
+            return Err(Error::at(
+                name_span,
+                format!("attr '{}' requires a value: write '{}=...'", name, name),
+            ));
+        }
+        self.pos += 1;
+        let value = self.parse_value()?;
         let end = self.last_span();
         Ok(Attr {
             name,
-            value,
+            value: Some(value),
             span: Span::new(name_span.start, end.end),
         })
     }

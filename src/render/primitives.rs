@@ -1,7 +1,7 @@
 //! Per-primitive SVG geometry. Sprint 5 implements all 14 shape kinds — most
 //! emit a single element; `cyl` and `cloud` emit a small composition.
 
-use super::values::{attr_num, attr_or_var, attr_pair, attr_points, attr_str, escape_xml, num};
+use super::values::{attr_num, attr_or_var, attr_points, attr_str, escape_xml, num};
 use crate::layout::PlacedNode;
 use crate::resolve::{ShapeKind, VarTable};
 use crate::Options;
@@ -53,9 +53,10 @@ fn emit_rect(
 ) {
     let (w, h) = dim_excluding_stroke(n, thickness);
     let radius = attr_num(&n.attrs, "radius").unwrap_or(0.0);
+    let dash = stroke_dasharray(n, thickness);
     writeln!(
         out,
-        r#"{}<rect x="{}" y="{}" width="{}" height="{}" rx="{}" ry="{}" fill="{}" stroke="{}" stroke-width="{}"/>"#,
+        r#"{}<rect x="{}" y="{}" width="{}" height="{}" rx="{}" ry="{}" fill="{}" stroke="{}" stroke-width="{}"{}/>"#,
         indent,
         num(-w / 2.0),
         num(-h / 2.0),
@@ -66,6 +67,7 @@ fn emit_rect(
         fill,
         stroke,
         num(thickness),
+        dash,
     )
     .unwrap();
 }
@@ -79,18 +81,12 @@ fn emit_oval(
     thickness: f64,
 ) {
     let (w, h) = dim_excluding_stroke(n, thickness);
-    let rx = attr_num(&n.attrs, "r")
-        .or_else(|| attr_num(&n.attrs, "rx"))
-        .unwrap_or(w / 2.0);
-    let ry = attr_num(&n.attrs, "r")
-        .or_else(|| attr_num(&n.attrs, "ry"))
-        .unwrap_or(h / 2.0);
     writeln!(
         out,
         r#"{}<ellipse cx="0" cy="0" rx="{}" ry="{}" fill="{}" stroke="{}" stroke-width="{}"/>"#,
         indent,
-        num(rx),
-        num(ry),
+        num(w / 2.0),
+        num(h / 2.0),
         fill,
         stroke,
         num(thickness),
@@ -282,23 +278,69 @@ fn emit_line(
     thickness: f64,
     arrow_default: bool,
 ) {
-    let from = attr_pair(&n.attrs, "from").unwrap_or((0.0, 0.0));
-    let to = attr_pair(&n.attrs, "to").unwrap_or((0.0, 0.0));
-    writeln!(
-        out,
-        r#"{}<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}"/>"#,
-        indent,
-        num(from.0),
-        num(from.1),
-        num(to.0),
-        num(to.1),
-        stroke,
-        num(thickness),
-    )
-    .unwrap();
-    // Inline markers for :line / :arrow primitives. Wires use a separate path
-    // and their own marker code in render/wires.rs.
+    let points = attr_points(&n.attrs, "points").unwrap_or_default();
+    if points.len() < 2 {
+        return;
+    }
+
+    // 2 points → SVG <line>; 3+ → SVG <polyline> with fill=none.
+    let dash = stroke_dasharray(n, thickness);
+    if points.len() == 2 {
+        let (from, to) = (points[0], points[1]);
+        writeln!(
+            out,
+            r#"{}<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}"{}/>"#,
+            indent,
+            num(from.0),
+            num(from.1),
+            num(to.0),
+            num(to.1),
+            stroke,
+            num(thickness),
+            dash,
+        )
+        .unwrap();
+    } else {
+        let pts: Vec<String> = points
+            .iter()
+            .map(|(x, y)| format!("{},{}", num(*x), num(*y)))
+            .collect();
+        writeln!(
+            out,
+            r#"{}<polyline points="{}" fill="none" stroke="{}" stroke-width="{}"{}/>"#,
+            indent,
+            pts.join(" "),
+            stroke,
+            num(thickness),
+            dash,
+        )
+        .unwrap();
+    }
+
+    // Markers go at the first and last points.
+    let from = points[0];
+    let to = points[points.len() - 1];
     super::markers::emit_inline_markers(out, indent, n, from, to, stroke, thickness, arrow_default);
+}
+
+/// Emit `stroke-dasharray="..."` for `stroke-style=dashed|dotted`, else empty.
+fn stroke_dasharray(n: &PlacedNode, thickness: f64) -> String {
+    match n.attrs.get("stroke-style") {
+        Some(crate::resolve::ResolvedValue::Ident(s)) => match s.as_str() {
+            "dashed" => format!(
+                r#" stroke-dasharray="{},{}""#,
+                num(thickness * 4.0),
+                num(thickness * 4.0)
+            ),
+            "dotted" => format!(
+                r#" stroke-dasharray="{},{}""#,
+                num(thickness),
+                num(thickness * 3.0)
+            ),
+            _ => String::new(),
+        },
+        _ => String::new(),
+    }
 }
 
 fn emit_poly(
@@ -378,8 +420,9 @@ fn emit_image(out: &mut String, n: &PlacedNode, indent: &str) {
         Some(crate::resolve::ResolvedValue::String(s)) => s.clone(),
         _ => return,
     };
-    let w = attr_num(&n.attrs, "w").unwrap_or(n.bbox.w());
-    let h = attr_num(&n.attrs, "h").unwrap_or(n.bbox.h());
+    // Image dimensions come from its bbox (driven by `size=`).
+    let w = n.bbox.w();
+    let h = n.bbox.h();
     writeln!(
         out,
         r#"{}<image href="{}" x="{}" y="{}" width="{}" height="{}"/>"#,

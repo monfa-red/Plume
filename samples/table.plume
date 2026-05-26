@@ -1,5 +1,5 @@
 scene {
-  specs :table cols=3 col-widths=[80,140,80] row-heights=28 {
+  specs :table layout=(3, 3) col-widths=[80, 140, 80] row-heights=28 {
     :cell "Voltage" weight=bold; :cell "Current" weight=bold; :cell "Power" weight=bold
     :cell "48 V";                :cell "20 A";               :cell "960 W"
     :cell "24 V";                :cell "10 A";               :cell "240 W"

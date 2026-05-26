@@ -1,61 +1,24 @@
 //! Grid layout.
 //!
-//! Supports `cols=N` (with optional `rows=N`), explicit `col=` / `row=` on
-//! children (1-indexed), declaration-order auto-flow for un-placed children,
-//! and `col-widths` / `row-heights` (scalar or list). `colspan` and `rowspan`
-//! default to 1.
+//! Container declares grid mode via `layout=(cols, rows)`. Children place
+//! themselves with `cell=(c, r)` and span tracks with `span=(c, r)`. Both
+//! tuples use (horizontal, vertical) = (x, y) = (col, row) order.
 
 use super::ir::{Bbox, PlacedNode};
 use super::primitives;
-use super::values::as_number_tuple;
+use super::values::{as_number_tuple, as_pair};
 use crate::error::Error;
 use crate::resolve::{AttrMap, ResolvedValue, VarTable};
 use crate::span::Span;
 
 pub fn lay_out_grid(
     children: &mut [PlacedNode],
+    cols: usize,
+    rows: usize,
     attrs: &AttrMap,
     vars: &VarTable,
     span: Span,
 ) -> Result<Bbox, Error> {
-    let cols = attr_uint(attrs, "cols", span)?;
-    let rows = attr_uint(attrs, "rows", span)?;
-
-    // Survey explicit child placements so auto-derived track counts grow to
-    // fit them — `col=3 row=2` on a child shouldn't error just because the
-    // container didn't list `rows=2`.
-    let mut max_col_used: usize = 0;
-    let mut max_row_used: usize = 0;
-    for child in children.iter() {
-        let cs = attr_uint(&child.attrs, "colspan", child.span)?
-            .unwrap_or(1)
-            .max(1);
-        let rs = attr_uint(&child.attrs, "rowspan", child.span)?
-            .unwrap_or(1)
-            .max(1);
-        if let Some(c) = attr_uint(&child.attrs, "col", child.span)? {
-            max_col_used = max_col_used.max(c.saturating_sub(1) + cs);
-        }
-        if let Some(r) = attr_uint(&child.attrs, "row", child.span)? {
-            max_row_used = max_row_used.max(r.saturating_sub(1) + rs);
-        }
-    }
-
-    let (cols, rows) = match (cols, rows) {
-        (Some(c), Some(r)) => (c, r),
-        (Some(c), None) => {
-            let auto_r = children.len().div_ceil(c.max(1));
-            (c, auto_r.max(max_row_used).max(1))
-        }
-        (None, Some(r)) => {
-            let auto_c = children.len().div_ceil(r.max(1));
-            (auto_c.max(max_col_used).max(1), r)
-        }
-        (None, None) => {
-            return Err(Error::at(span, "grid layout requires 'cols' or 'rows'"));
-        }
-    };
-
     let (gap_y, gap_x) = primitives::gap(attrs, vars, span)?;
 
     // Track sizes: explicit col-widths / row-heights, else auto from children.
@@ -67,14 +30,8 @@ pub fn lay_out_grid(
     let mut occupied = vec![vec![false; cols]; rows];
 
     for (i, child) in children.iter().enumerate() {
-        let cs = attr_uint(&child.attrs, "colspan", child.span)?
-            .unwrap_or(1)
-            .max(1);
-        let rs = attr_uint(&child.attrs, "rowspan", child.span)?
-            .unwrap_or(1)
-            .max(1);
-        let explicit_col_idx = attr_uint(&child.attrs, "col", child.span)?;
-        let explicit_row_idx = attr_uint(&child.attrs, "row", child.span)?;
+        let (cs, rs) = read_span(&child.attrs, child.span)?;
+        let (explicit_col_idx, explicit_row_idx) = read_cell(&child.attrs, child.span)?;
 
         let (col, row) = match (explicit_col_idx, explicit_row_idx) {
             (Some(c), Some(r)) => (c.saturating_sub(1), r.saturating_sub(1)),
@@ -94,7 +51,15 @@ pub fn lay_out_grid(
         if col + cs > cols || row + rs > rows {
             return Err(Error::at(
                 child.span,
-                format!("col={} (span {}) exceeds cols={}", col + 1, cs, cols),
+                format!(
+                    "cell=({}, {}) with span=({}, {}) exceeds grid layout=({}, {})",
+                    col + 1,
+                    row + 1,
+                    cs,
+                    rs,
+                    cols,
+                    rows
+                ),
             ));
         }
 
@@ -213,22 +178,6 @@ fn read_track_sizes(
     }
 }
 
-fn attr_uint(attrs: &AttrMap, name: &str, span: Span) -> Result<Option<usize>, Error> {
-    match attrs.get(name) {
-        Some(v) => {
-            let n = super::values::as_number(v, span)?;
-            if n < 0.0 || n.fract() != 0.0 {
-                return Err(Error::at(
-                    span,
-                    format!("'{}' expects a non-negative integer, got {}", name, n),
-                ));
-            }
-            Ok(Some(n as usize))
-        }
-        None => Ok(None),
-    }
-}
-
 fn cumulative(sizes: &[f64], gap: f64) -> Vec<f64> {
     let mut out = Vec::with_capacity(sizes.len() + 1);
     let mut acc = 0.0;
@@ -274,4 +223,42 @@ fn next_open(
         }
     }
     None
+}
+
+/// Read `cell=(c, r)` on a child — returns the 1-indexed grid position (or
+/// `(None, None)` if absent so the caller can auto-flow). One axis may be
+/// omitted by leaving the other unset; the engine picks the missing axis.
+fn read_cell(attrs: &AttrMap, span: Span) -> Result<(Option<usize>, Option<usize>), Error> {
+    match attrs.get("cell") {
+        None => Ok((None, None)),
+        Some(v) => {
+            let (c, r) = as_pair(v, span)?;
+            check_positive_int("cell.col", c, span)?;
+            check_positive_int("cell.row", r, span)?;
+            Ok((Some(c as usize), Some(r as usize)))
+        }
+    }
+}
+
+/// Read `span=(c, r)` on a child — defaults to (1, 1) if absent.
+fn read_span(attrs: &AttrMap, span: Span) -> Result<(usize, usize), Error> {
+    match attrs.get("span") {
+        None => Ok((1, 1)),
+        Some(v) => {
+            let (c, r) = as_pair(v, span)?;
+            check_positive_int("span.col", c, span)?;
+            check_positive_int("span.row", r, span)?;
+            Ok(((c as usize).max(1), (r as usize).max(1)))
+        }
+    }
+}
+
+fn check_positive_int(name: &str, n: f64, span: Span) -> Result<(), Error> {
+    if n < 1.0 || n.fract() != 0.0 {
+        return Err(Error::at(
+            span,
+            format!("'{}' expects a positive integer, got {}", name, n),
+        ));
+    }
+    Ok(())
 }

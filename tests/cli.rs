@@ -38,7 +38,7 @@ fn no_defaults_omits_style_block_but_keeps_var_refs() {
 #[test]
 fn theme_overrides_visual_var_visible_in_baked_output() {
     let svg = plume::compile_str_with(
-        "scene { :rect \"x\" fill=var(accent) }\n",
+        "scene { :rect \"x\" fill=--accent }\n",
         &Options {
             theme_css: Some("--plume-accent: hotpink;".to_string()),
             bake_vars: true,
@@ -53,7 +53,7 @@ fn theme_overrides_visual_var_visible_in_baked_output() {
 fn theme_layout_var_bakes_into_layout_math() {
     // gap = 20 default, theme overrides to 60. Two 40×40 rects stacked row-wise
     // should sit 40 px further apart.
-    let src = "scene layout=row {\n  :rect w=40 h=40\n  :rect w=40 h=40\n}\n";
+    let src = "scene layout=row {\n  :rect size=(40, 40)\n  :rect size=(40, 40)\n}\n";
     let default = plume::compile_str(src).expect("default compile");
     let themed = plume::compile_str_with(
         src,

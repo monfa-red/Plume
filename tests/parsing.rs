@@ -88,6 +88,46 @@ fn err_shape_def_needs_base_or_body() {
 }
 
 #[test]
-fn err_raw_css_var_outside_var() {
-    assert_parse_error("defaults { gap=--my-token }\n", "raw CSS variable");
+fn plume_var_value_parses_anywhere() {
+    // SPEC v1 §11.2: `--name` is a first-class value form, not function-scoped.
+    plume::check_parse("defaults { gap=--my-gap }\n").expect("--gap parses");
+    plume::check_parse("scene { :rect fill=--accent }\n").expect("--accent parses");
+}
+
+// ───────────────── Multi-line attr continuation (SPEC §2) ─────────────────
+
+#[track_caller]
+fn parses_same(single_line: &str, multi_line: &str) {
+    plume::check_parse(single_line).expect("single-line parse");
+    plume::check_parse(multi_line).expect("multi-line parse");
+}
+
+#[test]
+fn continuation_key_value_after_newline() {
+    parses_same(
+        "scene { my :rect cell=(1, 1) size=(80, 40) }\n",
+        "scene {\n  my :rect cell=(1, 1)\n     size=(80, 40)\n}\n",
+    );
+}
+
+#[test]
+fn continuation_dot_style_after_newline() {
+    parses_same(
+        "styles { thin stroke=#444 }\nscene { my :rect .thin }\n",
+        "styles { thin stroke=#444 }\nscene {\n  my :rect\n     .thin\n}\n",
+    );
+}
+
+#[test]
+fn continuation_open_brace_on_next_line() {
+    parses_same(
+        "scene { my :rect cell=(2, 1) { } }\n",
+        "scene {\n  my :rect cell=(2, 1)\n  {\n  }\n}\n",
+    );
+}
+
+#[test]
+fn newline_then_unrelated_ident_is_not_continuation() {
+    // Ensure two siblings without continuation keywords still parse as separate statements.
+    plume::check_parse("scene {\n  a :rect\n  b :rect\n}\n").expect("two separate statements");
 }

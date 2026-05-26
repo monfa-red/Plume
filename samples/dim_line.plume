@@ -1,5 +1,5 @@
 scene {
-  dim1 :dim from=(0, 200) to=(300, 200) {
+  dim1 :dim points=[(0, 200), (300, 200)] {
     :text "300 mm" at=center fill=#666 size=11
   }
 }

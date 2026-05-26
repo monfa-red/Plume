@@ -16,10 +16,9 @@ defaults {
   a_tuple2=(10, 20)
   a_tuple4=(2, 2, 4, gray)
   a_tuple5=(2, 2, 4, 4, gray)
-  a_list_pts=[(0,0), (10,10), (20,5)]
+  a_list_pts=[(0, 0), (10, 10), (20, 5)]
   a_list_empty=[]
-  a_var_plume=var(accent)
-  a_var_raw=var(--my-design-token)
+  a_plume_var=--accent
   a_rgb=rgb(255, 100, 50)
   a_rgba=rgba(255, 100, 50, 0.5)
   a_hsl=hsl(120, 50, 50)

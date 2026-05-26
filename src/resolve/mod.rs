@@ -515,6 +515,11 @@ mod tests {
         resolve(file).expect("resolve")
     }
 
+    fn parse_str(src: &str) -> crate::ast::File {
+        let tokens = crate::lexer::lex(src).expect("lex");
+        crate::parser::parse(&tokens).expect("parse")
+    }
+
     #[test]
     fn marker_order_marker_before_marker_end() {
         // marker=arrow (sets both), then marker-end=dot (overrides end only).
@@ -563,12 +568,12 @@ mod tests {
     }
 
     #[test]
-    fn var_ref_to_layout_var_carries_baked_value() {
-        // A scene attr that references a layout var should resolve to LiveVar
+    fn plume_var_to_layout_var_carries_baked_value() {
+        // SPEC §11.2: `--name` referencing a layout var resolves to LiveVar
         // with the baked numeric value attached.
         let p = resolve_str(
             "defaults { gap=25 }\n\
-             scene padding=var(gap) { :rect \"x\" }\n",
+             scene padding=--gap { :rect \"x\" }\n",
         );
         let padding = p.scene.attrs.get("padding").expect("padding attr");
         match padding {
@@ -585,8 +590,8 @@ mod tests {
     }
 
     #[test]
-    fn var_ref_to_visual_var_has_no_baked() {
-        let p = resolve_str("scene { a :rect \"X\" fill=var(accent) }\n");
+    fn plume_var_to_visual_var_has_no_baked() {
+        let p = resolve_str("scene { a :rect \"X\" fill=--accent }\n");
         let a = &p.scene.nodes[0];
         let fill = a.attrs.get("fill").expect("fill attr");
         match fill {
@@ -600,16 +605,16 @@ mod tests {
     }
 
     #[test]
-    fn raw_css_var_passthrough() {
-        let p = resolve_str("scene { a :rect \"X\" fill=var(--my-token) }\n");
-        let a = &p.scene.nodes[0];
-        let fill = a.attrs.get("fill").expect("fill attr");
-        match fill {
-            ResolvedValue::LiveVar { name, raw, .. } => {
-                assert_eq!(name, "my-token");
-                assert!(*raw);
-            }
-            other => panic!("expected LiveVar, got {:?}", other),
+    fn legacy_var_function_call_errors() {
+        // var() is no longer a function in v1; users should see a helpful error.
+        let result = crate::resolve::resolve(parse_str("scene { :rect fill=var(accent) }\n"));
+        match result {
+            Err(e) => assert!(
+                e.message.contains("var() is no longer"),
+                "got: {}",
+                e.message
+            ),
+            Ok(_) => panic!("expected var() to be rejected"),
         }
     }
 

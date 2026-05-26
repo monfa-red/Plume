@@ -1,14 +1,19 @@
 mod ast;
 mod error;
+mod fmt;
 mod layout;
 mod lexer;
+mod lint;
 mod parser;
 mod render;
 mod resolve;
+mod serve;
 mod span;
 mod theme;
 
-pub use error::Error;
+pub use error::{Diagnostic, Error, Level};
+pub use fmt::format as format_source;
+pub use serve::serve;
 pub use theme::extract_plume_vars;
 
 use std::path::Path;
@@ -74,6 +79,14 @@ pub fn check_parse(src: &str) -> Result<(), Error> {
     let tokens = lexer::lex(src)?;
     let _file = parser::parse(&tokens)?;
     Ok(())
+}
+
+/// Lex, parse, and run the lint pass. Returns warnings (no errors).
+/// Parse errors are surfaced as `Err`; missing lints just return an empty Vec.
+pub fn lint_str(src: &str) -> Result<Vec<Diagnostic>, Error> {
+    let tokens = lexer::lex(src)?;
+    let file = parser::parse(&tokens)?;
+    Ok(lint::lint(&file))
 }
 
 /// Lex, parse, and resolve. Verifies semantic correctness without running

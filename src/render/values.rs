@@ -100,17 +100,6 @@ fn extract_num(v: &ResolvedValue) -> Option<f64> {
     }
 }
 
-pub fn attr_pair(attrs: &AttrMap, name: &str) -> Option<(f64, f64)> {
-    match attrs.get(name)? {
-        ResolvedValue::Tuple(items) if items.len() == 2 => {
-            let x = extract_num(&items[0])?;
-            let y = extract_num(&items[1])?;
-            Some((x, y))
-        }
-        _ => None,
-    }
-}
-
 pub fn attr_points(attrs: &AttrMap, name: &str) -> Option<Vec<(f64, f64)>> {
     match attrs.get(name)? {
         ResolvedValue::List(items) => {

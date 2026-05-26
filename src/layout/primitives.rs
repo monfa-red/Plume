@@ -104,22 +104,10 @@ fn geom_bbox(inst: &ResolvedInst, vars: &VarTable) -> Result<Bbox, Error> {
         | ShapeKind::Cyl
         | ShapeKind::Diamond
         | ShapeKind::Cloud
-        | ShapeKind::Hex => {
+        | ShapeKind::Hex
+        | ShapeKind::Oval => {
             let (w, h) = closed_shape_dims(inst, vars)?;
             Ok(Bbox::centered(w, h))
-        }
-        ShapeKind::Oval => {
-            // :circle template sugars `r=N` → rx=ry=N. We accept either form.
-            let r = attr_num(attrs, "r");
-            let rx = r
-                .or_else(|| attr_num(attrs, "rx"))
-                .or_else(|| layout_var(vars, "oval-rx"))
-                .unwrap_or(30.0);
-            let ry = r
-                .or_else(|| attr_num(attrs, "ry"))
-                .or_else(|| layout_var(vars, "oval-ry"))
-                .unwrap_or(20.0);
-            Ok(Bbox::centered(rx * 2.0, ry * 2.0))
         }
         ShapeKind::Text => {
             let size = attr_num(attrs, "size")
@@ -131,24 +119,19 @@ fn geom_bbox(inst: &ResolvedInst, vars: &VarTable) -> Result<Bbox, Error> {
             Ok(Bbox::centered(w, h))
         }
         ShapeKind::Line | ShapeKind::Arrow => {
-            let from = attr_pair(attrs, "from", inst.span)?.ok_or_else(|| {
+            let points = attr_points(attrs, "points", inst.span)?.ok_or_else(|| {
                 Error::at(
                     inst.span,
-                    format!("':{}' requires 'from'", inst.shape.as_str()),
+                    format!("':{}' requires 'points'", inst.shape.as_str()),
                 )
             })?;
-            let to = attr_pair(attrs, "to", inst.span)?.ok_or_else(|| {
-                Error::at(
+            if points.len() < 2 {
+                return Err(Error::at(
                     inst.span,
-                    format!("':{}' requires 'to'", inst.shape.as_str()),
-                )
-            })?;
-            Ok(Bbox {
-                min_x: from.0.min(to.0),
-                min_y: from.1.min(to.1),
-                max_x: from.0.max(to.0),
-                max_y: from.1.max(to.1),
-            })
+                    format!("':{}' requires at least 2 points", inst.shape.as_str()),
+                ));
+            }
+            Ok(bounding_box(&points))
         }
         ShapeKind::Icon => {
             let size = attr_num(attrs, "size")
@@ -157,10 +140,8 @@ fn geom_bbox(inst: &ResolvedInst, vars: &VarTable) -> Result<Bbox, Error> {
             Ok(Bbox::centered(size, size))
         }
         ShapeKind::Image => {
-            let w = attr_num(attrs, "w")
-                .ok_or_else(|| Error::at(inst.span, "':image' requires 'w'"))?;
-            let h = attr_num(attrs, "h")
-                .ok_or_else(|| Error::at(inst.span, "':image' requires 'h'"))?;
+            let (w, h) = read_size(attrs, inst.span)?
+                .ok_or_else(|| Error::at(inst.span, "':image' requires 'size'"))?;
             Ok(Bbox::centered(w, h))
         }
         ShapeKind::Poly => {
@@ -169,41 +150,65 @@ fn geom_bbox(inst: &ResolvedInst, vars: &VarTable) -> Result<Bbox, Error> {
             if points.len() < 3 {
                 return Err(Error::at(inst.span, "':poly' requires at least 3 points"));
             }
-            let mut bb = Bbox {
-                min_x: f64::INFINITY,
-                min_y: f64::INFINITY,
-                max_x: f64::NEG_INFINITY,
-                max_y: f64::NEG_INFINITY,
-            };
-            for (x, y) in &points {
-                bb.min_x = bb.min_x.min(*x);
-                bb.min_y = bb.min_y.min(*y);
-                bb.max_x = bb.max_x.max(*x);
-                bb.max_y = bb.max_y.max(*y);
-            }
-            Ok(bb)
+            Ok(bounding_box(&points))
         }
         ShapeKind::Path => {
             // Native top-left coords (§6 rule 5). Real bbox needs SVG path
-            // parsing; Sprint 3 returns a zero bbox and Sprint 5 will fill in.
+            // parsing; v1 returns a zero bbox.
             Ok(Bbox::empty())
         }
     }
 }
 
+/// Read the `size=` attr in its two forms: `size=N` (scalar = square) or
+/// `size=(w, h)` (tuple = rectangle). Returns `Ok(None)` if absent.
+pub fn read_size(attrs: &AttrMap, span: Span) -> Result<Option<(f64, f64)>, Error> {
+    use crate::resolve::ResolvedValue;
+    match attrs.get("size") {
+        None => Ok(None),
+        Some(ResolvedValue::Number(n)) => Ok(Some((*n, *n))),
+        Some(ResolvedValue::LiveVar { baked: Some(b), .. }) => match b.as_ref() {
+            ResolvedValue::Number(n) => Ok(Some((*n, *n))),
+            ResolvedValue::Tuple(_) => Ok(Some(as_pair(b, span)?)),
+            _ => Err(Error::at(span, "'size' must be a number or (w, h) tuple")),
+        },
+        Some(v) => Ok(Some(as_pair(v, span)?)),
+    }
+}
+
 fn closed_shape_dims(inst: &ResolvedInst, vars: &VarTable) -> Result<(f64, f64), Error> {
-    let attrs = &inst.attrs;
-    let w = attr_num(attrs, "w");
-    let h = attr_num(attrs, "h");
+    if let Some(dims) = read_size(&inst.attrs, inst.span)? {
+        return Ok(dims);
+    }
     let (default_w, default_h) = match inst.shape {
         ShapeKind::Rect | ShapeKind::Slant => (
             layout_var(vars, "rect-w").unwrap_or(100.0),
             layout_var(vars, "rect-h").unwrap_or(40.0),
         ),
+        ShapeKind::Oval => (
+            layout_var(vars, "oval-w").unwrap_or(60.0),
+            layout_var(vars, "oval-h").unwrap_or(40.0),
+        ),
         ShapeKind::Hex | ShapeKind::Cyl | ShapeKind::Diamond | ShapeKind::Cloud => (60.0, 60.0),
         _ => (0.0, 0.0),
     };
-    Ok((w.unwrap_or(default_w), h.unwrap_or(default_h)))
+    Ok((default_w, default_h))
+}
+
+fn bounding_box(points: &[(f64, f64)]) -> Bbox {
+    let mut bb = Bbox {
+        min_x: f64::INFINITY,
+        min_y: f64::INFINITY,
+        max_x: f64::NEG_INFINITY,
+        max_y: f64::NEG_INFINITY,
+    };
+    for (x, y) in points {
+        bb.min_x = bb.min_x.min(*x);
+        bb.min_y = bb.min_y.min(*y);
+        bb.max_x = bb.max_x.max(*x);
+        bb.max_y = bb.max_y.max(*y);
+    }
+    bb
 }
 
 fn stroke_half(inst: &ResolvedInst, vars: &VarTable) -> f64 {
@@ -227,14 +232,11 @@ fn extract_num(v: &ResolvedValue) -> Option<f64> {
     }
 }
 
-fn attr_pair(attrs: &AttrMap, name: &str, span: Span) -> Result<Option<(f64, f64)>, Error> {
-    match attrs.get(name) {
-        Some(v) => Ok(Some(as_pair(v, span)?)),
-        None => Ok(None),
-    }
-}
-
-fn attr_points(attrs: &AttrMap, name: &str, span: Span) -> Result<Option<Vec<(f64, f64)>>, Error> {
+pub fn attr_points(
+    attrs: &AttrMap,
+    name: &str,
+    span: Span,
+) -> Result<Option<Vec<(f64, f64)>>, Error> {
     match attrs.get(name) {
         Some(ResolvedValue::List(items)) => {
             let mut out = Vec::with_capacity(items.len());

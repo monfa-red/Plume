@@ -1,63 +1,63 @@
 ---
 source: tests/conformance.rs
-assertion_line: 27
+assertion_line: 26
 expression: svg
 input_file: samples/table.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-62.525 -323.7 125.05 647.4" width="125.05" height="647.4" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-190.5 -82.5 381 165" width="381" height="165" class="plume">
   <defs/>
   <g class="plume-scene">
     <g class="plume-node plume-shape-table plume-shape-group plume-shape-rect" data-id="specs" transform="translate(0,0)">
-      <rect x="-42.025" y="-303.2" width="84.05" height="606.4" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,-278.4)">
+      <rect x="-170" y="-62" width="340" height="124" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(-130,-48)">
         <rect x="-41.525" y="-24.3" width="83.05" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Voltage</text>
         </g>
       </g>
-      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,-208.8)">
+      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,-48)">
         <rect x="-41.525" y="-24.3" width="83.05" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Current</text>
         </g>
       </g>
-      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,-139.2)">
+      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(130,-48)">
         <rect x="-34.375" y="-24.3" width="68.75" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Power</text>
         </g>
       </g>
-      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,-69.6)">
+      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(-130,0)">
         <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">48 V</text>
         </g>
       </g>
-      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,-0)">
+      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,0)">
         <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">20 A</text>
         </g>
       </g>
-      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,69.6)">
+      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(130,0)">
         <rect x="-34.375" y="-24.3" width="68.75" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">960 W</text>
         </g>
       </g>
-      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,139.2)">
+      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(-130,48)">
         <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">24 V</text>
         </g>
       </g>
-      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,208.8)">
+      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,48)">
         <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">10 A</text>
         </g>
       </g>
-      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,278.4)">
+      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(130,48)">
         <rect x="-34.375" y="-24.3" width="68.75" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">240 W</text>

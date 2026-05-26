@@ -149,32 +149,25 @@ fn lay_out_container_children(
         }
     }
 
-    // Lay out the flow children per the container's layout attr.
-    let layout_mode = container_attrs
-        .get("layout")
-        .and_then(|v| match v {
-            ResolvedValue::Ident(s) => Some(s.as_str()),
-            _ => None,
-        })
-        .unwrap_or("column");
+    // Lay out the flow children per the container's `layout=` attr.
+    let mode = read_layout_mode(container_attrs, span)?;
 
     let flow_bbox = if !flow_indices.is_empty() {
         let mut flow_children: Vec<PlacedNode> =
             flow_indices.iter().map(|i| children[*i].clone()).collect();
-        let bbox = match layout_mode {
-            "row" => {
+        let bbox = match mode {
+            LayoutMode::Row => {
                 flex::lay_out_flex(Axis::Row, &mut flow_children, container_attrs, vars, span)?
             }
-            "column" => flex::lay_out_flex(
+            LayoutMode::Column => flex::lay_out_flex(
                 Axis::Column,
                 &mut flow_children,
                 container_attrs,
                 vars,
                 span,
             )?,
-            "grid" => grid::lay_out_grid(&mut flow_children, container_attrs, vars, span)?,
-            other => {
-                return Err(Error::at(span, format!("unknown layout '{}'", other)));
+            LayoutMode::Grid(cols, rows) => {
+                grid::lay_out_grid(&mut flow_children, cols, rows, container_attrs, vars, span)?
             }
         };
         for (slot, placed) in flow_indices.iter().zip(flow_children.into_iter()) {
@@ -228,23 +221,86 @@ fn lay_out_container_children(
     Ok(union)
 }
 
-/// If the container has explicit w/h, return a centered bbox of that size
-/// (including stroke contribution).
-fn explicit_size(inst: &ResolvedInst, vars: &VarTable) -> Result<Option<Bbox>, Error> {
-    let w = inst.attrs.get("w").and_then(extract_num);
-    let h = inst.attrs.get("h").and_then(extract_num);
-    if let (Some(w), Some(h)) = (w, h) {
-        let stroke = inst
-            .attrs
-            .get("thickness")
-            .and_then(extract_num)
-            .or_else(|| values::layout_var(vars, "thickness"))
-            .unwrap_or(1.0)
-            / 2.0;
-        Ok(Some(Bbox::centered(w, h).inflate(stroke)))
-    } else {
-        Ok(None)
+/// Container layout mode, parsed from the `layout=` attr.
+#[derive(Clone, Copy, Debug)]
+enum LayoutMode {
+    Row,
+    Column,
+    /// `layout=(cols, rows)` — 2D grid with the given dimensions.
+    Grid(usize, usize),
+}
+
+fn read_layout_mode(attrs: &crate::resolve::AttrMap, span: Span) -> Result<LayoutMode, Error> {
+    match attrs.get("layout") {
+        None => Ok(LayoutMode::Column),
+        Some(ResolvedValue::Ident(s)) => match s.as_str() {
+            "row" => Ok(LayoutMode::Row),
+            "column" => Ok(LayoutMode::Column),
+            other => Err(Error::at(
+                span,
+                format!(
+                    "unknown layout '{}' — expected 'row', 'column', or (cols, rows)",
+                    other
+                ),
+            )),
+        },
+        Some(ResolvedValue::Tuple(items)) if items.len() == 2 => {
+            let cols = positive_int(&items[0], span, "layout.cols")?;
+            let rows = positive_int(&items[1], span, "layout.rows")?;
+            Ok(LayoutMode::Grid(cols, rows))
+        }
+        Some(_) => Err(Error::at(
+            span,
+            "layout= expects 'row', 'column', or a (cols, rows) tuple",
+        )),
     }
+}
+
+fn positive_int(v: &ResolvedValue, span: Span, what: &str) -> Result<usize, Error> {
+    let n = match v {
+        ResolvedValue::Number(n) => *n,
+        ResolvedValue::LiveVar { baked: Some(b), .. } => match b.as_ref() {
+            ResolvedValue::Number(n) => *n,
+            _ => {
+                return Err(Error::at(
+                    span,
+                    format!("{} must be a positive integer", what),
+                ))
+            }
+        },
+        _ => {
+            return Err(Error::at(
+                span,
+                format!("{} must be a positive integer", what),
+            ))
+        }
+    };
+    if n < 1.0 || n.fract() != 0.0 {
+        return Err(Error::at(
+            span,
+            format!("{} must be a positive integer, got {}", what, n),
+        ));
+    }
+    Ok(n as usize)
+}
+
+/// If a closed shape sets `size=` explicitly, use its geometric bbox
+/// (with stroke padding); otherwise fall through to content-driven sizing.
+fn explicit_size(inst: &ResolvedInst, vars: &VarTable) -> Result<Option<Bbox>, Error> {
+    let accepts_size = matches!(
+        inst.shape,
+        ShapeKind::Rect
+            | ShapeKind::Slant
+            | ShapeKind::Hex
+            | ShapeKind::Cyl
+            | ShapeKind::Diamond
+            | ShapeKind::Cloud
+            | ShapeKind::Oval
+    );
+    if !accepts_size || inst.attrs.get("size").is_none() {
+        return Ok(None);
+    }
+    Ok(Some(primitives::leaf_bbox(inst, vars)?))
 }
 
 fn extract_num(v: &ResolvedValue) -> Option<f64> {
@@ -255,13 +311,29 @@ fn extract_num(v: &ResolvedValue) -> Option<f64> {
     }
 }
 
-/// If the container declared explicit `w` and `h`, return the bbox children's
-/// anchors should resolve against (centered on local origin, no stroke pad —
-/// anchors live on the drawn shape's edges).
+/// If the container declared explicit `size=`, return a bbox the children's
+/// anchors should resolve against (no stroke pad — anchors live on the drawn
+/// shape's edges).
 fn container_anchor_bbox(attrs: &crate::resolve::AttrMap) -> Option<Bbox> {
-    let w = attrs.get("w").and_then(extract_num)?;
-    let h = attrs.get("h").and_then(extract_num)?;
+    let (w, h) = read_size_loose(attrs)?;
     Some(Bbox::centered(w, h))
+}
+
+fn read_size_loose(attrs: &crate::resolve::AttrMap) -> Option<(f64, f64)> {
+    let v = attrs.get("size")?;
+    match v {
+        ResolvedValue::Number(n) => Some((*n, *n)),
+        ResolvedValue::Tuple(items) if items.len() == 2 => {
+            let w = extract_num(&items[0])?;
+            let h = extract_num(&items[1])?;
+            Some((w, h))
+        }
+        ResolvedValue::LiveVar { baked: Some(b), .. } => match b.as_ref() {
+            ResolvedValue::Number(n) => Some((*n, *n)),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 // ───────────────────────────── Tests ─────────────────────────────
@@ -278,8 +350,8 @@ mod tests {
     }
 
     #[test]
-    fn rect_with_explicit_dims_keeps_those_dims() {
-        let l = lay_out("scene { :rect w=200 h=80 }\n");
+    fn rect_with_explicit_size_keeps_those_dims() {
+        let l = lay_out("scene { :rect size=(200, 80) }\n");
         let n = &l.nodes[0];
         // bbox includes stroke contribution of thickness/2 each side (= 0.5).
         assert!((n.bbox.w() - 201.0).abs() < 0.01, "bbox.w={}", n.bbox.w());
@@ -300,10 +372,27 @@ mod tests {
     }
 
     #[test]
-    fn oval_uses_rx_ry() {
-        let l = lay_out("scene { :oval rx=50 ry=25 }\n");
+    fn rect_with_size_and_text_overrides_auto_size() {
+        let l = lay_out("scene { :rect \"hello\" size=(200, 40) }\n");
         let n = &l.nodes[0];
-        // Oval bbox = 2*rx by 2*ry, plus stroke.
+        assert!((n.bbox.w() - 201.0).abs() < 0.01, "bbox.w={}", n.bbox.w());
+        assert!((n.bbox.h() - 41.0).abs() < 0.01, "bbox.h={}", n.bbox.h());
+    }
+
+    #[test]
+    fn rect_with_scalar_size() {
+        // `size=N` = N × N square.
+        let l = lay_out("scene { :rect \"sq\" size=100 }\n");
+        let n = &l.nodes[0];
+        assert!((n.bbox.w() - 101.0).abs() < 0.01, "bbox.w={}", n.bbox.w());
+        assert!((n.bbox.h() - 101.0).abs() < 0.01, "bbox.h={}", n.bbox.h());
+    }
+
+    #[test]
+    fn oval_uses_size() {
+        // Bbox semantics: size=(60, 40) means a 60×40 ellipse (rx=30 ry=20).
+        let l = lay_out("scene { :oval size=(100, 50) }\n");
+        let n = &l.nodes[0];
         assert!((n.bbox.w() - 101.0).abs() < 0.01);
         assert!((n.bbox.h() - 51.0).abs() < 0.01);
     }
@@ -312,17 +401,14 @@ mod tests {
     fn row_layout_stacks_horizontally() {
         let l = lay_out(
             "scene layout=row gap=10 {\n\
-               :rect w=100 h=40\n\
-               :rect w=60 h=40\n\
+               :rect size=(100, 40)\n\
+               :rect size=(60, 40)\n\
              }\n",
         );
         assert_eq!(l.nodes.len(), 2);
-        // Two rects + 10 gap = 100 + 10 + 60 = 170 total; centered on origin
-        // means cx ≈ -35 for first, +50 for second (approx; depends on stroke).
         let dx = l.nodes[1].cx - l.nodes[0].cx;
         // gap (10) + 100/2 + 60/2 (centers) = 10 + 80 = 90; allow stroke
         assert!((dx - 90.0).abs() < 2.0, "dx={}", dx);
-        // Cross axis same.
         assert!((l.nodes[0].cy - l.nodes[1].cy).abs() < 0.01);
     }
 
@@ -330,8 +416,8 @@ mod tests {
     fn column_layout_stacks_vertically() {
         let l = lay_out(
             "scene layout=column gap=20 {\n\
-               :rect w=100 h=40\n\
-               :rect w=100 h=60\n\
+               :rect size=(100, 40)\n\
+               :rect size=(100, 60)\n\
              }\n",
         );
         let dy = l.nodes[1].cy - l.nodes[0].cy;
@@ -341,24 +427,36 @@ mod tests {
     }
 
     #[test]
-    fn grid_places_by_col_row() {
+    fn grid_cells_default_to_center_alignment() {
+        // SPEC §5: grid cells default to h=center v=center for their content.
         let l = lay_out(
-            "scene layout=grid cols=3 gap=20 {\n\
-               :rect w=80 h=40 col=1 row=1\n\
-               :rect w=80 h=40 col=3 row=1\n\
-               :rect w=80 h=40 col=2 row=2\n\
+            "scene layout=(2, 1) col-widths=[200, 200] row-heights=100 gap=0 {\n\
+               a :rect size=(40, 40) cell=(1, 1)\n\
+               b :rect size=(40, 40) cell=(2, 1)\n\
+             }\n",
+        );
+        let dx = l.nodes[1].cx - l.nodes[0].cx;
+        assert!((dx - 200.0).abs() < 0.01, "dx={}", dx);
+        assert!((l.nodes[0].cy - l.nodes[1].cy).abs() < 0.01);
+    }
+
+    #[test]
+    fn grid_places_by_cell() {
+        let l = lay_out(
+            "scene layout=(3, 2) gap=20 {\n\
+               :rect size=(80, 40) cell=(1, 1)\n\
+               :rect size=(80, 40) cell=(3, 1)\n\
+               :rect size=(80, 40) cell=(2, 2)\n\
              }\n",
         );
         assert_eq!(l.nodes.len(), 3);
-        // Verify horizontal ordering of cols.
         assert!(l.nodes[0].cx < l.nodes[1].cx);
-        // Verify second-row node is below first-row nodes.
         assert!(l.nodes[2].cy > l.nodes[0].cy);
     }
 
     #[test]
     fn at_coord_places_absolutely() {
-        let l = lay_out("scene { :rect w=40 h=40 at=(100, 50) }\n");
+        let l = lay_out("scene { :rect size=(40, 40) at=(100, 50) }\n");
         let n = &l.nodes[0];
         assert!((n.cx - 100.0).abs() < 0.01, "cx={}", n.cx);
         assert!((n.cy - 50.0).abs() < 0.01, "cy={}", n.cy);
@@ -366,7 +464,7 @@ mod tests {
 
     #[test]
     fn viewbox_wraps_content_with_canvas_pad() {
-        let l = lay_out("scene { :rect w=100 h=40 }\n");
+        let l = lay_out("scene { :rect size=(100, 40) }\n");
         // canvas-pad defaults to 20. Content is 101 × 41 (stroke).
         assert!((l.viewbox.w - 141.0).abs() < 0.01, "w={}", l.viewbox.w);
         assert!((l.viewbox.h - 81.0).abs() < 0.01, "h={}", l.viewbox.h);
@@ -374,16 +472,14 @@ mod tests {
 
     #[test]
     fn defaults_override_layout_var_changes_layout_math() {
-        // Override gap default. Two children should now sit 60 apart, not 20.
         let l = lay_out(
             "defaults { gap=60 }\n\
              scene layout=row {\n\
-               :rect w=40 h=40\n\
-               :rect w=40 h=40\n\
+               :rect size=(40, 40)\n\
+               :rect size=(40, 40)\n\
              }\n",
         );
         let dx = l.nodes[1].cx - l.nodes[0].cx;
-        // 60 gap + 20 + 20 (half widths) = 100
         assert!((dx - 100.0).abs() < 2.0, "dx={}", dx);
     }
 
@@ -391,8 +487,8 @@ mod tests {
     fn wire_between_two_rects_produces_path() {
         let l = lay_out(
             "scene layout=row gap=80 {\n\
-               a :rect w=60 h=40\n\
-               b :rect w=60 h=40\n\
+               a :rect size=(60, 40)\n\
+               b :rect size=(60, 40)\n\
              }\n\
              wires { a -> b }\n",
         );
@@ -425,8 +521,8 @@ mod tests {
     fn auto_edge_picks_right_when_target_to_the_right() {
         let l = lay_out(
             "scene layout=row gap=80 {\n\
-               a :rect w=60 h=40\n\
-               b :rect w=60 h=40\n\
+               a :rect size=(60, 40)\n\
+               b :rect size=(60, 40)\n\
              }\n\
              wires { a -> b }\n",
         );
@@ -449,8 +545,8 @@ mod tests {
         // Forcing source's left edge even though target is to the right.
         let l = lay_out(
             "scene layout=row gap=80 {\n\
-               a :rect w=60 h=40\n\
-               b :rect w=60 h=40\n\
+               a :rect size=(60, 40)\n\
+               b :rect size=(60, 40)\n\
              }\n\
              wires { a[left] -> b }\n",
         );
@@ -467,8 +563,8 @@ mod tests {
     fn wire_label_lands_on_path() {
         let l = lay_out(
             "scene layout=row gap=80 {\n\
-               a :rect w=60 h=40\n\
-               b :rect w=60 h=40\n\
+               a :rect size=(60, 40)\n\
+               b :rect size=(60, 40)\n\
              }\n\
              wires { a -> b \"CAN\" }\n",
         );

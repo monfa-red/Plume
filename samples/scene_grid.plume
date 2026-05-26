@@ -7,8 +7,8 @@ shapes {
   bus :slant
 }
 
-scene layout=grid cols=3 gap=40 padding=20 {
-  outlet :oval "Outlet 120-240 VAC" col=1
-  drive  :psu  "Drive PSU"          col=2 .bold
-  bus48  :bus  "Bus"                col=3
+scene layout=(3, 1) gap=40 padding=20 {
+  outlet :oval "Outlet 120-240 VAC" cell=(1, 1)
+  drive  :psu  "Drive PSU"          cell=(2, 1) .bold
+  bus48  :bus  "Bus"                cell=(3, 1)
 }

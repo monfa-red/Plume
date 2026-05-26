@@ -47,7 +47,7 @@ pub fn built_in_defaults() -> VarTable {
         }),
     );
 
-    // Layout vars — baked at compile time.
+    // Layout vars — baked at compile time. SPEC §11.1.
     set_layout_n(&mut t, "text-size", 13.0);
     set_layout_n(&mut t, "text-pad", 16.0);
     set_layout_n(&mut t, "gap", 20.0);
@@ -56,9 +56,9 @@ pub fn built_in_defaults() -> VarTable {
     set_layout_n(&mut t, "radius", 0.0);
     set_layout_n(&mut t, "rect-w", 100.0);
     set_layout_n(&mut t, "rect-h", 40.0);
-    set_layout_n(&mut t, "oval-rx", 30.0);
-    set_layout_n(&mut t, "oval-ry", 20.0);
-    set_layout_n(&mut t, "circle-r", 20.0);
+    set_layout_n(&mut t, "oval-w", 60.0);
+    set_layout_n(&mut t, "oval-h", 40.0);
+    set_layout_n(&mut t, "circle-size", 40.0);
     set_layout_n(&mut t, "arrow-head", 10.0);
     set_layout_n(&mut t, "icon-size", 24.0);
     set_layout_n(&mut t, "canvas-pad", 20.0);
@@ -149,9 +149,10 @@ fn convert_value(v: &crate::ast::Value) -> Option<ResolvedValue> {
                 args,
             })
         }
-        // Raw `--name` CSS vars can't appear at value top level; theme values
-        // referencing one would error.
-        Value::RawCssVar(_) => return None,
+        // Theme values referencing `--name` are uncommon; treat as identifier
+        // for stringification purposes (the var system will resolve them when
+        // referenced from Plume source).
+        Value::RawCssVar(name) => ResolvedValue::Ident(format!("--{}", name)),
     })
 }
 
@@ -194,53 +195,39 @@ pub fn resolve_value(value: &Value, table: &VarTable) -> Result<ResolvedValue, E
             ResolvedValue::List(out)
         }
         Value::Call(call) => resolve_call(call, table)?,
-        Value::RawCssVar(_) => {
-            unreachable!("parser rejects raw css var outside var()");
+        Value::RawCssVar(name) => {
+            // SPEC §11.2: `--name` refers to `--plume-name`. Layout vars bake
+            // their value; visual vars stay live for runtime CSS.
+            let baked = match table.get(name) {
+                Some(VarEntry {
+                    kind: VarKind::Layout,
+                    value,
+                }) => Some(Box::new(value.clone())),
+                _ => None,
+            };
+            ResolvedValue::LiveVar {
+                name: name.clone(),
+                raw: false,
+                baked,
+            }
         }
     })
 }
 
 fn resolve_call(call: &FnCall, table: &VarTable) -> Result<ResolvedValue, Error> {
+    // SPEC v1 drops the `var(...)` function. Authors write `--name` directly.
     if call.name == "var" {
-        if call.args.len() != 1 {
-            return Err(Error::at(
-                call.span,
-                format!("var() expects 1 argument, got {}", call.args.len()),
-            ));
-        }
-        match &call.args[0] {
-            Value::Ident(name) => {
-                let baked = match table.get(name) {
-                    Some(VarEntry {
-                        kind: VarKind::Layout,
-                        value,
-                    }) => Some(Box::new(value.clone())),
-                    _ => None,
-                };
-                Ok(ResolvedValue::LiveVar {
-                    name: name.clone(),
-                    raw: false,
-                    baked,
-                })
-            }
-            Value::RawCssVar(name) => Ok(ResolvedValue::LiveVar {
-                name: name.clone(),
-                raw: true,
-                baked: None,
-            }),
-            _ => Err(Error::at(
-                call.span,
-                "var() argument must be an identifier or --css-var",
-            )),
-        }
-    } else {
-        let mut args = Vec::with_capacity(call.args.len());
-        for arg in &call.args {
-            args.push(resolve_value(arg, table)?);
-        }
-        Ok(ResolvedValue::Call(ResolvedCall {
-            name: call.name.clone(),
-            args,
-        }))
+        return Err(Error::at(
+            call.span,
+            "var() is no longer a function — write '--name' directly to reference a Plume CSS var",
+        ));
     }
+    let mut args = Vec::with_capacity(call.args.len());
+    for arg in &call.args {
+        args.push(resolve_value(arg, table)?);
+    }
+    Ok(ResolvedValue::Call(ResolvedCall {
+        name: call.name.clone(),
+        args,
+    }))
 }

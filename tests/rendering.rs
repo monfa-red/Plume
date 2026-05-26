@@ -45,7 +45,7 @@ fn defaults_override_baked_into_output() {
     // Override accent in defaults — bake mode should pick up the new value.
     let svg = render_baked(
         "defaults { accent=#ff00aa }\n\
-         scene { :rect \"x\" fill=var(accent) }\n",
+         scene { :rect \"x\" fill=--accent }\n",
     );
     assert!(svg.contains("fill=\"#ff00aa\""), "{}", svg);
 }
@@ -75,38 +75,38 @@ fn auto_classes_include_user_shape_chain() {
 
 #[test]
 fn hex_emits_polygon() {
-    let svg = render_live("scene { :hex w=60 h=60 }\n");
+    let svg = render_live("scene { :hex size=(60, 60) }\n");
     assert!(svg.contains("<polygon"), "{}", svg);
 }
 
 #[test]
 fn diamond_emits_polygon() {
-    let svg = render_live("scene { :diamond w=60 h=60 }\n");
+    let svg = render_live("scene { :diamond size=(60, 60) }\n");
     assert!(svg.contains("<polygon"), "{}", svg);
 }
 
 #[test]
 fn slant_emits_polygon_with_skew() {
-    let svg = render_live("scene { :slant w=80 h=40 skew=20 }\n");
+    let svg = render_live("scene { :slant size=(80, 40) skew=20 }\n");
     assert!(svg.contains("<polygon"), "{}", svg);
 }
 
 #[test]
 fn oval_emits_ellipse() {
-    let svg = render_live("scene { :oval rx=40 ry=20 }\n");
+    let svg = render_live("scene { :oval size=(80, 40) }\n");
     assert!(svg.contains("<ellipse"), "{}", svg);
 }
 
 #[test]
 fn cyl_emits_ellipse_and_path() {
-    let svg = render_live("scene { :cyl w=60 h=80 }\n");
+    let svg = render_live("scene { :cyl size=(60, 80) }\n");
     assert!(svg.contains("<ellipse"), "{}", svg);
     assert!(svg.contains("<path"), "{}", svg);
 }
 
 #[test]
 fn cloud_emits_path() {
-    let svg = render_live("scene { :cloud w=100 h=60 }\n");
+    let svg = render_live("scene { :cloud size=(100, 60) }\n");
     assert!(svg.contains("<path"), "{}", svg);
 }
 

@@ -1,18 +1,18 @@
 // Exercises every built-in template (SPEC §8).
 
-scene layout=grid cols=5 gap=20 padding=20 {
-  :group  "group"   col=1 row=1
-  :circle "circle"  r=25  col=2 row=1
-  :badge  "badge"   col=3 row=1
-  :button "button"  col=4 row=1
-  :card   "card"    col=5 row=1
+scene layout=(5, 2) gap=20 padding=20 {
+  :group  "group"            cell=(1, 1)
+  :circle "circle" size=50   cell=(2, 1)
+  :badge  "badge"            cell=(3, 1)
+  :button "button"           cell=(4, 1)
+  :card   "card"             cell=(5, 1)
 
-  :note   "note"    col=1 row=2
-  :db     "db"      col=2 row=2
-  specs :table cols=2 col-widths=[60, 60] row-heights=24 col=3 row=2 {
+  :note   "note"             cell=(1, 2)
+  :db     "db"               cell=(2, 2)
+  specs :table layout=(2, 2) col-widths=[60, 60] row-heights=24 cell=(3, 2) {
     :cell "A"; :cell "B"
     :cell "C"; :cell "D"
   }
-  :cell   "cell"    col=4 row=2
-  :dim    from=(-30,0) to=(30,0) col=5 row=2
+  :cell "cell"               cell=(4, 2)
+  :dim  points=[(-30, 0), (30, 0)] cell=(5, 2)
 }

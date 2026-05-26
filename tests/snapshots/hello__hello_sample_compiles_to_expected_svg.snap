@@ -4,7 +4,7 @@ assertion_line: 5
 expression: svg
 ---
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-54.875 -44.8 109.75 89.6" width="109.75" height="89.6" class="plume">
-  <style>@layer plume.defaults { :root, .plume { --plume-accent: #0a84ff;  --plume-arrow-head: 10;  --plume-bg: white;  --plume-canvas-pad: 20;  --plume-circle-r: 20;  --plume-danger: crimson;  --plume-fg: #222;  --plume-fill: white;  --plume-font: "system-ui, -apple-system, sans-serif";  --plume-gap: 20;  --plume-icon-size: 24;  --plume-muted: #888;  --plume-note-bg: #fff9c4;  --plume-on-accent: white;  --plume-oval-rx: 30;  --plume-oval-ry: 20;  --plume-padding: 0;  --plume-radius: 0;  --plume-rect-h: 40;  --plume-rect-w: 100;  --plume-shadow: rgba(0, 0, 0, 0.2);  --plume-stroke: #444;  --plume-text-color: var(--plume-fg);  --plume-text-pad: 16;  --plume-text-size: 13;  --plume-thickness: 1;  --plume-warn: orange; } }</style>
+  <style>@layer plume.defaults { :root, .plume { --plume-accent: #0a84ff;  --plume-arrow-head: 10;  --plume-bg: white;  --plume-canvas-pad: 20;  --plume-circle-size: 40;  --plume-danger: crimson;  --plume-fg: #222;  --plume-fill: white;  --plume-font: "system-ui, -apple-system, sans-serif";  --plume-gap: 20;  --plume-icon-size: 24;  --plume-muted: #888;  --plume-note-bg: #fff9c4;  --plume-on-accent: white;  --plume-oval-h: 40;  --plume-oval-w: 60;  --plume-padding: 0;  --plume-radius: 0;  --plume-rect-h: 40;  --plume-rect-w: 100;  --plume-shadow: rgba(0, 0, 0, 0.2);  --plume-stroke: #444;  --plume-text-color: var(--plume-fg);  --plume-text-pad: 16;  --plume-text-size: 13;  --plume-thickness: 1;  --plume-warn: orange; } }</style>
   <defs/>
   <g class="plume-scene">
     <g class="plume-node plume-shape-rect" transform="translate(0,0)">

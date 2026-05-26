@@ -1,9 +1,9 @@
-// Bare attrs: `dashed`, `dotted`, `double`, `shadow` (SPEC §4).
-// Each expands to its tuple default — `dashed` → `dashed=(4,4)`, etc.
+// Visual modifiers that used to be "bare attrs" now take explicit values
+// (SPEC v1: every attr is `name=value`).
 
 scene layout=row gap=20 padding=20 {
-  :rect "dashed" w=80 h=40 dashed
-  :rect "dotted" w=80 h=40 dotted
-  :rect "double" w=80 h=40 double
-  :rect "shadow" w=80 h=40 shadow
+  :rect "dashed" size=(80, 40) stroke-style=dashed
+  :rect "dotted" size=(80, 40) stroke-style=dotted
+  :rect "double" size=(80, 40) double=4
+  :rect "shadow" size=(80, 40) shadow=(2, 2, 4)
 }
