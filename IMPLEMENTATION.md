@@ -29,11 +29,11 @@ Each phase has a clear contract:
 - `lex(&str) -> Result<Vec<Token>, Error>`
 - `parse(&[Token]) -> Result<File, Error>`
 - `resolve(File) -> Result<Program, Error>`
-- `layout(&Program) -> LaidOut`
-- `route(&LaidOut) -> Routed`
-- `render(&Routed) -> String`
+- `layout(&Program) -> Result<LaidOut, Error>`
+- `route(&LaidOut) -> Result<Routed, Error>`
+- `render(&Routed) -> Result<String, Error>`
 
-Errors bubble through `Result`. Layout/route don't fail (resolve has already validated).
+Every phase is fallible. Some §15 errors are inherently layout-time (`col=5 exceeds cols=3`, `col-widths` length mismatch, auto-size with neither dims nor text on a primitive that requires them); pre-validating them in resolve would duplicate work. No panics in the library path — surface invariants as errors.
 
 ---
 
@@ -197,13 +197,15 @@ Each sprint produces a working, committed artifact. Sprints are sized for ~2–5
 
 **Deliverables:**
 - Defaults table: built-in fallbacks ← `--theme FILE` (via `theme.rs`) ← `defaults {}` entries.
+- **`VarKind` split — first-class.** Every CSS variable is tagged `Layout` or `Visual` at registration time. Layout vars resolve to a concrete number/value during resolve so phase 3 can do math; visual vars stay as `var(--plume-name)` strings that emit verbatim. Using a `Visual` var in a layout-affecting attr is an error; using a `Layout` var in a visual attr resolves to its baked value but still emits the live reference so runtime CSS can theme it. Test: a `--theme` override of `--plume-gap` changes layout, while a runtime CSS override of `--plume-gap` does not (visual-only runtime path).
+- **Ordered attr storage.** Inline attrs on a node, wire, or primitive are stored as an ordered `Vec<(Key, Value)>` *until* §12 merging finalizes them. Required because marker resolution (§7) is source-order-sensitive: `marker=arrow marker-end=dot` and `marker-end=dot marker=arrow` produce different SVG. Merging collapses to a map only after the marker pass reads positions.
 - Styles symbol table with composition (`.other`) and cycle detection.
 - Shapes symbol table with `:base` resolution, attr merging, cycle + depth-16 detection.
 - Scene tree with each node's `:type` and `.style`s resolved, attrs merged per §12 specificity.
 - Wires list with referenced IDs resolved.
 - Errors per spec §15 for all forward-ref / cycle / unknown cases.
 
-**Definition of done:** the complete example in SPEC §20 resolves cleanly into the IR. All §15 error cases produce the documented messages.
+**Definition of done:** the complete example in SPEC §20 resolves cleanly into the IR. All §15 error cases produce the documented messages. Var-kind and marker-order tests in place.
 
 ### Sprint 3 — Layout (1 week — hardest sprint)
 
