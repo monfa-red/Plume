@@ -1,0 +1,39 @@
+---
+source: tests/conformance.rs
+assertion_line: 27
+expression: svg
+input_file: samples/markers_all.plume
+---
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-80.5 -73 161 146" width="161" height="146" class="plume">
+  <defs/>
+  <g class="plume-scene">
+    <g class="plume-node plume-shape-arrow" transform="translate(0,-52.5)">
+      <line x1="-60" y1="0" x2="60" y2="0" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="56,0 46,5 46,-5" fill="#444"/>
+    </g>
+    <g class="plume-node plume-shape-line" transform="translate(0,-31.5)">
+      <line x1="-60" y1="0" x2="60" y2="0" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-56,0 -46,-5 -46,5" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="56,0 46,5 46,-5" fill="#444"/>
+    </g>
+    <g class="plume-node plume-shape-line" transform="translate(0,-10.5)">
+      <line x1="-60" y1="0" x2="60" y2="0" stroke="#444" stroke-width="1"/>
+      <circle class="plume-marker plume-marker-dot" cx="-56" cy="0" r="3.3333" fill="#444"/>
+      <circle class="plume-marker plume-marker-dot" cx="56" cy="0" r="3.3333" fill="#444"/>
+    </g>
+    <g class="plume-node plume-shape-line" transform="translate(0,10.5)">
+      <line x1="-60" y1="0" x2="60" y2="0" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-diamond" points="56,0 51,4 46,0 51,-4" fill="#444"/>
+    </g>
+    <g class="plume-node plume-shape-line" transform="translate(0,31.5)">
+      <line x1="-60" y1="0" x2="60" y2="0" stroke="#444" stroke-width="1"/>
+      <path class="plume-marker plume-marker-crow" d="M 56 0 L 46 0 M 56 0 L 46 5 M 56 0 L 46 -5" stroke="#444" stroke-width="1" fill="none"/>
+    </g>
+    <g class="plume-node plume-shape-line" transform="translate(0,52.5)">
+      <line x1="-60" y1="0" x2="60" y2="0" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-56,0 -46,-5 -46,5" fill="#444"/>
+      <circle class="plume-marker plume-marker-dot" cx="56" cy="0" r="3.3333" fill="#444"/>
+    </g>
+  </g>
+  <g class="plume-wires"/>
+</svg>

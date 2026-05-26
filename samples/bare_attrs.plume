@@ -1,0 +1,9 @@
+// Bare attrs: `dashed`, `dotted`, `double`, `shadow` (SPEC §4).
+// Each expands to its tuple default — `dashed` → `dashed=(4,4)`, etc.
+
+scene layout=row gap=20 padding=20 {
+  :rect "dashed" w=80 h=40 dashed
+  :rect "dotted" w=80 h=40 dotted
+  :rect "double" w=80 h=40 double
+  :rect "shadow" w=80 h=40 shadow
+}

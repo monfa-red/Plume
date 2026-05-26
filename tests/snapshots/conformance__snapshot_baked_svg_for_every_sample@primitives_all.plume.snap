@@ -1,0 +1,78 @@
+---
+source: tests/conformance.rs
+assertion_line: 27
+expression: svg
+input_file: samples/primitives_all.plume
+---
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-212.8 -153 425.6 306" width="425.6" height="306" class="plume">
+  <defs/>
+  <g class="plume-scene">
+    <g class="plume-node plume-shape-rect" transform="translate(-152.3,-102.5)">
+      <rect x="-40" y="-20" width="80" height="40" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">rect</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-oval" transform="translate(-60.5,-102.5)">
+      <ellipse cx="0" cy="0" rx="40" ry="20" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">oval</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-hex" transform="translate(41.3,-102.5)">
+      <polygon points="-40,0 -20,-30 20,-30 40,0 20,30 -20,30" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">hex</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-slant" transform="translate(152.3,-102.5)">
+      <polygon points="-32.7206,-20 47.2794,-20 32.7206,20 -47.2794,20" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">slant</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-cyl" transform="translate(-152.3,-16.5)">
+      <path d="M -35 -28 L -35 28 A 35 7 0 0 0 35 28 L 35 -28 A 35 7 0 0 0 -35 -28 Z" fill="white" stroke="#444" stroke-width="1"/>
+      <ellipse cx="0" cy="-28" rx="35" ry="7" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">cyl</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-diamond" transform="translate(-60.5,-16.5)">
+      <polygon points="0,-30 30,0 0,30 -30,0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">diamond</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-cloud" transform="translate(41.3,-16.5)">
+      <path d="M -25 30 Q -45 30 -45 10 Q -45 -10 -25 -5 Q -20 -25 5 -15 Q 25 -25 25 -5 Q 45 0 45 20 Q 45 40 25 30 Z" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">cloud</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-poly" transform="translate(152.3,-16.5)">
+      <polygon points="0,-30 30,30 -30,30" fill="white" stroke="#444" stroke-width="1"/>
+    </g>
+    <g class="plume-node plume-shape-text" transform="translate(-152.3,55.5)">
+      <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">text</text>
+    </g>
+    <g class="plume-node plume-shape-line" transform="translate(-60.5,55.5)">
+      <line x1="-30" y1="0" x2="30" y2="0" stroke="#444" stroke-width="1"/>
+    </g>
+    <g class="plume-node plume-shape-arrow" transform="translate(41.3,55.5)">
+      <line x1="-30" y1="0" x2="30" y2="0" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="26,0 16,5 16,-5" fill="#444"/>
+    </g>
+    <g class="plume-node plume-shape-icon" transform="translate(152.3,55.5)">
+      <rect x="-16" y="-16" width="32" height="32" fill="none" stroke="#444" stroke-width="1"/>
+      <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="12.8" fill="#444">star</text>
+    </g>
+    <g class="plume-node plume-shape-path" transform="translate(-152.3,112.5)">
+      <path d="M -25 -15 Q 0 -35 25 -15 L 25 15 Q 0 35 -25 15 Z" fill="white" stroke="#444" stroke-width="1"/>
+    </g>
+    <g class="plume-node plume-shape-image" transform="translate(-60.5,112.5)">
+      <image href="img/example.png" x="-30" y="-20" width="60" height="40"/>
+    </g>
+  </g>
+  <g class="plume-wires"/>
+</svg>

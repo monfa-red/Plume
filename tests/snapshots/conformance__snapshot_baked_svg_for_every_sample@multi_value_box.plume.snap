@@ -1,0 +1,57 @@
+---
+source: tests/conformance.rs
+assertion_line: 27
+expression: svg
+input_file: samples/multi_value_box.plume
+---
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-120.5 -182.8 241 365.6" width="241" height="365.6" class="plume">
+  <defs/>
+  <g class="plume-scene">
+    <g class="plume-node plume-shape-rect" transform="translate(0,-147.3)">
+      <rect x="-100" y="-15" width="200" height="30" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">scalar padding</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" transform="translate(0,-104.3)">
+      <rect x="-100" y="-15" width="200" height="30" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">(y, x) padding</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" transform="translate(0,-61.3)">
+      <rect x="-100" y="-15" width="200" height="30" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">(t, r, b, l)</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" transform="translate(0,-18.3)">
+      <rect x="-100" y="-15" width="200" height="30" rx="8" ry="8" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">radius scalar=8</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" transform="translate(0,24.7)">
+      <rect x="-100" y="-15" width="200" height="30" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">radius (top,bot)</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-group plume-shape-rect" data-id="inner" transform="translate(0,107.5)">
+      <rect x="-88" y="-54.8" width="176" height="109.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,-37.5)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">(2,8,16,24) gap demo</text>
+      </g>
+      <g class="plume-node plume-shape-rect" transform="translate(0,-14.7)">
+        <rect x="-40" y="-10" width="80" height="20" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      </g>
+      <g class="plume-node plume-shape-rect" transform="translate(0,10.3)">
+        <rect x="-40" y="-10" width="80" height="20" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      </g>
+      <g class="plume-node plume-shape-rect" transform="translate(0,35.3)">
+        <rect x="-40" y="-10" width="80" height="20" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      </g>
+    </g>
+  </g>
+  <g class="plume-wires"/>
+</svg>

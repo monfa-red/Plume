@@ -1,0 +1,30 @@
+---
+source: tests/conformance.rs
+assertion_line: 27
+expression: svg
+input_file: samples/scene_grid.plume
+---
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-218.25 -44.8 436.5 89.6" width="436.5" height="89.6" class="plume">
+  <defs/>
+  <g class="plume-scene">
+    <g class="plume-node plume-shape-oval" data-id="outlet" transform="translate(-116.9,0)">
+      <ellipse cx="0" cy="0" rx="80.85" ry="24.3" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Outlet 120-240 VAC</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-psu plume-shape-rect plume-style-bold" data-id="drive" transform="translate(53.625,0)">
+      <rect x="-48.675" y="-24.3" width="97.35" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Drive PSU</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-bus plume-shape-slant" data-id="bus48" transform="translate(170.525,0)">
+      <polygon points="-20.7138,-24.3 33.7362,-24.3 20.7138,24.3 -33.7362,24.3" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Bus</text>
+      </g>
+    </g>
+  </g>
+  <g class="plume-wires"/>
+</svg>

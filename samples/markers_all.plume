@@ -1,0 +1,11 @@
+// All marker types on :line / :arrow (SPEC §7).
+// Wires use the same attr names; see wires_labels.plume for the wire side.
+
+scene layout=column gap=20 padding=20 {
+  :arrow from=(-60,0) to=(60,0)                                   // default end=arrow
+  :line  from=(-60,0) to=(60,0) marker=arrow                      // both ends arrow
+  :line  from=(-60,0) to=(60,0) marker-start=dot     marker-end=dot
+  :line  from=(-60,0) to=(60,0) marker-end=diamond
+  :line  from=(-60,0) to=(60,0) marker-end=crow
+  :line  from=(-60,0) to=(60,0) marker=arrow marker-end=dot       // source-order: arrow then dot at end
+}

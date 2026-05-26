@@ -1,0 +1,29 @@
+---
+source: tests/conformance.rs
+assertion_line: 27
+expression: svg
+input_file: samples/wires_basic.plume
+---
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-40.575 -79.6 81.15 159.2" width="81.15" height="159.2" class="plume">
+  <defs/>
+  <g class="plume-scene">
+    <g class="plume-node plume-shape-rect" data-id="a" transform="translate(0,-34.8)">
+      <rect x="-20.075" y="-24.3" width="40.15" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">A</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" data-id="b" transform="translate(0,34.8)">
+      <rect x="-20.075" y="-24.3" width="40.15" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">B</text>
+      </g>
+    </g>
+  </g>
+  <g class="plume-wires">
+    <g class="plume-wire" data-from="a" data-to="b">
+      <path d="M 0 -10 L 0 10" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="0,6 -5,-4 5,-4" fill="#444"/>
+    </g>
+  </g>
+</svg>

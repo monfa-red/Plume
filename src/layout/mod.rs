@@ -185,6 +185,11 @@ fn lay_out_container_children(
         Bbox::empty()
     };
 
+    // Resolution bbox for named anchors. If the container has explicit
+    // dimensions (e.g. `:rect w=200 h=120 { … }`), anchors snap to those
+    // edges; otherwise we fall back to the flow-children extent.
+    let anchor_parent_bbox = container_anchor_bbox(container_attrs).unwrap_or(flow_bbox);
+
     // Absolutely positioned children.
     for i in &abs_indices {
         let pos = anchors::parse_at(children[*i].attrs.get("at").unwrap(), children[*i].span)?;
@@ -195,7 +200,7 @@ fn lay_out_container_children(
         let (target_cx, target_cy) = match pos {
             AbsolutePos::Coord(x, y) => (x, y),
             AbsolutePos::Anchor(name) => {
-                anchors::resolve_anchor(name, flow_bbox, children[*i].bbox)
+                anchors::resolve_anchor(name, anchor_parent_bbox, children[*i].bbox)
             }
         };
         // `at=(x,y)` puts the bbox CENTER at (x,y) per §6 rule 1.
@@ -248,6 +253,15 @@ fn extract_num(v: &ResolvedValue) -> Option<f64> {
         ResolvedValue::LiveVar { baked: Some(b), .. } => extract_num(b),
         _ => None,
     }
+}
+
+/// If the container declared explicit `w` and `h`, return the bbox children's
+/// anchors should resolve against (centered on local origin, no stroke pad —
+/// anchors live on the drawn shape's edges).
+fn container_anchor_bbox(attrs: &crate::resolve::AttrMap) -> Option<Bbox> {
+    let w = attrs.get("w").and_then(extract_num)?;
+    let h = attrs.get("h").and_then(extract_num)?;
+    Some(Bbox::centered(w, h))
 }
 
 // ───────────────────────────── Tests ─────────────────────────────

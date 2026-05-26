@@ -1,0 +1,18 @@
+// All 9 inner anchors + offset, attached to a base rect.
+// Per SPEC §6, `at=anchor` positions the child against the parent's bbox;
+// out-* anchors place outside the parent.
+
+scene padding=40 {
+  base :rect w=200 h=120 fill=#eee {
+    :rect "C"  w=18 h=14 fill=red at=center
+    :rect "T"  w=18 h=14 fill=red at=top
+    :rect "B"  w=18 h=14 fill=red at=bottom
+    :rect "L"  w=18 h=14 fill=red at=left
+    :rect "R"  w=18 h=14 fill=red at=right
+    :rect "TL" w=20 h=14 fill=blue at=top-left
+    :rect "TR" w=20 h=14 fill=blue at=top-right
+    :rect "BL" w=20 h=14 fill=blue at=bottom-left
+    :rect "BR" w=20 h=14 fill=blue at=bottom-right
+    :rect "Co" w=18 h=14 fill=green at=center offset=(40, 20)
+  }
+}

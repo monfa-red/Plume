@@ -1,0 +1,18 @@
+---
+source: tests/conformance.rs
+assertion_line: 27
+expression: svg
+input_file: samples/values.plume
+---
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-58.45 -44.8 116.9 89.6" width="116.9" height="89.6" class="plume">
+  <defs/>
+  <g class="plume-scene">
+    <g class="plume-node plume-shape-rect" transform="translate(0,0)">
+      <rect x="-37.95" y="-24.3" width="75.9" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">values</text>
+      </g>
+    </g>
+  </g>
+  <g class="plume-wires"/>
+</svg>

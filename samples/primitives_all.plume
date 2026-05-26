@@ -1,0 +1,21 @@
+// Exercises every built-in primitive (SPEC §7) at known dimensions.
+
+scene layout=grid cols=4 gap=20 padding=20 {
+  :rect    "rect"    w=80 h=40 col=1 row=1
+  :oval    "oval"    rx=40 ry=20 col=2 row=1
+  :hex     "hex"     w=80 h=60 col=3 row=1
+  :slant   "slant"   w=80 h=40 skew=20 col=4 row=1
+
+  :cyl     "cyl"     w=70 h=70 col=1 row=2
+  :diamond "diamond" w=60 h=60 col=2 row=2
+  :cloud   "cloud"   w=100 h=60 col=3 row=2
+  :poly    points=[(0,-30),(30,30),(-30,30)] col=4 row=2
+
+  :text    "text"    col=1 row=3
+  :line    from=(-30,0) to=(30,0) col=2 row=3
+  :arrow   from=(-30,0) to=(30,0) col=3 row=3
+  :icon    name=star size=32 col=4 row=3
+
+  :path    d="M -25 -15 Q 0 -35 25 -15 L 25 15 Q 0 35 -25 15 Z" col=1 row=4
+  :image   href="img/example.png" w=60 h=40 col=2 row=4
+}

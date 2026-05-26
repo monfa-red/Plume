@@ -1,0 +1,91 @@
+---
+source: tests/conformance.rs
+assertion_line: 27
+expression: svg
+input_file: samples/templates_all.plume
+---
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-237.95 -184.5 475.9 369" width="475.9" height="369" class="plume">
+  <defs/>
+  <g class="plume-scene">
+    <g class="plume-node plume-shape-group plume-shape-rect" transform="translate(-183.075,-139.7)">
+      <rect x="-34.375" y="-24.3" width="68.75" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">group</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-circle plume-shape-oval" transform="translate(-89.75,-139.7)">
+      <ellipse cx="0" cy="0" rx="25" ry="25" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">circle</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-badge plume-shape-rect" transform="translate(3.575,-139.7)">
+      <rect x="-34.375" y="-24.3" width="68.75" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">badge</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-button plume-shape-rect" transform="translate(96.9,-139.7)">
+      <rect x="-37.95" y="-24.3" width="75.9" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">button</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-card plume-shape-rect" transform="translate(186.65,-139.7)">
+      <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">card</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-note plume-shape-rect" transform="translate(-183.075,34.8)">
+      <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">note</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-db plume-shape-cyl" transform="translate(-89.75,34.8)">
+      <path d="M -23.65 -19.44 L -23.65 19.44 A 23.65 4.86 0 0 0 23.65 19.44 L 23.65 -19.44 A 23.65 4.86 0 0 0 -23.65 -19.44 Z" fill="white" stroke="#444" stroke-width="1"/>
+      <ellipse cx="0" cy="-19.44" rx="23.65" ry="4.86" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">db</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-table plume-shape-group plume-shape-rect" data-id="specs" transform="translate(3.575,34.8)">
+      <rect x="-20.575" y="-129.2" width="41.15" height="258.4" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,-104.4)">
+        <rect x="-20.075" y="-24.3" width="40.15" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">A</text>
+        </g>
+      </g>
+      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,-34.8)">
+        <rect x="-20.075" y="-24.3" width="40.15" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">B</text>
+        </g>
+      </g>
+      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,34.8)">
+        <rect x="-20.075" y="-24.3" width="40.15" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">C</text>
+        </g>
+      </g>
+      <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(0,104.4)">
+        <rect x="-20.075" y="-24.3" width="40.15" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">D</text>
+        </g>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-cell plume-shape-rect" transform="translate(96.9,34.8)">
+      <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">cell</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-dim plume-shape-line" transform="translate(186.65,34.8)">
+      <line x1="-30" y1="0" x2="30" y2="0" stroke="#444" stroke-width="1"/>
+    </g>
+  </g>
+  <g class="plume-wires"/>
+</svg>
