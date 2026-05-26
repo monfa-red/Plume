@@ -108,22 +108,19 @@ fn pulled_back(inner: (f64, f64), endpoint: (f64, f64), amount: f64) -> Option<(
     Some((endpoint.0 - ux * amount, endpoint.1 - uy * amount))
 }
 
+/// SPEC v1: `stroke-style=dashed|dotted` drives the dash pattern. We size
+/// the dashes against the line thickness so the look is consistent with the
+/// primitive renderer in `render/primitives.rs::stroke_dasharray`.
 fn wire_dash(attrs: &crate::resolve::AttrMap) -> String {
-    for name in ["dashed", "dotted"] {
-        if let Some(ResolvedValue::Tuple(items)) = attrs.get(name) {
-            let parts: Vec<String> = items
-                .iter()
-                .filter_map(|v| match v {
-                    ResolvedValue::Number(n) => Some(num(*n)),
-                    _ => None,
-                })
-                .collect();
-            if !parts.is_empty() {
-                return parts.join(",");
-            }
-        }
+    let thickness = attr_num(attrs, "thickness").unwrap_or(1.0);
+    match attrs.get("stroke-style") {
+        Some(ResolvedValue::Ident(s)) => match s.as_str() {
+            "dashed" => format!("{},{}", num(thickness * 4.0), num(thickness * 4.0)),
+            "dotted" => format!("{},{}", num(thickness), num(thickness * 3.0)),
+            _ => String::new(),
+        },
+        _ => String::new(),
     }
-    String::new()
 }
 
 fn render_wire_text(out: &mut String, t: &RoutedText, vars: &VarTable, opts: &Options) {
