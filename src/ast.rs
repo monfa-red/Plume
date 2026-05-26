@@ -99,7 +99,6 @@ pub struct WireDecl {
 #[derive(Debug)]
 pub struct WireEndpoint {
     pub id: String,
-    pub anchor: Option<AnchorName>,
     pub span: Span,
 }
 

@@ -3,7 +3,7 @@
 // happy while the pipeline fills in.
 #![allow(dead_code)]
 
-use crate::ast::{AnchorName, WireOp};
+use crate::ast::WireOp;
 use crate::span::Span;
 use std::collections::{BTreeMap, HashMap};
 
@@ -239,7 +239,6 @@ pub struct ResolvedWire {
 
 pub struct ResolvedEndpoint {
     pub id: String,
-    pub anchor: Option<AnchorName>,
     pub span: Span,
 }
 

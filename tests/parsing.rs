@@ -52,8 +52,9 @@ fn err_wire_chain_mixes_operators() {
 }
 
 #[test]
-fn err_invalid_wire_endpoint_anchor() {
-    assert_parse_error("wires { a[middle] -> b }\n", "wire endpoint anchor");
+fn err_wire_endpoint_brackets_rejected() {
+    // SPEC v2.1: bracket anchors on wire endpoints were dropped.
+    assert_parse_error("wires { a[right] -> b }\n", "expected wire operator");
 }
 
 #[test]

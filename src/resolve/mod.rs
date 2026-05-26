@@ -442,7 +442,6 @@ fn resolve_wires(
             .iter()
             .map(|ep| ResolvedEndpoint {
                 id: ep.id.clone(),
-                anchor: ep.anchor,
                 span: ep.span,
             })
             .collect();

@@ -541,22 +541,30 @@ mod tests {
     }
 
     #[test]
-    fn bracket_anchor_overrides_auto_edge() {
-        // Forcing source's left edge even though target is to the right.
+    fn wire_routes_around_intermediate_shape() {
+        // SPEC v2.1 §9: shapes other than endpoints are obstacles. A wire
+        // from `a` to `c` with `b` sitting between them should not pass
+        // through `b`'s bbox.
         let l = lay_out(
-            "scene layout=row gap=80 {\n\
-               a :rect size=(60, 40)\n\
-               b :rect size=(60, 40)\n\
+            "scene padding=20 {\n\
+               a :rect size=(40, 40) at=(0, 0)\n\
+               b :rect size=(40, 40) at=(100, 0)\n\
+               c :rect size=(40, 40) at=(200, 0)\n\
              }\n\
-             wires { a[left] -> b }\n",
+             wires { a -> c }\n",
         );
         let w = &l.wires[0];
-        let a = &l.nodes[0];
-        let a_left = a.cx - a.bbox.w() / 2.0;
-        assert!(
-            (w.path[0].0 - a_left).abs() < 1.0,
-            "anchor should pin first point to a's left edge",
-        );
+        let b = &l.nodes[1];
+        let b_left = b.cx - b.bbox.w() / 2.0;
+        let b_right = b.cx + b.bbox.w() / 2.0;
+        let b_top = b.cy - b.bbox.h() / 2.0;
+        let b_bot = b.cy + b.bbox.h() / 2.0;
+        // No path point should sit strictly inside b's bbox.
+        for &(x, y) in &w.path {
+            let inside =
+                x > b_left + 0.5 && x < b_right - 0.5 && y > b_top + 0.5 && y < b_bot - 0.5;
+            assert!(!inside, "path point ({}, {}) inside b's bbox", x, y);
+        }
     }
 
     #[test]

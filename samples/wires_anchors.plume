@@ -1,10 +1,13 @@
-scene {
+// SPEC v2.1: wire endpoints have no manual anchor — the router picks edges
+// automatically. To influence routing, reposition shapes via `at=` or `gap=`.
+
+scene layout=row gap=80 {
   fadec :rect "FADEC"
   drive :rect "Drive"
   bus48 :rect "Bus 48V"
 }
 
 wires {
-  fadec[right] <-> drive[left] "CAN"
-  drive[top-right] -> bus48[bottom-left]
+  fadec <-> drive "CAN"
+  drive -> bus48
 }

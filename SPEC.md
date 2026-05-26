@@ -435,21 +435,12 @@ A **chain** repeats a single operator: `a -> b -> c -> d`. Mixing operators with
 ### Wire syntax
 
 ```
-id1[anchor?] OP id2[anchor?] [OP id3[anchor?] …] "label?" .style…? attrs… { children? }
+id1 OP id2 [OP id3 …] "label?" .style…? attrs… { children? }
 ```
 
 A chain requires at least two nodes. Children may only be `:text` (wire labels). Block-level attrs on `wires { ... }` are defaults for each wire inside.
 
-### Endpoint anchors
-
-Append `[anchor]` to any node ID to force the edge the route uses at that endpoint. Anchors: `top`, `bottom`, `left`, `right`, `top-left`, `top-right`, `bottom-left`, `bottom-right`. No whitespace before `[`.
-
-```
-outlet[right] -> drive[left] -> bus48[left]
-fadec[right]  <-> drive[left] "CAN"
-```
-
-If omitted, the engine picks the edge nearest the other node (tie → right > bottom > left > top).
+The router picks the entry and exit edges automatically based on relative geometry; there is no per-endpoint edge override. To control routing, reposition shapes via `at=` or adjust `gap`.
 
 ### Label sugar
 
@@ -478,13 +469,41 @@ a <-> b marker-start=crow      // crow at a, arrow at b
 
 ### Routing
 
-Orthogonal L- or Z-bend between source and target bboxes. The engine picks L vs Z by relative position. Markers are inset 4 px from their endpoint.
+Wires route orthogonally on a coarse grid using A* with bend penalty, picking entry and exit edges by relative geometry. The router never repositions shapes — author controls placement via `at=` and `gap=`.
+
+**Obstacle rules.** Routes must clear other shapes (including `:group` frames) by at least `--wire-gap` (default 16; override on the `wires {}` block via `gap=N`). Wires also try to stay `--wire-gap` away from other wires.
+
+When the router walks the scene tree to collect obstacles for a given wire:
+
+| Shape | Treated as |
+|---|---|
+| The wire's source or target | Endpoint — not an obstacle |
+| A group that contains the source or target | Passable — recurse into its children |
+| Any other shape, including groups | Hard obstacle |
+
+This means a route can enter the group that contains its endpoint, but must avoid sibling shapes inside that group.
+
+**Fallback hierarchy.** The router tries each tier and stops at the first that succeeds:
+
+1. Path that respects gap from all shapes and wires.
+2. Path that crosses other wires when needed (preferred only if tier 1 fails).
+3. Path that crosses shapes (when fully surrounded).
+4. Straight line from edge to edge (last resort).
+
+Markers are inset 4 px from their endpoint.
 
 **Self-loops** (`a -> a`): a small loop exits the right edge, curves over the top, re-enters the top edge (diameter = `--rect-h × 0.75`).
 
-**Duplicate wires** between the same pair are allowed — they render as separate paths.
+**Duplicate / parallel wires** between the same pair fan out: entry and exit points are offset by `gap` along the edge so paths don't overlap.
 
 Manual waypoints are not in v1.
+
+### Wires block attrs
+
+| Attr | Notes |
+|---|---|
+| `gap` | Wire-to-shape and wire-to-wire clearance, in px. Defaults to `--wire-gap`. |
+| Visual attrs (`stroke`, `thickness`, …) | Apply to every wire in the block; per-wire attrs override. |
 
 ---
 
@@ -594,6 +613,7 @@ Layout (compile-time):
   --plume-arrow-head    10
   --plume-icon-size     24
   --plume-canvas-pad    20
+  --plume-wire-gap      16
 ```
 
 ### 11.2 `--name` references in attribute values
@@ -779,7 +799,6 @@ Format: `filename:line:col: error: <message>` (LSP-compatible). Filename is `<st
 | Grid placement out of range | `cell=(5, _) exceeds grid cols=3` |
 | `:slant skew` out of range | `skew=N must be in (-89, 89)` |
 | Unknown icon name | `unknown icon name 'XYZ' (not in Material Symbols)` |
-| Invalid wire endpoint anchor | `wire endpoint anchor 'X' must be top/bottom/left/right or a corner` |
 | `col-widths`/`row-heights` length mismatch | `col-widths has N values but grid cols=M` |
 | Removed v0 attr | `attr 'w' is no longer supported; use size=(w, h) instead` |
 | `var()` function call | `var() is no longer a function; write '--name' directly` |
@@ -825,7 +844,7 @@ wire_decl      = wire_endpoint wire_op wire_endpoint { wire_op wire_endpoint }
                  { style_ref | attr }
                  [ "{" { text_primitive_decl } "}" ]
                  newline_or_semi
-wire_endpoint  = ident [ "[" anchor_name "]" ]
+wire_endpoint  = ident
 text_primitive_decl = ":text" string { attr } newline_or_semi
 
 type_ref       = ":" ident
@@ -994,8 +1013,7 @@ wires stroke=--stroke thickness=1 {
   outlet -> ctrl -> bus24
   bus48 -> ssr -> bands
 
-  // brackets force a specific edge instead of the nearest-edge auto-pick
-  fadec[right] <-> drive[left] "CAN"
+  fadec <-> drive "CAN"
 
   estop --> fuse .power stroke=orange marker-end=dot
 }

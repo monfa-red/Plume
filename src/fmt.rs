@@ -356,11 +356,6 @@ impl<'a> Emitter<'a> {
                 self.out.push(' ');
             }
             self.out.push_str(&ep.id);
-            if let Some(a) = ep.anchor {
-                self.out.push('[');
-                self.out.push_str(anchor_str(a));
-                self.out.push(']');
-            }
         }
         if let Some(label) = &w.label {
             self.out.push(' ');
@@ -518,20 +513,6 @@ fn block_span(b: &Block) -> Span {
 
 fn wire_op_str(op: WireOp) -> &'static str {
     op.as_str()
-}
-
-fn anchor_str(a: crate::ast::AnchorName) -> &'static str {
-    use crate::ast::AnchorName::*;
-    match a {
-        Top => "top",
-        Bottom => "bottom",
-        Left => "left",
-        Right => "right",
-        TopLeft => "top-left",
-        TopRight => "top-right",
-        BottomLeft => "bottom-left",
-        BottomRight => "bottom-right",
-    }
 }
 
 // ─────────────────────────── Column alignment ───────────────────────────

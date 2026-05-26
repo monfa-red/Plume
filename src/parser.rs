@@ -617,27 +617,9 @@ impl<'a> Parser<'a> {
 
     fn parse_wire_endpoint(&mut self) -> Result<WireEndpoint, Error> {
         let (id, id_span) = self.expect_ident()?;
-        let anchor = if matches!(self.peek_kind(), Some(TokKind::LBracket)) {
-            self.pos += 1;
-            let (name, name_span) = self.expect_ident()?;
-            let parsed = AnchorName::parse(&name).ok_or_else(|| {
-                Error::at(
-                    name_span,
-                    format!(
-                        "wire endpoint anchor '{}' must be top/bottom/left/right or a corner",
-                        name
-                    ),
-                )
-            })?;
-            self.expect_rbracket()?;
-            Some(parsed)
-        } else {
-            None
-        };
         let end = self.last_span();
         Ok(WireEndpoint {
             id,
-            anchor,
             span: Span::new(id_span.start, end.end),
         })
     }

@@ -63,8 +63,7 @@ wires stroke=--stroke thickness=1 {
   outlet -> ctrl -> bus24
   bus48 -> ssr -> bands
 
-  // brackets force a specific edge instead of the nearest-edge auto-pick
-  fadec[right] <-> drive[left] "CAN"
+  fadec <-> drive "CAN"
 
   estop --> fuse .power stroke=orange marker-end=dot
 }
