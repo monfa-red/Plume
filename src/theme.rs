@@ -66,7 +66,6 @@ fn strip_block_comments(src: &str) -> String {
     out
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
