@@ -1,6 +1,5 @@
-use crate::ast::{DeclKind, File};
+use crate::ast::{Block, File, ShapeInst};
 use crate::error::Error;
-use crate::span::Span;
 
 #[derive(Debug)]
 pub struct Program {
@@ -18,16 +17,30 @@ pub enum Shape {
     Rect,
 }
 
+/// Sprint 1 resolver: handles the Sprint 0 hello case (anonymous `:rect`
+/// primitives in `scene`, with an optional label). Other blocks and shapes
+/// surface a "not yet implemented" error so the compile pipeline stays honest.
 pub fn resolve(file: File) -> Result<Program, Error> {
     let mut nodes = Vec::new();
 
-    if let Some(scene) = file.scene {
-        for decl in scene.items {
-            match decl.kind {
-                DeclKind::Primitive { ty, label } => {
-                    let shape = resolve_shape(&ty, decl.span)?;
-                    nodes.push(Node { shape, label });
+    for block in file.blocks {
+        match block {
+            Block::Scene(scene) => {
+                for inst in scene.body {
+                    nodes.push(resolve_inst(&inst)?);
                 }
+            }
+            Block::Defaults(b) => {
+                return Err(Error::at(b.span, "defaults block: not yet implemented"));
+            }
+            Block::Styles(b) => {
+                return Err(Error::at(b.span, "styles block: not yet implemented"));
+            }
+            Block::Shapes(b) => {
+                return Err(Error::at(b.span, "shapes block: not yet implemented"));
+            }
+            Block::Wires(b) => {
+                return Err(Error::at(b.span, "wires block: not yet implemented"));
             }
         }
     }
@@ -35,9 +48,32 @@ pub fn resolve(file: File) -> Result<Program, Error> {
     Ok(Program { nodes })
 }
 
-fn resolve_shape(name: &str, span: Span) -> Result<Shape, Error> {
-    match name {
-        "rect" => Ok(Shape::Rect),
-        other => Err(Error::at(span, format!("unknown type ':{}'", other))),
+fn resolve_inst(inst: &ShapeInst) -> Result<Node, Error> {
+    if inst.id.is_some() {
+        return Err(Error::at(
+            inst.span,
+            "named scene nodes: not yet implemented",
+        ));
     }
+    if inst.body.is_some() {
+        return Err(Error::at(inst.span, "node bodies: not yet implemented"));
+    }
+    if !inst.items.is_empty() {
+        return Err(Error::at(inst.span, "node attrs: not yet implemented"));
+    }
+
+    let shape = match inst.ty.name.as_str() {
+        "rect" => Shape::Rect,
+        other => {
+            return Err(Error::at(
+                inst.ty.span,
+                format!("type ':{}' not yet implemented", other),
+            ));
+        }
+    };
+
+    Ok(Node {
+        shape,
+        label: inst.label.clone(),
+    })
 }

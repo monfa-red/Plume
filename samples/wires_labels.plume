@@ -1,0 +1,15 @@
+scene {
+  a :rect "A"
+  b :rect "B"
+}
+
+wires {
+  a -> b "label"
+  a -> b {
+    :text "label" at=mid size=10
+    :text "↓"     at=0.75
+  }
+  a -> b marker=dot
+  a -> b marker-end=dot
+  a <-> b marker-start=crow
+}

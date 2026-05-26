@@ -29,3 +29,11 @@ pub fn compile_file(path: &Path) -> Result<String, Error> {
     })?;
     compile_str(&src)
 }
+
+/// Lex and parse only — verifies syntactic correctness without running
+/// resolve/layout/render. Used by tests and (eventually) `plume --check-parse`.
+pub fn check_parse(src: &str) -> Result<(), Error> {
+    let tokens = lexer::lex(src)?;
+    let _file = parser::parse(&tokens)?;
+    Ok(())
+}

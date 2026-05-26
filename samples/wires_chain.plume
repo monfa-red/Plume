@@ -1,0 +1,19 @@
+scene {
+  outlet :rect "Outlet"
+  drive  :rect "Drive"
+  bus48  :rect "Bus 48V"
+  fuse   :rect "Fuse"
+  caps   :rect "Caps"
+}
+
+wires {
+  outlet -> drive -> bus48 -> fuse -> caps .power
+  outlet --> drive
+  outlet -.-> drive
+  outlet <- drive
+  outlet <-- drive
+  outlet <-.- drive
+  outlet <-> drive
+  outlet <--> drive
+  outlet <-.-> drive
+}

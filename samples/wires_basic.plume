@@ -1,0 +1,8 @@
+scene {
+  a :rect "A"
+  b :rect "B"
+}
+
+wires stroke=#444 thickness=1 {
+  a -> b
+}

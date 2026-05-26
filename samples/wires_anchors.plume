@@ -1,0 +1,10 @@
+scene {
+  fadec :rect "FADEC"
+  drive :rect "Drive"
+  bus48 :rect "Bus 48V"
+}
+
+wires {
+  fadec[right] <-> drive[left] "CAN"
+  drive[top-right] -> bus48[bottom-left]
+}
