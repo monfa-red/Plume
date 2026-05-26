@@ -315,7 +315,7 @@ Install once:
 cargo install resvg
 ```
 
-**Sprint 0 finding — `--bake-vars` is required for the loop.** Both `resvg` and `librsvg`'s `rsvg-convert` ignore CSS custom properties: a spec-conformant SVG with `fill="var(--plume-fill)"` and an `@layer plume.defaults { ... }` `<style>` block renders as black-on-black (vars fall back to `black`, the default for `fill`/`color`). Browsers render the same SVG correctly. We need a CLI/library flag (working name `--bake-vars`) that emits literal colors instead of `var()` references for static rendering — useful both for our visual test loop and for SVG consumers that don't support CSS (email clients, image libs, etc.). Implement in Sprint 5 alongside the renderer. Layout vars already bake at compile time; this only changes visual var emission.
+**`--bake-vars` (shipped Sprint 5).** Both `resvg` and `librsvg`'s `rsvg-convert` ignore CSS custom properties: a spec-conformant SVG with `fill="var(--plume-fill)"` and an `@layer plume.defaults { ... }` `<style>` block renders as black-on-black. The `--bake-vars` flag emits literal colors inline (and omits the defaults `<style>` block) so renderers without var() support display the diagram correctly. Use it for the visual loop, image-converter pipelines, and SVG consumers that don't support CSS (email clients, etc.).
 
 For automated regression: `tests/conformance.rs` does steps 2–4 for every sample and fails if a snapshot diverges.
 

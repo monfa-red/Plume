@@ -9,16 +9,21 @@ mod span;
 mod theme;
 
 pub use error::Error;
+pub use render::Options as RenderOptions;
 pub use theme::extract_plume_vars;
 
 use std::path::Path;
 
 pub fn compile_str(src: &str) -> Result<String, Error> {
+    compile_str_with(src, &RenderOptions::default())
+}
+
+pub fn compile_str_with(src: &str, opts: &RenderOptions) -> Result<String, Error> {
     let tokens = lexer::lex(src)?;
     let file = parser::parse(&tokens)?;
     let program = resolve::resolve(file)?;
     let laid_out = layout::layout(&program)?;
-    Ok(render::render(&laid_out))
+    Ok(render::render(&laid_out, opts))
 }
 
 pub fn compile_file(path: &Path) -> Result<String, Error> {

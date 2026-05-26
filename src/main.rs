@@ -11,6 +11,11 @@ struct Cli {
     /// Output path (default: stdout)
     #[arg(short = 'o', long = "output")]
     output: Option<PathBuf>,
+    /// Emit `var()` values inline as their resolved literal — necessary for
+    /// renderers without CSS-variable support (resvg, librsvg, raster
+    /// converters). Omits the default-vars `<style>` block.
+    #[arg(long = "bake-vars")]
+    bake_vars: bool,
 }
 
 fn main() -> ExitCode {
@@ -34,7 +39,11 @@ fn main() -> ExitCode {
         },
     };
 
-    match plume::compile_str(&source) {
+    let opts = plume::RenderOptions {
+        bake_vars: cli.bake_vars,
+    };
+
+    match plume::compile_str_with(&source, &opts) {
         Ok(svg) => {
             if let Some(out_path) = cli.output {
                 if let Err(e) = std::fs::write(&out_path, svg.as_bytes()) {

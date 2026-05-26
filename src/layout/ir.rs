@@ -2,7 +2,7 @@
 // (phase 5); allow dead_code at the module level while the pipeline fills in.
 #![allow(dead_code)]
 
-use crate::resolve::{AttrMap, Markers, ShapeKind};
+use crate::resolve::{AttrMap, Markers, ShapeKind, VarTable};
 use crate::span::Span;
 
 pub struct LaidOut {
@@ -10,6 +10,9 @@ pub struct LaidOut {
     pub scene_attrs: AttrMap,
     pub nodes: Vec<PlacedNode>,
     pub wires: Vec<RoutedWire>,
+    /// Resolved CSS variables — carried through to render so the `<style>`
+    /// block and `--bake-vars` mode can both read them.
+    pub vars: VarTable,
 }
 
 #[derive(Clone)]
@@ -46,6 +49,8 @@ pub struct ViewBox {
 pub struct PlacedNode {
     pub id: Option<String>,
     pub shape: ShapeKind,
+    pub type_chain: Vec<String>,
+    pub applied_styles: Vec<String>,
     pub label: Option<String>,
     pub attrs: AttrMap,
     pub markers: Markers,

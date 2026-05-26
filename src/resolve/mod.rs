@@ -321,6 +321,16 @@ fn resolve_inst(
 ) -> Result<ResolvedInst, Error> {
     let resolved_shape = shapes.resolve(&inst.ty.name, inst.ty.span)?;
 
+    // Collect style names applied directly on this inst (left-to-right).
+    let applied_styles: Vec<String> = inst
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            AttrItem::Style(s) => Some(s.name.clone()),
+            AttrItem::Attr(_) => None,
+        })
+        .collect();
+
     // ID uniqueness + reserved check.
     if let Some(id) = &inst.id {
         if is_reserved(id) {
@@ -366,6 +376,8 @@ fn resolve_inst(
     Ok(ResolvedInst {
         id: inst.id.clone(),
         shape: resolved_shape.kind,
+        type_chain: resolved_shape.type_chain,
+        applied_styles,
         label: own_label,
         attrs,
         markers,

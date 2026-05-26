@@ -25,6 +25,12 @@ pub struct ResolvedScene {
 pub struct ResolvedInst {
     pub id: Option<String>,
     pub shape: ShapeKind,
+    /// User-shape and template names walked from the inst's declared type back
+    /// to its primitive (e.g. for `drive :psu` where `psu :rect`, this is
+    /// `["psu"]` — the primitive `rect` is in `shape`).
+    pub type_chain: Vec<String>,
+    /// Style class names applied to this inst, in source (left-to-right) order.
+    pub applied_styles: Vec<String>,
     /// For `Text` shape: the text content. For other shapes: always `None` —
     /// label sugar on non-text shapes produces a `Text` child instead.
     pub label: Option<String>,
@@ -154,6 +160,7 @@ pub struct ResolvedCall {
 
 /// CSS variable defaults table. Entries are keyed by name without the
 /// `--plume-` prefix.
+#[derive(Clone, Debug, Default)]
 pub struct VarTable {
     pub entries: HashMap<String, VarEntry>,
 }

@@ -31,6 +31,9 @@ pub struct ResolvedShape {
     pub kind: ShapeKind,
     pub attrs: Vec<ResolvedAttr>,
     pub body_items: Vec<ShapeInst>,
+    /// User-shape and template names walked, from the inst's declared type back
+    /// toward the primitive. Excludes the primitive itself (which is in `kind`).
+    pub type_chain: Vec<String>,
 }
 
 pub struct ShapesTable {
@@ -150,14 +153,16 @@ impl ShapesTable {
                 kind,
                 attrs: Vec::new(),
                 body_items: Vec::new(),
+                type_chain: Vec::new(),
             });
         }
 
         // Template — built-in, walk its base.
         if let Some((_, base)) = TEMPLATES.iter().find(|(n, _)| *n == name) {
             visiting.push(name.to_string());
-            let resolved = self.walk_chain(base, use_span, visiting, depth + 1)?;
+            let mut resolved = self.walk_chain(base, use_span, visiting, depth + 1)?;
             visiting.pop();
+            resolved.type_chain.insert(0, name.to_string());
             return Ok(resolved);
         }
 
@@ -169,22 +174,24 @@ impl ShapesTable {
             .ok_or_else(|| Error::at(use_span, format!("unknown type ':{}'", name)))?;
 
         visiting.push(name.to_string());
-        let (kind, mut attrs, mut body_items) = match &def.base {
+        let (kind, mut attrs, mut body_items, mut type_chain) = match &def.base {
             Some(base_name) => {
                 let base = self.walk_chain(base_name, def.span, visiting, depth + 1)?;
-                (base.kind, base.attrs, base.body_items)
+                (base.kind, base.attrs, base.body_items, base.type_chain)
             }
-            None => (ShapeKind::Rect, Vec::new(), Vec::new()),
+            None => (ShapeKind::Rect, Vec::new(), Vec::new(), Vec::new()),
         };
         visiting.pop();
 
         attrs.extend(def.attrs.iter().cloned());
         body_items.extend(def.body_items.iter().cloned());
+        type_chain.insert(0, name.to_string());
 
         Ok(ResolvedShape {
             kind,
             attrs,
             body_items,
+            type_chain,
         })
     }
 }

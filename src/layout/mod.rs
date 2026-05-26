@@ -58,6 +58,7 @@ pub fn layout(program: &Program) -> Result<LaidOut, Error> {
         scene_attrs: program.scene.attrs.clone(),
         nodes: top_nodes,
         wires: routed_wires,
+        vars: program.vars.clone(),
     })
 }
 
@@ -111,6 +112,8 @@ fn layout_inst(inst: &ResolvedInst, vars: &VarTable) -> Result<PlacedNode, Error
     Ok(PlacedNode {
         id: inst.id.clone(),
         shape: inst.shape,
+        type_chain: inst.type_chain.clone(),
+        applied_styles: inst.applied_styles.clone(),
         label: inst.label.clone(),
         attrs: inst.attrs.clone(),
         markers: inst.markers.clone(),
