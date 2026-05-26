@@ -31,7 +31,7 @@ input_file: samples/wires_anchors.plume
       <path d="M -122.025 0 L -99.775 0 L -51.775 0 L -42.025 0" fill="none" stroke="#444" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="-118.025,0 -108.025,-5 -108.025,5" fill="#444"/>
       <polygon class="plume-marker plume-marker-arrow" points="-46.025,0 -56.025,5 -56.025,-5" fill="#444"/>
-      <text x="-82.025" y="7.7" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="#222">CAN</text>
+      <text x="-82.025" y="0" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="#222" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">CAN</text>
     </g>
     <g class="plume-wire" data-from="drive" data-to="bus48">
       <path d="M 27.725 0 L 44.225 0 L 92.225 0 L 107.725 0" fill="none" stroke="#444" stroke-width="1"/>

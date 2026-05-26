@@ -84,20 +84,22 @@ fn render_wire_text(out: &mut String, t: &RoutedText, vars: &VarTable, opts: &Op
     let size = attr_num(&t.attrs, "size").unwrap_or(11.0);
     let fill = attr_or_var(&t.attrs, "fill", "text-color", vars, opts);
     let font = attr_or_var(&t.attrs, "font", "font", vars, opts);
-    // Lift text slightly above the route along the perpendicular.
-    let lift = size * 0.7;
-    let nx = -t.tangent.1;
-    let ny = t.tangent.0;
-    let x = t.position.0 + nx * lift;
-    let y = t.position.1 + ny * lift;
+    // Background-coloured stroke painted UNDER the glyph fill. The wire path
+    // visually disappears behind the label without us having to clip the path.
+    // Halo width tracks font size so big labels get a proportional buffer.
+    let halo = attr_or_var(&t.attrs, "halo", "bg", vars, opts);
+    let halo_w = (size * 0.4).max(2.0);
+    let (x, y) = t.position;
     writeln!(
         out,
-        r#"      <text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-size="{}" font-family={} fill="{}">{}</text>"#,
+        r#"      <text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-size="{}" font-family={} fill="{}" paint-order="stroke" stroke="{}" stroke-width="{}" stroke-linejoin="round">{}</text>"#,
         num(x),
         num(y),
         num(size),
         wrap_font(&font),
         fill,
+        halo,
+        num(halo_w),
         escape_xml(&t.content),
     )
     .unwrap();

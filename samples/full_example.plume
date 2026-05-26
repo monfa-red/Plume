@@ -40,22 +40,22 @@ scene layout=(3, 2) gap=40 padding=20 background=--bg {
     }
   }
 
-  consumers :group "Consumers" cell=(3, 1) layout=column gap=20 {
+  consumers :group "Consumers" cell=(3, 1) layout=column gap=40 {
     booster :group "Booster" layout=row gap=15 {
       fuse :alert "60A Fuse" { :badge "HOT" }
-      caps :rect  "MOSFET + 20x Caps" double=4 size=(80, 40) fill=white
+      caps :rect  "MOSFET" double=4 size=(80, 40) fill=white
     }
     heaters :group "Heaters" layout=row gap=15 {
       ssr   :rect "3x SSR"          double=4 size=(60, 40)
-      bands :rect "6x Band Heaters" double=4 size=(80, 40)
+      bands :rect "Heaters" double=4 size=(80, 40)
     }
   }
 
-  fadec :group "FADEC" cell=(1, 2) layout=column gap=10 {
+  fadec :group "FADEC" cell=(1, 2) layout=column gap=10 padding=10 {
     estop :icon name=power_settings_new size=32
   }
 
-  fd1 :force_diagram at=(900, 700)
+  fd1 :force_diagram at=(300, 200)
 }
 
 wires stroke=--stroke thickness=1 {

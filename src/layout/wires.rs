@@ -2,17 +2,20 @@
 //!
 //! For each wire segment we:
 //!   1. Pick entry / exit edges by relative geometry (nearest edge).
-//!   2. Build an obstacle map. Each top-level scene node is an obstacle UNLESS
-//!      it contains the source or target endpoint (in which case we recurse
-//!      into its children — siblings of the endpoint inside that container
-//!      become obstacles). This lets routes enter the group that holds their
-//!      endpoint while still avoiding cousin shapes.
-//!   3. Run A* on a coarse grid (cell size ≈ wire-gap). The cost penalises
+//!   2. Apply a lane offset along the chosen edges. Parallel wires (same
+//!      pair of endpoints) get distinct offsets BEFORE A* runs, so each
+//!      wire computes its own path on its own track instead of stacking
+//!      onto the leader and then being shifted post-hoc (which produced
+//!      crossing paths when the leader and the follower took different
+//!      A* routes).
+//!   3. Build an obstacle map. Each scene node is a hard obstacle UNLESS it
+//!      is an endpoint or a named ancestor of an endpoint — in those cases
+//!      we recurse into its children so the path can enter the group that
+//!      holds its endpoint while still avoiding cousin shapes.
+//!   4. Run A* on a coarse grid (cell size ≈ wire-gap). The cost penalises
 //!      bends so paths stay straight when they can.
-//!   4. Fall back through a hierarchy: shapes-and-wires-respected → ignore
+//!   5. Fall back through a hierarchy: shapes-and-wires-respected → ignore
 //!      other wires → ignore shapes too → straight line.
-//!   5. Parallel wires between the same pair are bundled apart in a final
-//!      pass.
 
 use super::ir::{PlacedNode, RoutedText, RoutedWire};
 use super::values::layout_var;
@@ -30,23 +33,41 @@ pub fn route_wires(
 ) -> Result<Vec<RoutedWire>, Error> {
     let scene = SceneIndex::build(scene_nodes);
 
+    // Pre-pass: count wires that share each endpoint pair. Parallel wires
+    // get a lane offset BEFORE A* runs so each finds its own track instead
+    // of stacking onto the first wire's path.
+    let mut pair_total: HashMap<(String, String), usize> = HashMap::new();
+    for w in &program.wires {
+        let key = pair_key(&w.endpoints[0].id, &w.endpoints.last().unwrap().id);
+        *pair_total.entry(key).or_insert(0) += 1;
+    }
+    let mut pair_seen: HashMap<(String, String), usize> = HashMap::new();
+
     let mut routed: Vec<RoutedWire> = Vec::new();
     let mut soft_blocked: Vec<Vec<(usize, usize)>> = Vec::new();
 
     for wire in &program.wires {
         let gap = wire_gap(wire, &program.vars);
-        // The grid expands with each wire only if needed; rebuild per-wire since
-        // gap can differ. Cheap relative to A* itself.
         let bounds = scene.bounds(gap);
         let grid = Grid::new(bounds, (gap.max(8.0) / 2.0).max(4.0));
 
-        for sub in route_one_wire(wire, &scene, &grid, gap, &soft_blocked)? {
+        let key = pair_key(&wire.endpoints[0].id, &wire.endpoints.last().unwrap().id);
+        let total = pair_total.get(&key).copied().unwrap_or(1);
+        let lane = pair_seen.entry(key).or_insert(0);
+        let lane_idx = *lane;
+        *lane += 1;
+        let lane_offset = if total > 1 {
+            (lane_idx as f64 - (total as f64 - 1.0) / 2.0) * (gap / 2.0)
+        } else {
+            0.0
+        };
+
+        for sub in route_one_wire(wire, &scene, &grid, gap, lane_offset, &soft_blocked)? {
             soft_blocked.push(grid.cells_along(&sub.path));
             routed.push(sub);
         }
     }
 
-    bundle_parallel(&mut routed);
     Ok(routed)
 }
 
@@ -57,6 +78,7 @@ fn route_one_wire(
     scene: &SceneIndex,
     grid: &Grid,
     gap: f64,
+    lane_offset: f64,
     soft_blocked: &[Vec<(usize, usize)>],
 ) -> Result<Vec<RoutedWire>, Error> {
     let n = wire.endpoints.len();
@@ -79,7 +101,7 @@ fn route_one_wire(
             ));
         }
 
-        let path = route_segment(&src, &tgt, scene, grid, gap, soft_blocked);
+        let path = route_segment(&src, &tgt, scene, grid, gap, lane_offset, soft_blocked);
 
         let is_first = i == 0;
         let is_last = i == n - 2;
@@ -116,15 +138,29 @@ fn route_segment(
     scene: &SceneIndex,
     grid: &Grid,
     gap: f64,
+    lane_offset: f64,
     soft_blocked: &[Vec<(usize, usize)>],
 ) -> Vec<(f64, f64)> {
     let src_edge = nearest_edge(&src.bbox, (tgt.bbox.cx(), tgt.bbox.cy()));
     let tgt_edge = nearest_edge(&tgt.bbox, (src.bbox.cx(), src.bbox.cy()));
-    let src_pt = edge_midpoint(&src.bbox, src_edge);
-    let tgt_pt = edge_midpoint(&tgt.bbox, tgt_edge);
+    // Lane offset shifts the endpoint along its edge so parallel wires don't
+    // stack. Clamp to the inner half of the edge so the connection stays
+    // clearly on the shape.
+    let src_pt = lane_shift(
+        edge_midpoint(&src.bbox, src_edge),
+        src_edge,
+        lane_offset,
+        &src.bbox,
+    );
+    let tgt_pt = lane_shift(
+        edge_midpoint(&tgt.bbox, tgt_edge),
+        tgt_edge,
+        lane_offset,
+        &tgt.bbox,
+    );
 
-    let start_cell = grid.cell_outside(&src.bbox, src_edge, gap);
-    let goal_cell = grid.cell_outside(&tgt.bbox, tgt_edge, gap);
+    let start_cell = grid.cell_outside(&src.bbox, src_edge, gap, lane_offset);
+    let goal_cell = grid.cell_outside(&tgt.bbox, tgt_edge, gap, lane_offset);
 
     let shape_obstacles = scene.obstacles_for(&src.id, &tgt.id, gap);
     let blocked_by_shapes = grid.block_cells(&shape_obstacles);
@@ -442,14 +478,22 @@ impl Grid {
     }
 
     /// Pick the cell one step outside `bbox` in the direction of `edge`,
-    /// padded by `gap` so we sit clear of any obstacle inflation.
-    fn cell_outside(&self, bbox: &AbsBbox, edge: Edge, gap: f64) -> (usize, usize) {
+    /// padded by `gap` so we sit clear of any obstacle inflation. The
+    /// `lane_offset` shifts along the edge — used so parallel wires start
+    /// from different tracks.
+    fn cell_outside(
+        &self,
+        bbox: &AbsBbox,
+        edge: Edge,
+        gap: f64,
+        lane_offset: f64,
+    ) -> (usize, usize) {
         let pad = gap + self.cell_size * 0.5;
         let p = match edge {
-            Edge::Right => (bbox.x + bbox.w + pad, bbox.cy()),
-            Edge::Left => (bbox.x - pad, bbox.cy()),
-            Edge::Top => (bbox.cx(), bbox.y - pad),
-            Edge::Bottom => (bbox.cx(), bbox.y + bbox.h + pad),
+            Edge::Right => (bbox.x + bbox.w + pad, bbox.cy() + lane_offset),
+            Edge::Left => (bbox.x - pad, bbox.cy() + lane_offset),
+            Edge::Top => (bbox.cx() + lane_offset, bbox.y - pad),
+            Edge::Bottom => (bbox.cx() + lane_offset, bbox.y + bbox.h + pad),
         };
         self.world_to_cell(p)
     }
@@ -723,69 +767,32 @@ fn edge_midpoint(bbox: &AbsBbox, e: Edge) -> (f64, f64) {
     }
 }
 
-// ─────────────────────────── Edge bundling ───────────────────────────
-
-/// When two or more routed wires connect the same pair of nodes in the same
-/// direction, fan their endpoints apart along the shared edge so the SVG
-/// paths don't sit on top of each other.
-fn bundle_parallel(routed: &mut [RoutedWire]) {
-    if routed.len() < 2 {
-        return;
+/// Shift an edge connection point along the edge by `lane_offset`, clamped
+/// so the point stays on the shape's edge.
+fn lane_shift(pt: (f64, f64), edge: Edge, lane_offset: f64, bbox: &AbsBbox) -> (f64, f64) {
+    if lane_offset.abs() < 0.01 {
+        return pt;
     }
-    let mut groups: HashMap<(String, String), Vec<usize>> = HashMap::new();
-    for (i, w) in routed.iter().enumerate() {
-        let key = canonical_pair(&w.data_from, &w.data_to);
-        groups.entry(key).or_default().push(i);
-    }
-    for (_, members) in groups.iter() {
-        if members.len() < 2 {
-            continue;
+    let inset = 4.0; // keep at least this far from the edge corner
+    match edge {
+        Edge::Top | Edge::Bottom => {
+            let min_x = bbox.x + inset;
+            let max_x = bbox.x + bbox.w - inset;
+            ((pt.0 + lane_offset).clamp(min_x, max_x), pt.1)
         }
-        // Spacing tuned for the default --wire-gap of 16. Bundled offsets
-        // step by gap/2 so the visible separation matches the routing grid.
-        let spacing = 8.0;
-        let n = members.len() as f64;
-        for (idx, &m) in members.iter().enumerate() {
-            let offset = (idx as f64 - (n - 1.0) / 2.0) * spacing;
-            shift_endpoints(&mut routed[m], offset);
+        Edge::Left | Edge::Right => {
+            let min_y = bbox.y + inset;
+            let max_y = bbox.y + bbox.h - inset;
+            (pt.0, (pt.1 + lane_offset).clamp(min_y, max_y))
         }
     }
 }
 
-fn canonical_pair(a: &str, b: &str) -> (String, String) {
+fn pair_key(a: &str, b: &str) -> (String, String) {
     if a <= b {
         (a.to_string(), b.to_string())
     } else {
         (b.to_string(), a.to_string())
-    }
-}
-
-fn shift_endpoints(w: &mut RoutedWire, offset: f64) {
-    if w.path.len() < 2 || offset.abs() < 0.01 {
-        return;
-    }
-    let n = w.path.len();
-    let first = w.path[0];
-    let second = w.path[1];
-    let last = w.path[n - 1];
-    let prev = w.path[n - 2];
-
-    // Shift the endpoint perpendicular to the first/last segment's direction.
-    let (dx1, dy1) = (second.0 - first.0, second.1 - first.1);
-    let (dx2, dy2) = (last.0 - prev.0, last.1 - prev.1);
-    if dx1.abs() > dy1.abs() {
-        w.path[0].1 += offset;
-        w.path[1].1 += offset;
-    } else {
-        w.path[0].0 += offset;
-        w.path[1].0 += offset;
-    }
-    if dx2.abs() > dy2.abs() {
-        w.path[n - 1].1 += offset;
-        w.path[n - 2].1 += offset;
-    } else {
-        w.path[n - 1].0 += offset;
-        w.path[n - 2].0 += offset;
     }
 }
 
