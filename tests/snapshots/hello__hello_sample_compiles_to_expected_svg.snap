@@ -1,0 +1,16 @@
+---
+source: tests/hello.rs
+assertion_line: 6
+expression: svg
+---
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-70 -40 140 80" width="140" height="80" class="plume">
+  <style>@layer plume.defaults { :root, .plume { --plume-fill: white; --plume-stroke: #444; --plume-text-color: #222; --plume-font: system-ui, -apple-system, sans-serif; } }</style>
+  <defs/>
+  <g class="plume-scene">
+    <g class="plume-node plume-shape-rect" transform="translate(0,0)">
+      <rect x="-50" y="-20" width="100" height="40" fill="var(--plume-fill)" stroke="var(--plume-stroke)" stroke-width="1"/>
+      <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="var(--plume-font)" fill="var(--plume-text-color)">hello</text>
+    </g>
+  </g>
+  <g class="plume-wires"/>
+</svg>

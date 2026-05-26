@@ -1,0 +1,28 @@
+[package]
+name = "plume"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "A small, human-readable language for plain-text diagrams"
+license = "MIT"
+keywords = ["diagram", "svg", "dsl"]
+categories = ["command-line-utilities", "graphics"]
+
+[[bin]]
+name = "plume"
+path = "src/main.rs"
+
+[lib]
+name = "plume"
+path = "src/lib.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+insta = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
