@@ -160,7 +160,7 @@ shapes {
   }
 
   // base + body — full composition
-  card :group layout=column gap=8 padding=12 {
+  panel :group layout=column gap=8 padding=12 {
     :text "Title" at=top weight=bold
     :text "Content"
   }
