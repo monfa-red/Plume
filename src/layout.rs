@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::resolve::{Node, Program, Shape};
+use crate::resolve::{Program, ResolvedInst, ShapeKind};
 
 #[derive(Debug)]
 pub struct LaidOut {
@@ -17,7 +17,7 @@ pub struct ViewBox {
 
 #[derive(Debug)]
 pub struct PlacedNode {
-    pub shape: Shape,
+    pub shape: ShapeKind,
     pub label: Option<String>,
     pub cx: f64,
     pub cy: f64,
@@ -30,27 +30,48 @@ const RECT_H: f64 = 40.0;
 const CANVAS_PAD: f64 = 20.0;
 
 pub fn layout(program: &Program) -> Result<LaidOut, Error> {
-    let placed: Vec<PlacedNode> = program.nodes.iter().map(place_node).collect();
+    let placed: Vec<PlacedNode> = program
+        .scene
+        .nodes
+        .iter()
+        .map(place_top_level)
+        .collect::<Result<_, _>>()?;
 
-    let viewbox = compute_viewbox(&placed);
     Ok(LaidOut {
-        viewbox,
+        viewbox: compute_viewbox(&placed),
         nodes: placed,
     })
 }
 
-fn place_node(n: &Node) -> PlacedNode {
-    let (w, h) = match n.shape {
-        Shape::Rect => (RECT_W, RECT_H),
+fn place_top_level(inst: &ResolvedInst) -> Result<PlacedNode, Error> {
+    let (w, h) = match inst.shape {
+        ShapeKind::Rect => (RECT_W, RECT_H),
+        other => {
+            return Err(Error::at(
+                inst.span,
+                format!("layout for shape ':{}' not yet implemented", other.as_str()),
+            ));
+        }
     };
-    PlacedNode {
-        shape: n.shape,
-        label: n.label.clone(),
+
+    Ok(PlacedNode {
+        shape: inst.shape,
+        label: extract_label(inst),
         cx: 0.0,
         cy: 0.0,
         w,
         h,
-    }
+    })
+}
+
+/// Find the first Text child and return its content. Used to surface the
+/// label-sugar text on Rect (and other non-text) parents until Sprint 3 builds
+/// the full child-positioning layout.
+fn extract_label(inst: &ResolvedInst) -> Option<String> {
+    inst.children
+        .iter()
+        .find(|c| c.shape == ShapeKind::Text)
+        .and_then(|c| c.label.clone())
 }
 
 fn compute_viewbox(nodes: &[PlacedNode]) -> ViewBox {

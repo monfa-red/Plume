@@ -1,5 +1,5 @@
 use crate::layout::{LaidOut, PlacedNode};
-use crate::resolve::Shape;
+use crate::resolve::ShapeKind;
 use std::fmt::Write;
 
 const STYLE_BLOCK: &str = r#"  <style>@layer plume.defaults { :root, .plume { --plume-fill: white; --plume-stroke: #444; --plume-text-color: #222; --plume-font: system-ui, -apple-system, sans-serif; } }</style>
@@ -30,8 +30,8 @@ pub fn render(laid_out: &LaidOut) -> String {
 }
 
 fn render_node(out: &mut String, n: &PlacedNode) {
-    match n.shape {
-        Shape::Rect => render_rect(out, n),
+    if n.shape == ShapeKind::Rect {
+        render_rect(out, n);
     }
 }
 

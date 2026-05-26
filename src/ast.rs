@@ -76,7 +76,7 @@ pub struct WiresBlock {
 
 /// Node or primitive instance. `id` is `Some` for node decls in a scene,
 /// `None` for anonymous primitives in a shape body or scene.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ShapeInst {
     pub id: Option<String>,
     pub ty: TypeRef,
@@ -103,7 +103,7 @@ pub struct WireEndpoint {
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TextDecl {
     pub text: String,
     pub items: Vec<AttrItem>,
@@ -167,32 +167,32 @@ impl AnchorName {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TypeRef {
     pub name: String,
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AttrItem {
     Attr(Attr),
     Style(StyleRef),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Attr {
     pub name: String,
     pub value: Option<Value>, // None = bare attr
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StyleRef {
     pub name: String,
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Number(f64),
     String(String),
@@ -204,7 +204,7 @@ pub enum Value {
     RawCssVar(String), // only valid inside var()
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FnCall {
     pub name: String,
     pub args: Vec<Value>,

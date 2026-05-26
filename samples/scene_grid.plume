@@ -1,3 +1,12 @@
+styles {
+  bold weight=bold
+}
+
+shapes {
+  psu :rect
+  bus :slant
+}
+
 scene layout=grid cols=3 gap=40 padding=20 {
   outlet :oval "Outlet 120-240 VAC" col=1
   drive  :psu  "Drive PSU"          col=2 .bold

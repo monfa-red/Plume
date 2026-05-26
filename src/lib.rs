@@ -9,6 +9,7 @@ mod span;
 mod theme;
 
 pub use error::Error;
+pub use theme::extract_plume_vars;
 
 use std::path::Path;
 
@@ -35,5 +36,14 @@ pub fn compile_file(path: &Path) -> Result<String, Error> {
 pub fn check_parse(src: &str) -> Result<(), Error> {
     let tokens = lexer::lex(src)?;
     let _file = parser::parse(&tokens)?;
+    Ok(())
+}
+
+/// Lex, parse, and resolve. Verifies semantic correctness without running
+/// layout or render. Used by tests and (eventually) `plume --check`.
+pub fn check(src: &str) -> Result<(), Error> {
+    let tokens = lexer::lex(src)?;
+    let file = parser::parse(&tokens)?;
+    let _program = resolve::resolve(file)?;
     Ok(())
 }

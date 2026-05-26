@@ -9,8 +9,9 @@ shapes {
     :icon name=copy
   }
 
-  // base + body — full composition
-  card :group layout=column gap=8 padding=12 {
+  // base + body — full composition. `card` is reserved (it's a built-in
+  // template per §18), so we name our user shape `info_card`.
+  info_card :group layout=column gap=8 padding=12 {
     :text "Title" at=top weight=bold
     :text "Content"
   }
