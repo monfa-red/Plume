@@ -62,7 +62,11 @@ pub fn marker_anchor(
     }
     let ux = dx / len;
     let uy = dy / len;
-    let inset = 4.0_f64.min(len * 0.5);
+    // Visible gap between the marker tip and the shape edge. Kept small —
+    // the user's intuition is that the tip should "almost touch" the shape.
+    // The line stop point (in render/wires.rs `shorten_for_markers`) sits
+    // further back along the segment so the marker body still covers it.
+    let inset = 1.0_f64.min(len * 0.5);
     let tip = (anchor.0 - ux * inset, anchor.1 - uy * inset);
     Some((tip, (ux, uy)))
 }

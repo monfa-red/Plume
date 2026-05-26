@@ -169,62 +169,98 @@ fn route_segment_with_lanes(
     tgt_lane: f64,
     soft_blocked: &[Vec<(usize, usize)>],
 ) -> Vec<(f64, f64)> {
-    let src_pt = lane_shift(
-        edge_midpoint(&spec.src_bbox, spec.src_edge),
-        spec.src_edge,
-        src_lane,
-        &spec.src_bbox,
-    );
-    let tgt_pt = lane_shift(
-        edge_midpoint(&spec.tgt_bbox, spec.tgt_edge),
-        spec.tgt_edge,
-        tgt_lane,
-        &spec.tgt_bbox,
-    );
-    let start_cell = grid.cell_outside(&spec.src_bbox, spec.src_edge, spec.gap, src_lane);
-    let goal_cell = grid.cell_outside(&spec.tgt_bbox, spec.tgt_edge, spec.gap, tgt_lane);
-
     let shape_obstacles = scene.obstacles_for(&spec.src_id, &spec.tgt_id, spec.gap);
     let blocked_by_shapes = grid.block_cells(&shape_obstacles);
     let blocked_by_wires = grid.flatten_soft(soft_blocked);
 
-    // Tier 1: avoid shapes AND wires.
-    if let Some(cells) = a_star(
-        grid,
-        start_cell,
-        goal_cell,
-        spec.src_edge,
-        spec.tgt_edge,
-        &blocked_by_shapes,
-        &blocked_by_wires,
-    ) {
-        return assemble_path(src_pt, spec.src_edge, &cells, tgt_pt, spec.tgt_edge, grid);
+    // Try every edge combination (4 src × 4 tgt = 16), keeping the cheapest
+    // A* result. `nearest_edge` was a fast heuristic, but on tight diagrams
+    // it picks an edge that forces a long detour (e.g. exiting RIGHT into an
+    // obstacle when going UP and OVER would be much shorter). Exhaustive
+    // search at this scale is still microsecond-fast: the grid is coarse
+    // and most candidate paths are rejected almost immediately.
+    let all_edges = [Edge::Right, Edge::Bottom, Edge::Left, Edge::Top];
+    type Candidate = (i64, Edge, Edge, Vec<(usize, usize)>);
+    let mut best: Option<Candidate> = None;
+
+    for tier in 0..3 {
+        let (use_shapes, use_wires) = match tier {
+            0 => (&blocked_by_shapes[..], &blocked_by_wires[..]),
+            1 => (&blocked_by_shapes[..], &[][..]),
+            _ => (&[][..], &[][..]),
+        };
+        for &se in &all_edges {
+            for &te in &all_edges {
+                let start = grid.cell_outside(&spec.src_bbox, se, spec.gap, src_lane);
+                let goal = grid.cell_outside(&spec.tgt_bbox, te, spec.gap, tgt_lane);
+                if let Some((cells, cost)) =
+                    a_star(grid, start, goal, se, te, use_shapes, use_wires)
+                {
+                    if best.as_ref().map_or(true, |b| cost < b.0) {
+                        best = Some((cost, se, te, cells));
+                    }
+                }
+            }
+        }
+        if best.is_some() {
+            break;
+        }
     }
-    // Tier 2: avoid shapes only.
-    if let Some(cells) = a_star(
+
+    let Some((_, src_edge, tgt_edge, cells)) = best else {
+        // Final fallback: straight line. We still need anchor points.
+        let pt = edge_midpoint(&spec.src_bbox, spec.src_edge);
+        return vec![pt, edge_midpoint(&spec.tgt_bbox, spec.tgt_edge)];
+    };
+
+    // Snap the lane-shifted endpoints to the grid row/column that A*
+    // actually picked. Without this, the first segment from `src_pt` to
+    // `grid.cell_center(start)` ends up with a 1–3 px perpendicular kink
+    // (the grid is discrete, the lane shift is continuous). Snapping
+    // collapses that kink to zero.
+    let src_pt = snap_to_cell(
+        lane_shift(
+            edge_midpoint(&spec.src_bbox, src_edge),
+            src_edge,
+            src_lane,
+            &spec.src_bbox,
+        ),
+        src_edge,
+        cells.first().copied(),
         grid,
-        start_cell,
-        goal_cell,
-        spec.src_edge,
-        spec.tgt_edge,
-        &blocked_by_shapes,
-        &[],
-    ) {
-        return assemble_path(src_pt, spec.src_edge, &cells, tgt_pt, spec.tgt_edge, grid);
-    }
-    // Tier 3: no obstacles (allows crossing shapes).
-    if let Some(cells) = a_star(
+    );
+    let tgt_pt = snap_to_cell(
+        lane_shift(
+            edge_midpoint(&spec.tgt_bbox, tgt_edge),
+            tgt_edge,
+            tgt_lane,
+            &spec.tgt_bbox,
+        ),
+        tgt_edge,
+        cells.last().copied(),
         grid,
-        start_cell,
-        goal_cell,
-        spec.src_edge,
-        spec.tgt_edge,
-        &[],
-        &[],
-    ) {
-        return assemble_path(src_pt, spec.src_edge, &cells, tgt_pt, spec.tgt_edge, grid);
+    );
+
+    assemble_path(src_pt, src_edge, &cells, tgt_pt, tgt_edge, grid)
+}
+
+/// Align `pt` with the adjacent A* cell on the edge's perpendicular axis,
+/// so the first/last segment is purely horizontal or vertical. For a
+/// Right/Left edge the cell dictates `y`; for Top/Bottom it dictates `x`.
+fn snap_to_cell(
+    pt: (f64, f64),
+    edge: Edge,
+    cell: Option<(usize, usize)>,
+    grid: &Grid,
+) -> (f64, f64) {
+    let Some(c) = cell else {
+        return pt;
+    };
+    let cc = grid.cell_center(c);
+    match edge {
+        Edge::Right | Edge::Left => (pt.0, cc.1),
+        Edge::Top | Edge::Bottom => (cc.0, pt.1),
     }
-    vec![src_pt, tgt_pt]
 }
 
 fn build_routed_wire(spec: &SegmentSpec, path: Vec<(f64, f64)>) -> RoutedWire {
@@ -674,7 +710,7 @@ fn a_star(
     tgt_edge: Edge,
     blocked: &[bool],
     soft: &[bool],
-) -> Option<Vec<(usize, usize)>> {
+) -> Option<(Vec<(usize, usize)>, i64)> {
     let start_dir = preferred_dir(src_edge);
     let goal_dir = opposite(preferred_dir(tgt_edge));
 
@@ -713,7 +749,7 @@ fn a_star(
                     path.push(extra);
                 }
             }
-            return Some(path);
+            return Some((path, node.g_cost));
         }
 
         for &d in &[Dir::Right, Dir::Left, Dir::Up, Dir::Down] {
