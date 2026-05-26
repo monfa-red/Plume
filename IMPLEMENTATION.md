@@ -284,6 +284,33 @@ Each sprint produces a working, committed artifact. Sprints are sized for ~2–5
 
 ---
 
+### Sprint 8 — Finish the linter (~1 week)
+
+**Goal:** Turn the Sprint-7 one-rule lint stub into a real linter — multiple rules, per-rule controls, machine-readable diagnostics, and an autofix path.
+
+**Current state** (after v2 refactor):
+- `src/lint.rs` (~110 LOC), one rule: `visual-attr-inline` warns when `fill`, `stroke`, `radius`, `double`, `shadow`, `weight`, etc. are set inline instead of via `styles {}`.
+- Wired into `main.rs` as default-on; `--no-warn` silences, `--strict` promotes to errors.
+- Returns `Vec<Diagnostic>` with span + message. No rule IDs, no fix hints.
+
+**Deliverables:**
+- **Rule registry.** Each rule has a stable ID (`visual-attr-inline`, `unused-style`, …), severity, and short message. Diagnostics carry the rule ID so CI logs and editor surfaces can filter.
+- **Additional rules** (each ~30–80 LOC, one file each under `src/lint/`):
+  - `unused-style` — `styles { ... }` defined but never referenced via `.name`.
+  - `unused-shape` — same for `shapes { ... }`.
+  - `unused-default` — `defaults { foo=… }` entry that doesn't match any built-in or any `var(foo)` reference.
+  - `duplicate-style-ref` — `.a .a` on one inst.
+  - `dead-shape-body` — shape def's `{ body }` content shadowed by every instantiation's inline body.
+  - `wire-self-loop` — `a -> a` (already errors in routing; warn before resolve so authors see it earlier).
+  - `gap-without-layout` — `gap=` on a container with no `layout=` attr (silently ignored today).
+- **Configurable severity / disable.** Read a `[lint]` section from a future `plume.toml`, or accept `--allow rule` / `--deny rule` flags on the CLI. Inline `// plume-allow: rule-id` for one-line escapes.
+- **Autofix.** `plume lint --fix` rewrites the source for fixable rules (`visual-attr-inline` extracts inline visual attrs into a generated `_inline_N` style; `unused-*` deletes the dead block). Use `src/fmt.rs` to produce well-formed output.
+- **Diagnostic ranges.** Today's `Diagnostic.span` is a single point; widen to a real range so editor squiggles span the offending attr.
+- **JSON output.** `plume lint --json` emits machine-readable diagnostics for LSP / CI integrations (`{rule, severity, file, line, col, message, fix?}`).
+- **Tests.** Per-rule unit tests in `src/lint/<rule>.rs#[cfg(test)] mod tests`. Snapshot tests that lint every `samples/*.plume` and freeze the expected warning set — so a regression that newly fires (or silences) a warning is visible in `cargo insta review`.
+
+**Definition of done:** every spec smell from the table above is caught with a tested rule. `plume lint --fix samples/full_example.plume` removes the SPEC §20 example's inline visual attrs into a generated style block, the result still snapshots identically with `--bake-vars`, and the §20 sample passes `plume --strict` cleanly. `lint_str` returns rule IDs so an editor / LSP layer can map them to UI affordances.
+
 ## Testing strategy
 
 Layered:
@@ -370,9 +397,7 @@ cargo insta review
 
 Not for this implementation but worth keeping in mind so the code doesn't paint into corners:
 
-- `plume fmt` — formatter.
-- `plume watch` — recompile on change.
-- LSP server (the parser already emits spans; would mostly mean a `tower-lsp` shell).
+- LSP server (the parser already emits spans; would mostly mean a `tower-lsp` shell, plus the lint rule IDs from Sprint 8).
 - WASM target — needs the workspace split.
 - mdbook-based docs site under `docs/`.
 - Auto-layout via a graph library (force-directed, Sugiyama).
