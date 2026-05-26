@@ -33,136 +33,158 @@ pub fn route_wires(
 ) -> Result<Vec<RoutedWire>, Error> {
     let scene = SceneIndex::build(scene_nodes);
 
-    // Pre-pass: count wires that share each endpoint pair. Parallel wires
-    // get a lane offset BEFORE A* runs so each finds its own track instead
-    // of stacking onto the first wire's path.
-    let mut pair_total: HashMap<(String, String), usize> = HashMap::new();
-    for w in &program.wires {
-        let key = pair_key(&w.endpoints[0].id, &w.endpoints.last().unwrap().id);
-        *pair_total.entry(key).or_insert(0) += 1;
-    }
-    let mut pair_seen: HashMap<(String, String), usize> = HashMap::new();
+    // Pre-pass: explode chains into per-segment specs, pre-pick the entry/
+    // exit edge for each end via `nearest_edge`, and count how many segments
+    // share each (shape, edge) so we can fan wires sharing an exit/entry
+    // along that edge. Lanes are computed per endpoint independently — a
+    // wire's source lane comes from the bin (src_id, src_edge); its target
+    // lane from (tgt_id, tgt_edge).
+    let specs = plan_segments(program, &scene)?;
 
-    let mut routed: Vec<RoutedWire> = Vec::new();
+    let mut bin_total: HashMap<(String, Edge), usize> = HashMap::new();
+    for s in &specs {
+        *bin_total.entry((s.src_id.clone(), s.src_edge)).or_insert(0) += 1;
+        *bin_total.entry((s.tgt_id.clone(), s.tgt_edge)).or_insert(0) += 1;
+    }
+    let mut bin_seen: HashMap<(String, Edge), usize> = HashMap::new();
+    let mut lane_offsets: Vec<(f64, f64)> = Vec::with_capacity(specs.len());
+    for s in &specs {
+        let src = next_lane(&mut bin_seen, &bin_total, &s.src_id, s.src_edge, s.gap);
+        let tgt = next_lane(&mut bin_seen, &bin_total, &s.tgt_id, s.tgt_edge, s.gap);
+        lane_offsets.push((src, tgt));
+    }
+
+    let mut routed: Vec<RoutedWire> = Vec::with_capacity(specs.len());
     let mut soft_blocked: Vec<Vec<(usize, usize)>> = Vec::new();
 
-    for wire in &program.wires {
-        let gap = wire_gap(wire, &program.vars);
-        let bounds = scene.bounds(gap);
-        let grid = Grid::new(bounds, (gap.max(8.0) / 2.0).max(4.0));
+    for (i, spec) in specs.iter().enumerate() {
+        let bounds = scene.bounds(spec.gap);
+        let grid = Grid::new(bounds, (spec.gap.max(8.0) / 2.0).max(4.0));
 
-        let key = pair_key(&wire.endpoints[0].id, &wire.endpoints.last().unwrap().id);
-        let total = pair_total.get(&key).copied().unwrap_or(1);
-        let lane = pair_seen.entry(key).or_insert(0);
-        let lane_idx = *lane;
-        *lane += 1;
-        let lane_offset = if total > 1 {
-            (lane_idx as f64 - (total as f64 - 1.0) / 2.0) * (gap / 2.0)
-        } else {
-            0.0
-        };
-
-        for sub in route_one_wire(wire, &scene, &grid, gap, lane_offset, &soft_blocked)? {
-            soft_blocked.push(grid.cells_along(&sub.path));
-            routed.push(sub);
-        }
+        let (src_lane, tgt_lane) = lane_offsets[i];
+        let path = route_segment_with_lanes(spec, &scene, &grid, src_lane, tgt_lane, &soft_blocked);
+        soft_blocked.push(grid.cells_along(&path));
+        routed.push(build_routed_wire(spec, path));
     }
 
     Ok(routed)
 }
 
-// ─────────────────────────── Per-wire orchestration ───────────────────────────
-
-fn route_one_wire(
-    wire: &ResolvedWire,
-    scene: &SceneIndex,
-    grid: &Grid,
+/// Count the number of segments using each `(shape, edge)` so far, returning
+/// the lane offset for THIS segment. Lanes are centred around 0: for a bin
+/// with `n` segments at indices `0..n`, offsets are `(i − (n−1)/2) * step`.
+fn next_lane(
+    seen: &mut HashMap<(String, Edge), usize>,
+    total: &HashMap<(String, Edge), usize>,
+    id: &str,
+    edge: Edge,
     gap: f64,
-    lane_offset: f64,
-    soft_blocked: &[Vec<(usize, usize)>],
-) -> Result<Vec<RoutedWire>, Error> {
-    let n = wire.endpoints.len();
-    let from_id = wire.endpoints.first().unwrap().id.clone();
-    let to_id = wire.endpoints.last().unwrap().id.clone();
-    let mut subs = Vec::with_capacity(n - 1);
-
-    for i in 0..(n - 1) {
-        let src = scene
-            .lookup(&wire.endpoints[i].id)
-            .ok_or_else(|| undefined_wire_id(&wire.endpoints[i].id, wire.endpoints[i].span))?;
-        let tgt = scene.lookup(&wire.endpoints[i + 1].id).ok_or_else(|| {
-            undefined_wire_id(&wire.endpoints[i + 1].id, wire.endpoints[i + 1].span)
-        })?;
-
-        if wire.endpoints[i].id == wire.endpoints[i + 1].id {
-            return Err(Error::at(
-                wire.span,
-                "self-loops are not yet routed (SPEC §9 self-loop is deferred)",
-            ));
-        }
-
-        let path = route_segment(&src, &tgt, scene, grid, gap, lane_offset, soft_blocked);
-
-        let is_first = i == 0;
-        let is_last = i == n - 2;
-        subs.push(RoutedWire {
-            path: path.clone(),
-            markers: Markers {
-                start: if is_first {
-                    wire.markers.start
-                } else {
-                    MarkerKind::None
-                },
-                end: if is_last {
-                    wire.markers.end
-                } else {
-                    MarkerKind::None
-                },
-            },
-            attrs: wire.attrs.clone(),
-            texts: if is_first {
-                place_texts(&wire.texts, &path)
-            } else {
-                Vec::new()
-            },
-            data_from: from_id.clone(),
-            data_to: to_id.clone(),
-        });
+) -> f64 {
+    let key = (id.to_string(), edge);
+    let n = total.get(&key).copied().unwrap_or(1);
+    if n <= 1 {
+        return 0.0;
     }
-    Ok(subs)
+    let i = seen.entry(key).or_insert(0);
+    let idx = *i;
+    *i += 1;
+    let step = gap / 2.0;
+    (idx as f64 - (n as f64 - 1.0) / 2.0) * step
 }
 
-fn route_segment(
-    src: &ShapeRef,
-    tgt: &ShapeRef,
+// ─────────────────────────── Per-segment orchestration ───────────────────────────
+
+/// One wire SEGMENT — chains explode into one spec per link. Holds the bits
+/// of state we need both for the lane-counting pre-pass and for the routing
+/// pass without having to re-look-up shapes or re-pick edges.
+struct SegmentSpec<'a> {
+    wire: &'a ResolvedWire,
+    src_id: String,
+    tgt_id: String,
+    src_edge: Edge,
+    tgt_edge: Edge,
+    src_bbox: AbsBbox,
+    tgt_bbox: AbsBbox,
+    gap: f64,
+    /// True iff this is the first segment in its chain — only the first
+    /// segment carries the chain's start marker and wire-text labels.
+    is_first: bool,
+    /// True iff this is the last segment in its chain.
+    is_last: bool,
+    data_from: String,
+    data_to: String,
+}
+
+fn plan_segments<'a>(
+    program: &'a Program,
+    scene: &SceneIndex,
+) -> Result<Vec<SegmentSpec<'a>>, Error> {
+    let mut out = Vec::new();
+    for wire in &program.wires {
+        let n = wire.endpoints.len();
+        let from_id = wire.endpoints.first().unwrap().id.clone();
+        let to_id = wire.endpoints.last().unwrap().id.clone();
+        let gap = wire_gap(wire, &program.vars);
+        for i in 0..(n - 1) {
+            let src_id = wire.endpoints[i].id.clone();
+            let tgt_id = wire.endpoints[i + 1].id.clone();
+            if src_id == tgt_id {
+                return Err(Error::at(
+                    wire.span,
+                    "self-loops are not yet routed (SPEC §9 self-loop is deferred)",
+                ));
+            }
+            let src = scene
+                .lookup(&src_id)
+                .ok_or_else(|| undefined_wire_id(&src_id, wire.endpoints[i].span))?;
+            let tgt = scene
+                .lookup(&tgt_id)
+                .ok_or_else(|| undefined_wire_id(&tgt_id, wire.endpoints[i + 1].span))?;
+            let src_edge = nearest_edge(&src.bbox, (tgt.bbox.cx(), tgt.bbox.cy()));
+            let tgt_edge = nearest_edge(&tgt.bbox, (src.bbox.cx(), src.bbox.cy()));
+            out.push(SegmentSpec {
+                wire,
+                src_id,
+                tgt_id,
+                src_edge,
+                tgt_edge,
+                src_bbox: src.bbox,
+                tgt_bbox: tgt.bbox,
+                gap,
+                is_first: i == 0,
+                is_last: i == n - 2,
+                data_from: from_id.clone(),
+                data_to: to_id.clone(),
+            });
+        }
+    }
+    Ok(out)
+}
+
+fn route_segment_with_lanes(
+    spec: &SegmentSpec,
     scene: &SceneIndex,
     grid: &Grid,
-    gap: f64,
-    lane_offset: f64,
+    src_lane: f64,
+    tgt_lane: f64,
     soft_blocked: &[Vec<(usize, usize)>],
 ) -> Vec<(f64, f64)> {
-    let src_edge = nearest_edge(&src.bbox, (tgt.bbox.cx(), tgt.bbox.cy()));
-    let tgt_edge = nearest_edge(&tgt.bbox, (src.bbox.cx(), src.bbox.cy()));
-    // Lane offset shifts the endpoint along its edge so parallel wires don't
-    // stack. Clamp to the inner half of the edge so the connection stays
-    // clearly on the shape.
     let src_pt = lane_shift(
-        edge_midpoint(&src.bbox, src_edge),
-        src_edge,
-        lane_offset,
-        &src.bbox,
+        edge_midpoint(&spec.src_bbox, spec.src_edge),
+        spec.src_edge,
+        src_lane,
+        &spec.src_bbox,
     );
     let tgt_pt = lane_shift(
-        edge_midpoint(&tgt.bbox, tgt_edge),
-        tgt_edge,
-        lane_offset,
-        &tgt.bbox,
+        edge_midpoint(&spec.tgt_bbox, spec.tgt_edge),
+        spec.tgt_edge,
+        tgt_lane,
+        &spec.tgt_bbox,
     );
+    let start_cell = grid.cell_outside(&spec.src_bbox, spec.src_edge, spec.gap, src_lane);
+    let goal_cell = grid.cell_outside(&spec.tgt_bbox, spec.tgt_edge, spec.gap, tgt_lane);
 
-    let start_cell = grid.cell_outside(&src.bbox, src_edge, gap, lane_offset);
-    let goal_cell = grid.cell_outside(&tgt.bbox, tgt_edge, gap, lane_offset);
-
-    let shape_obstacles = scene.obstacles_for(&src.id, &tgt.id, gap);
+    let shape_obstacles = scene.obstacles_for(&spec.src_id, &spec.tgt_id, spec.gap);
     let blocked_by_shapes = grid.block_cells(&shape_obstacles);
     let blocked_by_wires = grid.flatten_soft(soft_blocked);
 
@@ -171,48 +193,118 @@ fn route_segment(
         grid,
         start_cell,
         goal_cell,
-        src_edge,
-        tgt_edge,
+        spec.src_edge,
+        spec.tgt_edge,
         &blocked_by_shapes,
         &blocked_by_wires,
     ) {
-        return assemble_path(src_pt, &cells, tgt_pt, grid);
+        return assemble_path(src_pt, spec.src_edge, &cells, tgt_pt, spec.tgt_edge, grid);
     }
     // Tier 2: avoid shapes only.
     if let Some(cells) = a_star(
         grid,
         start_cell,
         goal_cell,
-        src_edge,
-        tgt_edge,
+        spec.src_edge,
+        spec.tgt_edge,
         &blocked_by_shapes,
         &[],
     ) {
-        return assemble_path(src_pt, &cells, tgt_pt, grid);
+        return assemble_path(src_pt, spec.src_edge, &cells, tgt_pt, spec.tgt_edge, grid);
     }
     // Tier 3: no obstacles (allows crossing shapes).
-    if let Some(cells) = a_star(grid, start_cell, goal_cell, src_edge, tgt_edge, &[], &[]) {
-        return assemble_path(src_pt, &cells, tgt_pt, grid);
+    if let Some(cells) = a_star(
+        grid,
+        start_cell,
+        goal_cell,
+        spec.src_edge,
+        spec.tgt_edge,
+        &[],
+        &[],
+    ) {
+        return assemble_path(src_pt, spec.src_edge, &cells, tgt_pt, spec.tgt_edge, grid);
     }
-    // Tier 4: straight line.
     vec![src_pt, tgt_pt]
+}
+
+fn build_routed_wire(spec: &SegmentSpec, path: Vec<(f64, f64)>) -> RoutedWire {
+    RoutedWire {
+        markers: Markers {
+            start: if spec.is_first {
+                spec.wire.markers.start
+            } else {
+                MarkerKind::None
+            },
+            end: if spec.is_last {
+                spec.wire.markers.end
+            } else {
+                MarkerKind::None
+            },
+        },
+        attrs: spec.wire.attrs.clone(),
+        texts: if spec.is_first {
+            place_texts(&spec.wire.texts, &path)
+        } else {
+            Vec::new()
+        },
+        data_from: spec.data_from.clone(),
+        data_to: spec.data_to.clone(),
+        path,
+    }
 }
 
 fn assemble_path(
     src_pt: (f64, f64),
+    src_edge: Edge,
     cells: &[(usize, usize)],
     tgt_pt: (f64, f64),
+    tgt_edge: Edge,
     grid: &Grid,
 ) -> Vec<(f64, f64)> {
-    // Convert grid cell centres to world coords; collapse collinear runs;
-    // anchor first and last points to the actual shape edges.
-    let mut pts: Vec<(f64, f64)> = Vec::with_capacity(cells.len() + 2);
+    let mut pts: Vec<(f64, f64)> = Vec::with_capacity(cells.len() + 4);
     pts.push(src_pt);
+    // Insert a corner so src_pt → first_cell is strictly axis-aligned. The
+    // source's chosen edge dictates which axis the first segment runs on.
+    if let Some(&first) = cells.first() {
+        let first_world = grid.cell_center(first);
+        if let Some(corner) = bridge_corner(src_pt, first_world, src_edge) {
+            pts.push(corner);
+        }
+    }
     for &c in cells {
         pts.push(grid.cell_center(c));
     }
+    // Same trick for the tail: insert a corner so last_cell → tgt_pt is axis-aligned.
+    if let Some(&last) = cells.last() {
+        let last_world = grid.cell_center(last);
+        if let Some(corner) = bridge_corner(tgt_pt, last_world, tgt_edge) {
+            pts.push(corner);
+        }
+    }
     pts.push(tgt_pt);
     simplify(&pts)
+}
+
+/// Return the corner needed to make `inner → endpoint` strictly orthogonal,
+/// where `endpoint` lies on a shape edge of orientation `edge`. The endpoint's
+/// edge fixes which axis the connecting segment runs along: a Right/Left edge
+/// means a horizontal segment, Top/Bottom means vertical. The corner sits at
+/// the intersection.
+fn bridge_corner(endpoint: (f64, f64), inner: (f64, f64), edge: Edge) -> Option<(f64, f64)> {
+    if approx_eq(endpoint.0, inner.0) && approx_eq(endpoint.1, inner.1) {
+        return None;
+    }
+    let corner = match edge {
+        Edge::Right | Edge::Left => (inner.0, endpoint.1),
+        Edge::Top | Edge::Bottom => (endpoint.0, inner.1),
+    };
+    // Skip the corner if it collapses onto either endpoint of the segment.
+    if (approx_eq(corner.0, endpoint.0) && approx_eq(corner.1, endpoint.1))
+        || (approx_eq(corner.0, inner.0) && approx_eq(corner.1, inner.1))
+    {
+        return None;
+    }
+    Some(corner)
 }
 
 fn simplify(pts: &[(f64, f64)]) -> Vec<(f64, f64)> {
@@ -232,29 +324,6 @@ fn simplify(pts: &[(f64, f64)]) -> Vec<(f64, f64)> {
         }
     }
     out.push(*pts.last().unwrap());
-    // Force the first segment to leave the source orthogonally — snap the
-    // second point's coordinates to align with the source's exit axis.
-    if out.len() >= 2 {
-        let (sx, sy) = out[0];
-        let (mut nx, mut ny) = out[1];
-        if (nx - sx).abs() > (ny - sy).abs() {
-            ny = sy;
-        } else {
-            nx = sx;
-        }
-        out[1] = (nx, ny);
-    }
-    let last_i = out.len() - 1;
-    if out.len() >= 2 {
-        let (tx, ty) = out[last_i];
-        let (mut px, mut py) = out[last_i - 1];
-        if (tx - px).abs() > (ty - py).abs() {
-            py = ty;
-        } else {
-            px = tx;
-        }
-        out[last_i - 1] = (px, py);
-    }
     out
 }
 
@@ -302,7 +371,6 @@ impl AbsBbox {
 
 #[derive(Clone)]
 struct ShapeRef {
-    id: String,
     bbox: AbsBbox,
 }
 
@@ -364,7 +432,6 @@ impl SceneIndex {
     fn lookup(&self, id: &str) -> Option<ShapeRef> {
         let i = *self.by_id.get(id)?;
         Some(ShapeRef {
-            id: id.to_string(),
             bbox: self.nodes[i].bbox,
         })
     }
@@ -724,7 +791,7 @@ fn opposite(d: Dir) -> Dir {
 
 // ─────────────────────────── Edge selection ───────────────────────────
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 enum Edge {
     Right,
     Bottom,
@@ -785,14 +852,6 @@ fn lane_shift(pt: (f64, f64), edge: Edge, lane_offset: f64, bbox: &AbsBbox) -> (
             let max_y = bbox.y + bbox.h - inset;
             (pt.0, (pt.1 + lane_offset).clamp(min_y, max_y))
         }
-    }
-}
-
-fn pair_key(a: &str, b: &str) -> (String, String) {
-    if a <= b {
-        (a.to_string(), b.to_string())
-    } else {
-        (b.to_string(), a.to_string())
     }
 }
 

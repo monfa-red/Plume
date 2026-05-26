@@ -40,52 +40,52 @@ input_file: samples/wires_chain.plume
   </g>
   <g class="plume-wires">
     <g class="plume-wire" data-from="outlet" data-to="caps">
-      <path d="M 0 -114.4 L 0 -96 L 0 -104 L 0 -94.4" fill="none" stroke="red" stroke-width="2"/>
+      <path d="M -32 -114.4 L -32 -96 L -30.025 -96 L -30.025 -104 L -30.875 -104 L -30.875 -94.4" fill="none" stroke="red" stroke-width="2"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="caps">
-      <path d="M 0 -44.8 L 0 -24 L 0 -40 L 0 -24.8" fill="none" stroke="red" stroke-width="2"/>
+      <path d="M 0 -44.8 L 0 -24 L 1.975 -24 L 1.975 -40 L 0 -40 L 0 -24.8" fill="none" stroke="red" stroke-width="2"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="caps">
-      <path d="M 0 24.8 L 0 48 L 0 32 L 0 44.8" fill="none" stroke="red" stroke-width="2"/>
+      <path d="M 0 24.8 L 0 48 L 1.975 48 L 1.975 32 L 0 32 L 0 44.8" fill="none" stroke="red" stroke-width="2"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="caps">
-      <path d="M 0 94.4 L 0 112 L 0 104 L 0 114.4" fill="none" stroke="red" stroke-width="2"/>
+      <path d="M 0 94.4 L 0 112 L 1.975 112 L 1.975 104 L 0 104 L 0 110.4" fill="none" stroke="red" stroke-width="2"/>
       <polygon class="plume-marker plume-marker-arrow" points="0,110.4 -5,100.4 5,100.4" fill="red"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="drive">
-      <path d="M -28 -114.4 L -28 -96 L -28 -104 L -28 -94.4" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-28,-98.4 -33,-108.4 -23,-108.4" fill="#444"/>
+      <path d="M -24 -114.4 L -24 -96 L -22.025 -96 L -22.025 -104 L -24 -104 L -24 -98.4" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-24,-98.4 -29,-108.4 -19,-108.4" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="drive">
-      <path d="M -20 -114.4 L -20 -96 L -20 -104 L -20 -94.4" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-20,-98.4 -25,-108.4 -15,-108.4" fill="#444"/>
+      <path d="M -16 -114.4 L -16 -96 L -14.025 -96 L -14.025 -104 L -16 -104 L -16 -98.4" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-16,-98.4 -21,-108.4 -11,-108.4" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="drive">
-      <path d="M -12 -114.4 L -12 -96 L -12 -104 L -12 -94.4" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-12,-110.4 -7,-100.4 -17,-100.4" fill="#444"/>
+      <path d="M -8 -110.4 L -8 -96 L -6.025 -96 L -6.025 -104 L -8 -104 L -8 -94.4" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-8,-110.4 -3,-100.4 -13,-100.4" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="drive">
-      <path d="M -4 -114.4 L -4 -96 L -4 -104 L -4 -94.4" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-4,-110.4 1,-100.4 -9,-100.4" fill="#444"/>
+      <path d="M 0 -110.4 L 0 -96 L 1.975 -96 L 1.975 -104 L 0 -104 L 0 -94.4" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="0,-110.4 5,-100.4 -5,-100.4" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="drive">
-      <path d="M 4 -114.4 L 4 -96 L 4 -104 L 4 -94.4" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="4,-110.4 9,-100.4 -1,-100.4" fill="#444"/>
+      <path d="M 8 -110.4 L 8 -96 L 9.975 -96 L 9.975 -104 L 8 -104 L 8 -94.4" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="8,-110.4 13,-100.4 3,-100.4" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="drive">
-      <path d="M 12 -114.4 L 12 -96 L 12 -104 L 12 -94.4" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="12,-110.4 17,-100.4 7,-100.4" fill="#444"/>
-      <polygon class="plume-marker plume-marker-arrow" points="12,-98.4 7,-108.4 17,-108.4" fill="#444"/>
+      <path d="M 16 -110.4 L 16 -96 L 17.975 -96 L 17.975 -104 L 16 -104 L 16 -98.4" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="16,-110.4 21,-100.4 11,-100.4" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="16,-98.4 11,-108.4 21,-108.4" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="drive">
-      <path d="M 20 -114.4 L 20 -96 L 20 -104 L 20 -94.4" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="20,-110.4 25,-100.4 15,-100.4" fill="#444"/>
-      <polygon class="plume-marker plume-marker-arrow" points="20,-98.4 15,-108.4 25,-108.4" fill="#444"/>
+      <path d="M 24 -110.4 L 24 -96 L 25.975 -96 L 25.975 -104 L 24 -104 L 24 -98.4" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="24,-110.4 29,-100.4 19,-100.4" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="24,-98.4 19,-108.4 29,-108.4" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="drive">
-      <path d="M 28 -114.4 L 28 -96 L 28 -104 L 28 -94.4" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="28,-110.4 33,-100.4 23,-100.4" fill="#444"/>
-      <polygon class="plume-marker plume-marker-arrow" points="28,-98.4 23,-108.4 33,-108.4" fill="#444"/>
+      <path d="M 32 -110.4 L 32 -96 L 33.975 -96 L 33.975 -104 L 30.875 -104 L 30.875 -98.4" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="32,-110.4 37,-100.4 27,-100.4" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="30.875,-98.4 25.875,-108.4 35.875,-108.4" fill="#444"/>
     </g>
   </g>
 </svg>

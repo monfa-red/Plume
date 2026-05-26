@@ -23,8 +23,15 @@ pub fn render_wire(out: &mut String, w: &RoutedWire, vars: &VarTable, opts: &Opt
     )
     .unwrap();
 
-    let mut d = format!("M {} {}", num(w.path[0].0), num(w.path[0].1));
-    for p in &w.path[1..] {
+    // Shorten the path at each marker-bearing endpoint so the drawn line
+    // STOPS where the marker tip will sit. Otherwise the stroke pokes out
+    // past the arrowhead, which reads as a rendering bug. The visible gap
+    // between the marker tip and the shape's edge (`MARKER_INSET`, 4 px)
+    // gives the "almost touching" look the SPEC describes.
+    let drawn = shorten_for_markers(&w.path, &w.markers);
+
+    let mut d = format!("M {} {}", num(drawn[0].0), num(drawn[0].1));
+    for p in &drawn[1..] {
         write!(d, " L {} {}", num(p.0), num(p.1)).unwrap();
     }
     let dash_attr = if dash.is_empty() {
@@ -60,6 +67,45 @@ pub fn render_wire(out: &mut String, w: &RoutedWire, vars: &VarTable, opts: &Opt
     }
 
     out.push_str("    </g>\n");
+}
+
+/// Same value that `markers::marker_anchor` uses to inset the tip from the
+/// raw endpoint. Keep these two in sync — the line should end exactly at
+/// the marker tip so nothing visibly pokes past it.
+const MARKER_INSET: f64 = 4.0;
+
+fn shorten_for_markers(path: &[(f64, f64)], markers: &crate::resolve::Markers) -> Vec<(f64, f64)> {
+    let mut p = path.to_vec();
+    if p.len() < 2 {
+        return p;
+    }
+    if markers.end != MarkerKind::None {
+        let n = p.len();
+        if let Some((nx, ny)) = pulled_back(p[n - 2], p[n - 1], MARKER_INSET) {
+            p[n - 1] = (nx, ny);
+        }
+    }
+    if markers.start != MarkerKind::None {
+        if let Some((nx, ny)) = pulled_back(p[1], p[0], MARKER_INSET) {
+            p[0] = (nx, ny);
+        }
+    }
+    p
+}
+
+/// Move `endpoint` along the segment `inner → endpoint`, toward `inner`, by
+/// `amount` pixels. Returns `None` if the segment is too short to absorb the
+/// shift (in which case we'd rather leave the line untouched than collapse it).
+fn pulled_back(inner: (f64, f64), endpoint: (f64, f64), amount: f64) -> Option<(f64, f64)> {
+    let dx = endpoint.0 - inner.0;
+    let dy = endpoint.1 - inner.1;
+    let len = (dx * dx + dy * dy).sqrt();
+    if len <= amount + 0.5 {
+        return None;
+    }
+    let ux = dx / len;
+    let uy = dy / len;
+    Some((endpoint.0 - ux * amount, endpoint.1 - uy * amount))
 }
 
 fn wire_dash(attrs: &crate::resolve::AttrMap) -> String {

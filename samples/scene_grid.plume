@@ -1,14 +1,21 @@
-styles {
-  bold weight=bold
-}
-
 shapes {
-  psu :rect
-  bus :slant
+  // attr bundle form
+  psu :rect radius=5
+  bus :slant fill=gray
+
+  // container with layout
+  toolbar layout=row gap=10 {
+    :icon name=save
+    :icon name=copy
+  }
+
+  // base + body — full composition.
+  panel :group layout=column gap=8 padding=12 {
+    :text "Title" at=top weight=bold
+    :text "Content"
+  }
 }
 
-scene layout=(3, 1) gap=40 padding=20 {
-  outlet :oval "Outlet 120-240 VAC" cell=(1, 1)
-  drive  :psu  "Drive PSU"          cell=(2, 1) .bold
-  bus48  :bus  "Bus"                cell=(3, 1)
+scene {
+  :rect "hello"
 }

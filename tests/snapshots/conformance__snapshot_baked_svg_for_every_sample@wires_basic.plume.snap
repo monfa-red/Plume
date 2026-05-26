@@ -22,7 +22,7 @@ input_file: samples/wires_basic.plume
   </g>
   <g class="plume-wires">
     <g class="plume-wire" data-from="a" data-to="b">
-      <path d="M 0 -10 L 0 8.4 L 0 0.4 L 0 10" fill="none" stroke="#444" stroke-width="1"/>
+      <path d="M 0 -10 L 0 8.4 L -0.575 8.4 L -0.575 0.4 L 0 0.4 L 0 6" fill="none" stroke="#444" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="0,6 -5,-4 5,-4" fill="#444"/>
     </g>
   </g>
