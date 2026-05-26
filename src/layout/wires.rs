@@ -173,13 +173,13 @@ fn route_segment_with_lanes(
     let blocked_by_shapes = grid.block_cells(&shape_obstacles);
     let blocked_by_wires = grid.flatten_soft(soft_blocked);
 
-    // Try every edge combination (4 src × 4 tgt = 16), keeping the cheapest
-    // A* result. `nearest_edge` was a fast heuristic, but on tight diagrams
-    // it picks an edge that forces a long detour (e.g. exiting RIGHT into an
-    // obstacle when going UP and OVER would be much shorter). Exhaustive
-    // search at this scale is still microsecond-fast: the grid is coarse
-    // and most candidate paths are rejected almost immediately.
-    let all_edges = [Edge::Right, Edge::Bottom, Edge::Left, Edge::Top];
+    // Edge candidates: 3 per side. We drop the edge that strictly faces AWAY
+    // from the other shape (a path would loop all the way around the source
+    // to use it). The remaining 3 × 3 = 9 combos cover every shape that
+    // produced visibly bad routes during testing, including the
+    // `meter → hmi` case where the perpendicular Bottom edges save the day.
+    let src_edges = candidate_edges(&spec.src_bbox, &spec.tgt_bbox);
+    let tgt_edges = candidate_edges(&spec.tgt_bbox, &spec.src_bbox);
     type Candidate = (i64, Edge, Edge, Vec<(usize, usize)>);
     let mut best: Option<Candidate> = None;
 
@@ -189,8 +189,8 @@ fn route_segment_with_lanes(
             1 => (&blocked_by_shapes[..], &[][..]),
             _ => (&[][..], &[][..]),
         };
-        for &se in &all_edges {
-            for &te in &all_edges {
+        for &se in &src_edges {
+            for &te in &tgt_edges {
                 let start = grid.cell_outside(&spec.src_bbox, se, spec.gap, src_lane);
                 let goal = grid.cell_outside(&spec.tgt_bbox, te, spec.gap, tgt_lane);
                 if let Some((cells, cost)) =
@@ -242,6 +242,34 @@ fn route_segment_with_lanes(
     );
 
     assemble_path(src_pt, src_edge, &cells, tgt_pt, tgt_edge, grid)
+}
+
+/// For `self_bbox` connecting to `other_bbox`, return the edges of
+/// `self_bbox` worth considering as the entry/exit point — that is, every
+/// edge except the one strictly facing AWAY from `other_bbox`. With
+/// `other` to the right, the Left edge is excluded; with `other` below,
+/// the Top edge is excluded. Perpendicular edges are kept because they
+/// can produce a shorter route when the direct edge is blocked.
+fn candidate_edges(self_bbox: &AbsBbox, other_bbox: &AbsBbox) -> Vec<Edge> {
+    let dx = other_bbox.cx() - self_bbox.cx();
+    let dy = other_bbox.cy() - self_bbox.cy();
+    let mut out = Vec::with_capacity(4);
+    for e in [Edge::Right, Edge::Bottom, Edge::Left, Edge::Top] {
+        let strictly_away = match e {
+            Edge::Right => dx < -0.5,
+            Edge::Left => dx > 0.5,
+            Edge::Bottom => dy < -0.5,
+            Edge::Top => dy > 0.5,
+        };
+        if !strictly_away {
+            out.push(e);
+        }
+    }
+    if out.is_empty() {
+        // Degenerate case (perfectly overlapping centres) — fall back to all.
+        out.extend_from_slice(&[Edge::Right, Edge::Bottom, Edge::Left, Edge::Top]);
+    }
+    out
 }
 
 /// Align `pt` with the adjacent A* cell on the edge's perpendicular axis,

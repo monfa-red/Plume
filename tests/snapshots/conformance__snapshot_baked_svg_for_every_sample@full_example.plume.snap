@@ -135,7 +135,7 @@ input_file: samples/full_example.plume
       <path d="M -213.2 -67.1 L -115.9 -67.1 L -115.9 -83.1 L -96.85 -83.1" fill="none" stroke="red" stroke-width="2"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="caps">
-      <path d="M 37.25 -75.1 L 102.7 -75.1" fill="none" stroke="red" stroke-width="2"/>
+      <path d="M 37.25 -75.1 L 47.25 -75.1" fill="none" stroke="red" stroke-width="2"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="caps">
       <path d="M 102.7 -83.1 L 212.1 -83.1 L 212.1 -75.1 L 229.9 -75.1" fill="none" stroke="red" stroke-width="2"/>
@@ -148,8 +148,8 @@ input_file: samples/full_example.plume
       <path d="M -213.2 -59.1 L -187.9 -59.1 L -187.9 -3.1 L -104 -3.1" fill="none" stroke="#444" stroke-width="1"/>
     </g>
     <g class="plume-wire" data-from="outlet" data-to="bus24">
-      <path d="M 44.4 -3.1 L 105.85 -3.1" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="108.85,-3.1 98.85,1.9 98.85,-8.1" fill="#444"/>
+      <path d="M 44.4 -3.1 L 50.4 -3.1" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="53.4,-3.1 43.4,1.9 43.4,-8.1" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="bus48" data-to="bands">
       <path d="M 102.7 -75.1 L 140.1 -75.1 L 140.1 12.9 L 217.9 12.9" fill="none" stroke="#444" stroke-width="1"/>
@@ -159,14 +159,14 @@ input_file: samples/full_example.plume
       <polygon class="plume-marker plume-marker-arrow" points="292.9,12.9 282.9,17.9 282.9,7.9" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="fadec" data-to="drive">
-      <path d="M -327.425 108.9 L -395.9 108.9 L -395.9 -123.1 L -27.9 -123.1 L -27.9 -106.1" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-324.425,108.9 -334.425,113.9 -334.425,103.9" fill="#444"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-27.9,-103.1 -32.9,-113.1 -22.9,-113.1" fill="#444"/>
-      <text x="-353.6375" y="-123.1" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="#222" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">CAN</text>
+      <path d="M -291.9 66.5 L -291.9 -11.1 L -395.9 -11.1 L -395.9 -107.1 L -123.9 -107.1 L -123.9 -75.1 L -100.85 -75.1" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-291.9,69.5 -296.9,59.5 -286.9,59.5" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-97.85,-75.1 -107.85,-70.1 -107.85,-80.1" fill="#444"/>
+      <text x="-371.175" y="-107.1" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="#222" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">CAN</text>
     </g>
     <g class="plume-wire" data-from="estop" data-to="fuse">
-      <path d="M -278.05 124.9 L 396.1 124.9 L 396.1 -115.1 L 252.1 -115.1 L 252.1 -95.5" fill="none" stroke="orange" stroke-width="2"/>
-      <circle class="plume-marker plume-marker-dot" cx="252.1" cy="-92.5" r="3.3333" fill="orange"/>
+      <path d="M -278.05 124.9 L 396.1 124.9 L 396.1 -115.1 L 252.1 -115.1 L 252.1 -58.5" fill="none" stroke="orange" stroke-width="2"/>
+      <circle class="plume-marker plume-marker-dot" cx="252.1" cy="-55.5" r="3.3333" fill="orange"/>
     </g>
   </g>
 </svg>
