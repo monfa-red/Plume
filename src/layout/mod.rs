@@ -170,7 +170,7 @@ fn lay_out_container_children(
                 grid::lay_out_grid(&mut flow_children, cols, rows, container_attrs, vars, span)?
             }
         };
-        for (slot, placed) in flow_indices.iter().zip(flow_children.into_iter()) {
+        for (slot, placed) in flow_indices.iter().zip(flow_children) {
             children[*slot] = placed;
         }
         bbox
