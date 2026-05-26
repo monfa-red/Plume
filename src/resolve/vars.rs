@@ -74,6 +74,87 @@ fn set_visual(t: &mut VarTable, name: &str, v: ResolvedValue) {
     t.set(name, VarKind::Visual, v);
 }
 
+/// Apply a `--theme FILE`'s `--plume-*` overrides on top of the built-in
+/// defaults. Theme entries arrive as `(name, raw_value_string)` from
+/// `theme::extract_plume_vars`.
+///
+/// Theme values are parsed as standalone Plume values where possible — numbers,
+/// hex colors, and tuple/call shapes go through the full lexer/parser path so
+/// layout vars carry their numeric meaning. Anything that doesn't parse falls
+/// back to a `String` value, which still emits verbatim in the SVG style block
+/// and is acceptable for visual-only vars.
+pub fn apply_theme(table: &mut VarTable, entries: &[(String, String)]) {
+    for (name, raw) in entries {
+        let value = parse_theme_value(raw);
+        let kind = match table.get(name) {
+            Some(VarEntry { kind, .. }) => *kind,
+            None => VarKind::Visual,
+        };
+        table.set(name.clone(), kind, value);
+    }
+}
+
+fn parse_theme_value(raw: &str) -> ResolvedValue {
+    let s = raw.trim();
+    // Try the standalone Plume value parser first so numbers, hexes, tuples,
+    // and rgb()/rgba()/hsl() calls all round-trip with full type info.
+    if let Some(v) = try_parse_via_plume(s) {
+        return v;
+    }
+    // Anything we can't parse stays a literal CSS string. Emits verbatim in
+    // the style block (e.g. `rgba(0,0,0,0.2)`, `Inter, sans-serif`) — perfect
+    // for visual vars; layout vars that fall through here have no numeric
+    // meaning and will trigger the visual-var error if used in a layout attr.
+    ResolvedValue::String(s.to_string())
+}
+
+fn try_parse_via_plume(s: &str) -> Option<ResolvedValue> {
+    let tokens = crate::lexer::lex(s).ok()?;
+    // Empty input is not a value.
+    if tokens.is_empty() {
+        return None;
+    }
+    let ast_value = crate::parser::parse_value_only(&tokens).ok()?;
+    convert_value(&ast_value)
+}
+
+fn convert_value(v: &crate::ast::Value) -> Option<ResolvedValue> {
+    use crate::ast::Value;
+    Some(match v {
+        Value::Number(n) => ResolvedValue::Number(*n),
+        Value::String(s) => ResolvedValue::String(s.clone()),
+        Value::Hex(h) => ResolvedValue::Hex(h.clone()),
+        Value::Ident(s) => ResolvedValue::Ident(s.clone()),
+        Value::Tuple(items) => {
+            let mut out = Vec::with_capacity(items.len());
+            for item in items {
+                out.push(convert_value(item)?);
+            }
+            ResolvedValue::Tuple(out)
+        }
+        Value::List(items) => {
+            let mut out = Vec::with_capacity(items.len());
+            for item in items {
+                out.push(convert_value(item)?);
+            }
+            ResolvedValue::List(out)
+        }
+        Value::Call(c) => {
+            let mut args = Vec::with_capacity(c.args.len());
+            for arg in &c.args {
+                args.push(convert_value(arg)?);
+            }
+            ResolvedValue::Call(crate::resolve::ResolvedCall {
+                name: c.name.clone(),
+                args,
+            })
+        }
+        // Raw `--name` CSS vars can't appear at value top level; theme values
+        // referencing one would error.
+        Value::RawCssVar(_) => return None,
+    })
+}
+
 /// Apply a `defaults {}` block on top of the table. Each entry overrides the
 /// previous value; unknown names are introduced as Visual vars so user-defined
 /// `--plume-*` vars can be themed at runtime.

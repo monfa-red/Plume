@@ -5,7 +5,14 @@ fn render_live(src: &str) -> String {
 }
 
 fn render_baked(src: &str) -> String {
-    plume::compile_str_with(src, &RenderOptions { bake_vars: true }).expect("compile")
+    plume::compile_str_with(
+        src,
+        &RenderOptions {
+            bake_vars: true,
+            ..Default::default()
+        },
+    )
+    .expect("compile")
 }
 
 #[test]
@@ -113,8 +120,14 @@ fn poly_emits_polygon_with_user_points() {
 fn full_spec_example_renders_in_both_modes() {
     let src = std::fs::read_to_string("samples/full_example.plume").expect("read");
     let live = plume::compile_str(&src).expect("live compile");
-    let baked =
-        plume::compile_str_with(&src, &RenderOptions { bake_vars: true }).expect("baked compile");
+    let baked = plume::compile_str_with(
+        &src,
+        &RenderOptions {
+            bake_vars: true,
+            ..Default::default()
+        },
+    )
+    .expect("baked compile");
     assert!(live.contains("var(--plume-"));
     assert!(!baked.contains("@layer plume.defaults"));
     // Both should be plausible SVG documents.

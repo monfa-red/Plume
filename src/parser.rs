@@ -17,6 +17,23 @@ pub fn parse(tokens: &[Token]) -> Result<File, Error> {
     Ok(File { blocks })
 }
 
+/// Parse a single Plume value from a complete token stream. Used by the theme
+/// loader to interpret `--plume-NAME: VALUE;` declarations as Plume values
+/// (numbers, hex, tuples, calls, …) rather than opaque CSS strings.
+pub fn parse_value_only(tokens: &[Token]) -> Result<Value, Error> {
+    let mut p = Parser {
+        toks: tokens,
+        pos: 0,
+    };
+    p.skip_newlines();
+    let v = p.parse_value()?;
+    p.skip_newlines();
+    if p.peek().is_some() {
+        return Err(Error::at(p.next_span(), "trailing tokens after value"));
+    }
+    Ok(v)
+}
+
 struct Parser<'a> {
     toks: &'a [Token],
     pos: usize,

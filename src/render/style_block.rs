@@ -4,16 +4,14 @@
 //! (a runtime theme switcher, an embedding page) wins automatically.
 
 use super::values::format_value;
-use super::Options;
 use crate::resolve::VarTable;
+use crate::Options;
 use std::fmt::Write;
 
 pub fn emit(out: &mut String, vars: &VarTable, opts: &Options) {
-    if opts.bake_vars {
-        // Bake mode: every `var()` has been replaced with its literal in the
-        // tree, so no defaults block is needed (and including one would only
-        // change the renderer if it does support vars — which is the opposite
-        // of what bake mode is for).
+    if opts.bake_vars || opts.no_defaults {
+        // `--bake-vars` inlines every value, and `--no-defaults` defers the
+        // defaults to the host page. Either way, skip the `<style>` block.
         return;
     }
 

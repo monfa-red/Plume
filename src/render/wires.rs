@@ -2,9 +2,9 @@
 
 use super::markers::{emit_marker, marker_anchor};
 use super::values::{attr_num, attr_or_var, escape_xml, num};
-use super::Options;
 use crate::layout::{RoutedText, RoutedWire};
 use crate::resolve::{MarkerKind, ResolvedValue, VarTable};
+use crate::Options;
 use std::fmt::Write;
 
 pub fn render_wire(out: &mut String, w: &RoutedWire, vars: &VarTable, opts: &Options) {

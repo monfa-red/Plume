@@ -1,8 +1,8 @@
 //! Attribute extraction + ResolvedValue → CSS-formatted string helpers used by
 //! every render submodule.
 
-use super::Options;
 use crate::resolve::{AttrMap, ResolvedCall, ResolvedValue, VarTable};
+use crate::Options;
 
 /// Format a value for use inline in SVG/CSS (e.g. an attribute value).
 ///

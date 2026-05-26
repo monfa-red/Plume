@@ -5,16 +5,8 @@ mod values;
 mod wires;
 
 use crate::layout::{LaidOut, PlacedNode};
+use crate::Options;
 use values::{build_classes, escape_xml, num};
-
-#[derive(Debug, Clone, Default)]
-pub struct Options {
-    /// When `true`, emit `var()` values as their resolved literal so renderers
-    /// without CSS-variable support (resvg, librsvg, image-conversion
-    /// pipelines) still display the diagram. The `@layer plume.defaults` style
-    /// block is skipped in this mode since every value is already inline.
-    pub bake_vars: bool,
-}
 
 pub fn render(laid_out: &LaidOut, opts: &Options) -> String {
     let mut out = String::with_capacity(2048);

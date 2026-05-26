@@ -2,9 +2,9 @@
 //! emit a single element; `cyl` and `cloud` emit a small composition.
 
 use super::values::{attr_num, attr_or_var, attr_pair, attr_points, attr_str, escape_xml, num};
-use super::Options;
 use crate::layout::PlacedNode;
 use crate::resolve::{ShapeKind, VarTable};
+use crate::Options;
 use std::fmt::Write;
 
 pub fn render_geometry(

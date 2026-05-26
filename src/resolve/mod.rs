@@ -13,7 +13,14 @@ use crate::error::Error;
 use crate::span::Span;
 use std::collections::HashMap;
 
+/// Resolve without a theme. Convenience wrapper around `resolve_with_theme`;
+/// kept for the tests and library callers that don't pipe a theme through.
+#[allow(dead_code)]
 pub fn resolve(file: File) -> Result<Program, Error> {
+    resolve_with_theme(file, &[])
+}
+
+pub fn resolve_with_theme(file: File, theme: &[(String, String)]) -> Result<Program, Error> {
     check_block_order(&file.blocks)?;
 
     let mut defaults_block: Option<&DefaultsBlock> = None;
@@ -35,8 +42,9 @@ pub fn resolve(file: File) -> Result<Program, Error> {
     let scene_block = scene_block_opt
         .ok_or_else(|| Error::at(Span::empty(), "missing required 'scene' block"))?;
 
-    // Vars
+    // Vars: built-in defaults ← theme file ← `defaults {}` block.
     let mut vars = vars::built_in_defaults();
+    vars::apply_theme(&mut vars, theme);
     if let Some(d) = defaults_block {
         vars::apply_defaults_block(&mut vars, &d.entries)?;
     }
