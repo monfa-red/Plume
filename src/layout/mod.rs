@@ -5,6 +5,7 @@ mod ir;
 mod primitives;
 mod text;
 mod values;
+mod wires;
 
 pub use ir::*;
 
@@ -31,19 +32,32 @@ pub fn layout(program: &Program) -> Result<LaidOut, Error> {
         Span::empty(),
     )?;
 
-    // Compute viewbox = scene bbox + canvas-pad on every side.
+    // Route wires after nodes are placed.
+    let routed_wires = wires::route_wires(program, &top_nodes)?;
+
+    // Compute viewbox = (scene bbox ∪ wire paths) + canvas-pad on every side.
     let pad = values::layout_var(&program.vars, "canvas-pad").unwrap_or(20.0);
+    let mut bbox = scene_bbox;
+    for w in &routed_wires {
+        for (x, y) in &w.path {
+            bbox.min_x = bbox.min_x.min(*x);
+            bbox.min_y = bbox.min_y.min(*y);
+            bbox.max_x = bbox.max_x.max(*x);
+            bbox.max_y = bbox.max_y.max(*y);
+        }
+    }
     let vb = ViewBox {
-        x: scene_bbox.min_x - pad,
-        y: scene_bbox.min_y - pad,
-        w: scene_bbox.w() + 2.0 * pad,
-        h: scene_bbox.h() + 2.0 * pad,
+        x: bbox.min_x - pad,
+        y: bbox.min_y - pad,
+        w: bbox.w() + 2.0 * pad,
+        h: bbox.h() + 2.0 * pad,
     };
 
     Ok(LaidOut {
         viewbox: vb,
         scene_attrs: program.scene.attrs.clone(),
         nodes: top_nodes,
+        wires: routed_wires,
     })
 }
 
@@ -354,6 +368,120 @@ mod tests {
         let dx = l.nodes[1].cx - l.nodes[0].cx;
         // 60 gap + 20 + 20 (half widths) = 100
         assert!((dx - 100.0).abs() < 2.0, "dx={}", dx);
+    }
+
+    #[test]
+    fn wire_between_two_rects_produces_path() {
+        let l = lay_out(
+            "scene layout=row gap=80 {\n\
+               a :rect w=60 h=40\n\
+               b :rect w=60 h=40\n\
+             }\n\
+             wires { a -> b }\n",
+        );
+        assert_eq!(l.wires.len(), 1);
+        let w = &l.wires[0];
+        assert!(w.path.len() >= 2, "path={:?}", w.path);
+        // Markers: `->` defaults to end=Arrow, start=None.
+        assert_eq!(w.markers.start, crate::resolve::MarkerKind::None);
+        assert_eq!(w.markers.end, crate::resolve::MarkerKind::Arrow);
+    }
+
+    #[test]
+    fn chain_wire_splits_into_subwires_with_markers_on_outer_ends() {
+        let l = lay_out(
+            "scene layout=row gap=40 {\n\
+               a :rect w=40 h=40\n\
+               b :rect w=40 h=40\n\
+               c :rect w=40 h=40\n\
+             }\n\
+             wires { a -> b -> c }\n",
+        );
+        assert_eq!(l.wires.len(), 2, "expected 2 sub-wires for a→b→c");
+        // First sub-wire keeps the start (None for `->`); end is suppressed.
+        assert_eq!(l.wires[0].markers.end, crate::resolve::MarkerKind::None);
+        // Last sub-wire keeps the end (Arrow).
+        assert_eq!(l.wires[1].markers.end, crate::resolve::MarkerKind::Arrow);
+    }
+
+    #[test]
+    fn auto_edge_picks_right_when_target_to_the_right() {
+        let l = lay_out(
+            "scene layout=row gap=80 {\n\
+               a :rect w=60 h=40\n\
+               b :rect w=60 h=40\n\
+             }\n\
+             wires { a -> b }\n",
+        );
+        let w = &l.wires[0];
+        // Source (a) sits to the left of target (b); auto-edge picks the
+        // right edge of a as the exit. First point should be on a's right
+        // boundary (x ≈ a.cx + w/2).
+        let a = &l.nodes[0];
+        let a_right = a.cx + a.bbox.w() / 2.0;
+        assert!(
+            (w.path[0].0 - a_right).abs() < 1.0,
+            "first point x={} != a's right edge {}",
+            w.path[0].0,
+            a_right
+        );
+    }
+
+    #[test]
+    fn bracket_anchor_overrides_auto_edge() {
+        // Forcing source's left edge even though target is to the right.
+        let l = lay_out(
+            "scene layout=row gap=80 {\n\
+               a :rect w=60 h=40\n\
+               b :rect w=60 h=40\n\
+             }\n\
+             wires { a[left] -> b }\n",
+        );
+        let w = &l.wires[0];
+        let a = &l.nodes[0];
+        let a_left = a.cx - a.bbox.w() / 2.0;
+        assert!(
+            (w.path[0].0 - a_left).abs() < 1.0,
+            "anchor should pin first point to a's left edge",
+        );
+    }
+
+    #[test]
+    fn wire_label_lands_on_path() {
+        let l = lay_out(
+            "scene layout=row gap=80 {\n\
+               a :rect w=60 h=40\n\
+               b :rect w=60 h=40\n\
+             }\n\
+             wires { a -> b \"CAN\" }\n",
+        );
+        let w = &l.wires[0];
+        assert_eq!(w.texts.len(), 1);
+        assert_eq!(w.texts[0].content, "CAN");
+        // Mid-position should sit between path endpoints (approximately).
+        let mid_x = (w.path[0].0 + w.path.last().unwrap().0) / 2.0;
+        assert!(
+            (w.texts[0].position.0 - mid_x).abs() < 30.0,
+            "label x={} far from midpoint {}",
+            w.texts[0].position.0,
+            mid_x
+        );
+    }
+
+    #[test]
+    fn full_spec_example_routes_all_wires() {
+        let src = std::fs::read_to_string("samples/full_example.plume").unwrap();
+        let tokens = crate::lexer::lex(&src).expect("lex");
+        let file = crate::parser::parse(&tokens).expect("parse");
+        let program = crate::resolve::resolve(file).expect("resolve");
+        let l = layout(&program).expect("layout");
+        // §20 has 5 wire decls totalling 10 sub-segments:
+        //   outlet→drive→bus48→fuse→caps (4)
+        //   outlet→ctrl→bus24            (2)
+        //   bus48→ssr→bands              (2)
+        //   fadec↔drive                  (1)
+        //   estop→fuse                   (1)
+        assert_eq!(l.wires.len(), 10, "got {} routed wires", l.wires.len());
     }
 
     #[test]

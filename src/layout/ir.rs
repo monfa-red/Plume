@@ -9,6 +9,29 @@ pub struct LaidOut {
     pub viewbox: ViewBox,
     pub scene_attrs: AttrMap,
     pub nodes: Vec<PlacedNode>,
+    pub wires: Vec<RoutedWire>,
+}
+
+#[derive(Clone)]
+pub struct RoutedWire {
+    /// Orthogonal polyline through the scene, in scene coordinates.
+    pub path: Vec<(f64, f64)>,
+    pub markers: Markers,
+    pub attrs: AttrMap,
+    pub texts: Vec<RoutedText>,
+    /// First and last endpoint IDs of the chain this segment belongs to —
+    /// emitted as `data-from` / `data-to` for CSS / a11y hooks.
+    pub data_from: String,
+    pub data_to: String,
+}
+
+#[derive(Clone)]
+pub struct RoutedText {
+    pub content: String,
+    pub position: (f64, f64),
+    /// Unit tangent at the text position (for rotation / offset frame).
+    pub tangent: (f64, f64),
+    pub attrs: AttrMap,
 }
 
 #[derive(Debug, Clone, Copy)]

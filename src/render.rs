@@ -1,4 +1,4 @@
-use crate::layout::{LaidOut, PlacedNode};
+use crate::layout::{LaidOut, PlacedNode, RoutedText, RoutedWire};
 use crate::resolve::{MarkerKind, Markers, ResolvedValue, ShapeKind};
 use std::fmt::Write;
 
@@ -28,10 +28,250 @@ pub fn render(laid_out: &LaidOut) -> String {
         render_node(&mut out, node, 2);
     }
     out.push_str("  </g>\n");
-    out.push_str("  <g class=\"plume-wires\"/>\n");
+
+    if laid_out.wires.is_empty() {
+        out.push_str("  <g class=\"plume-wires\"/>\n");
+    } else {
+        out.push_str("  <g class=\"plume-wires\">\n");
+        for wire in &laid_out.wires {
+            render_wire(&mut out, wire);
+        }
+        out.push_str("  </g>\n");
+    }
     out.push_str("</svg>\n");
 
     out
+}
+
+fn render_wire(out: &mut String, w: &RoutedWire) {
+    if w.path.len() < 2 {
+        return;
+    }
+    let stroke = attr_str(&w.attrs, "stroke", "var(--plume-stroke)");
+    let thickness = attr_num(&w.attrs, "thickness").unwrap_or(1.0);
+    let dash = wire_dash(&w.attrs);
+
+    writeln!(
+        out,
+        r#"    <g class="plume-wire" data-from="{}" data-to="{}">"#,
+        escape_xml(&w.data_from),
+        escape_xml(&w.data_to),
+    )
+    .unwrap();
+
+    let mut d = format!("M {} {}", num(w.path[0].0), num(w.path[0].1));
+    for p in &w.path[1..] {
+        d.push_str(&format!(" L {} {}", num(p.0), num(p.1)));
+    }
+    let dash_attr = if dash.is_empty() {
+        String::new()
+    } else {
+        format!(r#" stroke-dasharray="{}""#, dash)
+    };
+    writeln!(
+        out,
+        r#"      <path d="{}" fill="none" stroke="{}" stroke-width="{}"{}/>"#,
+        d,
+        stroke,
+        num(thickness),
+        dash_attr,
+    )
+    .unwrap();
+
+    let inset = 4.0_f64;
+    if w.markers.start != MarkerKind::None {
+        if let Some((tip, dir)) = wire_marker_anchor(&w.path, true, inset) {
+            render_wire_marker(out, w.markers.start, tip, dir, &stroke, thickness);
+        }
+    }
+    if w.markers.end != MarkerKind::None {
+        if let Some((tip, dir)) = wire_marker_anchor(&w.path, false, inset) {
+            render_wire_marker(out, w.markers.end, tip, dir, &stroke, thickness);
+        }
+    }
+
+    for t in &w.texts {
+        render_wire_text(out, t);
+    }
+
+    out.push_str("    </g>\n");
+}
+
+fn wire_dash(attrs: &crate::resolve::AttrMap) -> String {
+    if let Some(ResolvedValue::Tuple(items)) = attrs.get("dashed") {
+        let parts: Vec<String> = items
+            .iter()
+            .filter_map(|v| match v {
+                ResolvedValue::Number(n) => Some(num(*n)),
+                _ => None,
+            })
+            .collect();
+        if !parts.is_empty() {
+            return parts.join(",");
+        }
+    }
+    if let Some(ResolvedValue::Tuple(items)) = attrs.get("dotted") {
+        let parts: Vec<String> = items
+            .iter()
+            .filter_map(|v| match v {
+                ResolvedValue::Number(n) => Some(num(*n)),
+                _ => None,
+            })
+            .collect();
+        if !parts.is_empty() {
+            return parts.join(",");
+        }
+    }
+    String::new()
+}
+
+/// Position the marker tip inset from the endpoint along the last segment.
+fn wire_marker_anchor(
+    path: &[(f64, f64)],
+    at_start: bool,
+    inset: f64,
+) -> Option<((f64, f64), (f64, f64))> {
+    if path.len() < 2 {
+        return None;
+    }
+    let (anchor, neighbor) = if at_start {
+        (path[0], path[1])
+    } else {
+        (path[path.len() - 1], path[path.len() - 2])
+    };
+    let dx = anchor.0 - neighbor.0;
+    let dy = anchor.1 - neighbor.1;
+    let len = (dx * dx + dy * dy).sqrt();
+    if len < 1e-9 {
+        return Some((anchor, (1.0, 0.0)));
+    }
+    let ux = dx / len;
+    let uy = dy / len;
+    let tip = (anchor.0 - ux * inset, anchor.1 - uy * inset);
+    Some((tip, (ux, uy)))
+}
+
+fn render_wire_marker(
+    out: &mut String,
+    kind: MarkerKind,
+    tip: (f64, f64),
+    direction: (f64, f64),
+    stroke: &str,
+    thickness: f64,
+) {
+    let size = 10.0_f64.max(thickness * 5.0);
+    let ux = direction.0;
+    let uy = direction.1;
+    let px = -uy;
+    let py = ux;
+
+    match kind {
+        MarkerKind::Arrow => {
+            let bx = tip.0 - ux * size;
+            let by = tip.1 - uy * size;
+            let lx = bx + px * size * 0.5;
+            let ly = by + py * size * 0.5;
+            let rx = bx - px * size * 0.5;
+            let ry = by - py * size * 0.5;
+            writeln!(
+                out,
+                r#"      <polygon class="plume-marker plume-marker-arrow" points="{},{} {},{} {},{}" fill="{}"/>"#,
+                num(tip.0),
+                num(tip.1),
+                num(lx),
+                num(ly),
+                num(rx),
+                num(ry),
+                stroke,
+            )
+            .unwrap();
+        }
+        MarkerKind::Dot => {
+            writeln!(
+                out,
+                r#"      <circle class="plume-marker plume-marker-dot" cx="{}" cy="{}" r="{}" fill="{}"/>"#,
+                num(tip.0),
+                num(tip.1),
+                num(size / 3.0),
+                stroke,
+            )
+            .unwrap();
+        }
+        MarkerKind::Diamond => {
+            let bx = tip.0 - ux * size;
+            let by = tip.1 - uy * size;
+            let mx = (tip.0 + bx) / 2.0;
+            let my = (tip.1 + by) / 2.0;
+            let lx = mx + px * size * 0.4;
+            let ly = my + py * size * 0.4;
+            let rx = mx - px * size * 0.4;
+            let ry = my - py * size * 0.4;
+            writeln!(
+                out,
+                r#"      <polygon class="plume-marker plume-marker-diamond" points="{},{} {},{} {},{} {},{}" fill="{}"/>"#,
+                num(tip.0),
+                num(tip.1),
+                num(lx),
+                num(ly),
+                num(bx),
+                num(by),
+                num(rx),
+                num(ry),
+                stroke,
+            )
+            .unwrap();
+        }
+        MarkerKind::Crow => {
+            // Crow's foot: three lines fanning back from the tip.
+            let bx = tip.0 - ux * size;
+            let by = tip.1 - uy * size;
+            let lx = bx + px * size * 0.5;
+            let ly = by + py * size * 0.5;
+            let rx = bx - px * size * 0.5;
+            let ry = by - py * size * 0.5;
+            writeln!(
+                out,
+                r#"      <path class="plume-marker plume-marker-crow" d="M {} {} L {} {} M {} {} L {} {} M {} {} L {} {}" stroke="{}" stroke-width="{}" fill="none"/>"#,
+                num(tip.0),
+                num(tip.1),
+                num(bx),
+                num(by),
+                num(tip.0),
+                num(tip.1),
+                num(lx),
+                num(ly),
+                num(tip.0),
+                num(tip.1),
+                num(rx),
+                num(ry),
+                stroke,
+                num(thickness),
+            )
+            .unwrap();
+        }
+        MarkerKind::None => {}
+    }
+}
+
+fn render_wire_text(out: &mut String, t: &RoutedText) {
+    let size = attr_num(&t.attrs, "size").unwrap_or(11.0);
+    let fill = attr_str(&t.attrs, "fill", "var(--plume-text-color)");
+    // For Sprint 4, place the text just above the route point (small lift).
+    let lift = size * 0.7;
+    let nx = -t.tangent.1;
+    let ny = t.tangent.0;
+    let x = t.position.0 + nx * lift;
+    let y = t.position.1 + ny * lift;
+    writeln!(
+        out,
+        r#"      <text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-size="{}" font-family="var(--plume-font)" fill="{}">{}</text>"#,
+        num(x),
+        num(y),
+        num(size),
+        fill,
+        escape_xml(&t.content),
+    )
+    .unwrap();
 }
 
 fn render_node(out: &mut String, n: &PlacedNode, depth: usize) {
