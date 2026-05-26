@@ -80,7 +80,11 @@ pub fn emit_marker(
     stroke: &str,
     thickness: f64,
 ) {
-    let size = 10.0_f64.max(thickness * 5.0);
+    // Marker scales linearly with line thickness, with a small floor so
+    // 1 px lines still get a visible head. Floor was 10 — too big — and
+    // 0 — too small. 6 gives 1 px lines a clearly visible arrow without
+    // overwhelming the line.
+    let size = 6.0_f64.max(thickness * 5.0);
     let ux = direction.0;
     let uy = direction.1;
     let px = -uy;

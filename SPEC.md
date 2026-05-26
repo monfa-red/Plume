@@ -379,7 +379,7 @@ Three attrs control endpoint markers:
 | `marker-start=X` | Start end (or wire source). |
 | `marker-end=X` | End end (or wire target). |
 
-Marker values: `none`, `arrow` (scales with `thickness`; size = `max(var(--plume-arrow-head, 10), thickness × 5)`), `dot` (filled circle), `diamond` (filled rhombus), `crow` (crow's-foot).
+Marker values: `none`, `arrow` (size = `max(--arrow-head, thickness × 5)`), `dot` (filled circle), `diamond` (filled rhombus), `crow` (crow's-foot). Markers scale linearly with thickness, with a floor so 1 px lines still get a visible head.
 
 **Per-type defaults:**
 
@@ -610,7 +610,7 @@ Layout (compile-time):
   --plume-oval-w        60
   --plume-oval-h        40
   --plume-circle-size   40
-  --plume-arrow-head    10
+  --plume-arrow-head    6
   --plume-icon-size     24
   --plume-canvas-pad    20
   --plume-wire-gap      16
@@ -906,7 +906,7 @@ Forward references or unknown names → error per [§ 15](#15-errors).
 2. Pick entry/exit edges — bracketed anchor wins, else nearest edge (tie → right > bottom > left > top).
 3. Compute L- or Z-bend route.
 4. Self-loops emit a fixed-shape loop.
-5. Place markers (`arrow` / `dot` / `diamond` / `crow`, sized per `--arrow-head` or `thickness × 5`) inset 4 px from the endpoint.
+5. Place markers (`arrow` / `dot` / `diamond` / `crow`, sized `max(--arrow-head, thickness × 5)`) with the tip 1 px from the endpoint.
 6. Place wire-text children at requested anchors along the route.
 
 **Phase 5 — Render.** Depth-first emit SVG per [§ 13](#13-svg-output).

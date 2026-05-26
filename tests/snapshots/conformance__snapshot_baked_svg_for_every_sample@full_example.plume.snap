@@ -123,7 +123,7 @@ input_file: samples/full_example.plume
       </g>
       <g class="plume-node plume-shape-arrow" transform="translate(-25,19)">
         <line x1="0" y1="0" x2="50" y2="20" stroke="#444" stroke-width="1"/>
-        <polygon class="plume-marker plume-marker-arrow" points="49.0715,19.6286 37.9298,20.5571 41.6437,11.2723" fill="#444"/>
+        <polygon class="plume-marker plume-marker-arrow" points="49.0715,19.6286 42.3865,20.1857 44.6148,14.6148" fill="#444"/>
       </g>
       <g class="plume-node plume-shape-text" transform="translate(0,-39.5)">
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="12" font-family="system-ui, -apple-system, sans-serif" fill="#222">Cavity</text>
@@ -149,19 +149,19 @@ input_file: samples/full_example.plume
     </g>
     <g class="plume-wire" data-from="outlet" data-to="bus24">
       <path d="M 44.4 -3.1 L 50.4 -3.1" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="53.4,-3.1 43.4,1.9 43.4,-8.1" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="53.4,-3.1 47.4,-0.1 47.4,-6.1" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="bus48" data-to="bands">
       <path d="M 102.7 -75.1 L 140.1 -75.1 L 140.1 12.9 L 217.9 12.9" fill="none" stroke="#444" stroke-width="1"/>
     </g>
     <g class="plume-wire" data-from="bus48" data-to="bands">
       <path d="M 278.9 12.9 L 289.9 12.9" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="292.9,12.9 282.9,17.9 282.9,7.9" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="292.9,12.9 286.9,15.9 286.9,9.9" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="fadec" data-to="drive">
       <path d="M -291.9 66.5 L -291.9 -11.1 L -395.9 -11.1 L -395.9 -107.1 L -123.9 -107.1 L -123.9 -75.1 L -100.85 -75.1" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-291.9,69.5 -296.9,59.5 -286.9,59.5" fill="#444"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-97.85,-75.1 -107.85,-70.1 -107.85,-80.1" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-291.9,69.5 -294.9,63.5 -288.9,63.5" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-97.85,-75.1 -103.85,-72.1 -103.85,-78.1" fill="#444"/>
       <text x="-371.175" y="-107.1" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="#222" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">CAN</text>
     </g>
     <g class="plume-wire" data-from="estop" data-to="fuse">

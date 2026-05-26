@@ -59,7 +59,7 @@ pub fn built_in_defaults() -> VarTable {
     set_layout_n(&mut t, "oval-w", 60.0);
     set_layout_n(&mut t, "oval-h", 40.0);
     set_layout_n(&mut t, "circle-size", 40.0);
-    set_layout_n(&mut t, "arrow-head", 10.0);
+    set_layout_n(&mut t, "arrow-head", 6.0);
     set_layout_n(&mut t, "icon-size", 24.0);
     set_layout_n(&mut t, "canvas-pad", 20.0);
     set_layout_n(&mut t, "wire-gap", 16.0);

@@ -61,7 +61,7 @@ input_file: samples/primitives_all.plume
     </g>
     <g class="plume-node plume-shape-arrow" transform="translate(50.5,55.5)">
       <line x1="-30" y1="0" x2="30" y2="0" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="29,0 19,5 19,-5" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="29,0 23,3 23,-3" fill="#444"/>
     </g>
     <g class="plume-node plume-shape-icon" transform="translate(161.5,55.5)">
       <rect x="-16" y="-16" width="32" height="32" fill="none" stroke="#444" stroke-width="1"/>
