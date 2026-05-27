@@ -1,13 +1,13 @@
-// SPEC v2.1: wire endpoints have no manual anchor — the router picks edges
-// automatically. To influence routing, reposition shapes via `at=` or `gap=`.
+// SPEC §10: wire endpoints carry an optional `.side` to pin the routing edge.
+// Without one, the router picks edges by relative geometry.
 
-scene layout=row gap=80 {
-  fadec :rect "FADEC"
-  drive :rect "Drive"
-  bus48 :rect "Bus 48V"
+{
+  |scene| layout:row gap:80
 }
 
-wires {
-  fadec <-> drive "CAN"
-  drive -> bus48
-}
+cat  |rect| "Cat"
+dog  |rect| "Dog"
+bird |rect| "Bird"
+
+cat.r <-> dog.l "chats"
+dog.b -> bird.t

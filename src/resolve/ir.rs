@@ -3,7 +3,7 @@
 // happy while the pipeline fills in.
 #![allow(dead_code)]
 
-use crate::ast::WireOp;
+use crate::ast::{LineStyle, Side};
 use crate::span::Span;
 use std::collections::{BTreeMap, HashMap};
 
@@ -21,26 +21,28 @@ pub struct ResolvedScene {
 }
 
 /// A resolved node or primitive instance. `id` is `Some` iff the source used a
-/// named scene node (`drive :psu …`); anonymous primitives have `id == None`.
+/// named scene node (`cat |treat| …`); anonymous primitives have `id == None`.
 pub struct ResolvedInst {
     pub id: Option<String>,
     pub shape: ShapeKind,
     /// User-shape and template names walked from the inst's declared type back
-    /// to its primitive (e.g. for `drive :psu` where `psu :rect`, this is
-    /// `["psu"]` — the primitive `rect` is in `shape`).
+    /// to its primitive (e.g. for `cat |treat|` where `treat:rect`, this is
+    /// `["treat"]` — the primitive `rect` is in `shape`).
     pub type_chain: Vec<String>,
     /// Style class names applied to this inst, in source (left-to-right) order.
     pub applied_styles: Vec<String>,
     /// For `Text` shape: the text content. For other shapes: always `None` —
     /// label sugar on non-text shapes produces a `Text` child instead.
     pub label: Option<String>,
+    /// Optional href — wraps the rendered shape in `<a href>` for links.
+    pub href: Option<String>,
     pub attrs: AttrMap,
     pub markers: Markers,
     pub children: Vec<ResolvedInst>,
     pub span: Span,
 }
 
-/// One of the 14 built-in primitives. All user shapes resolve to one of these.
+/// One of the 13 built-in primitives. All user shapes resolve to one of these.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ShapeKind {
     Rect,
@@ -54,7 +56,6 @@ pub enum ShapeKind {
     Path,
     Text,
     Line,
-    Arrow,
     Icon,
     Image,
 }
@@ -73,7 +74,6 @@ impl ShapeKind {
             "path" => Self::Path,
             "text" => Self::Text,
             "line" => Self::Line,
-            "arrow" => Self::Arrow,
             "icon" => Self::Icon,
             "image" => Self::Image,
             _ => return None,
@@ -93,7 +93,6 @@ impl ShapeKind {
             Self::Path => "path",
             Self::Text => "text",
             Self::Line => "line",
-            Self::Arrow => "arrow",
             Self::Icon => "icon",
             Self::Image => "image",
         }
@@ -101,7 +100,7 @@ impl ShapeKind {
 }
 
 /// One ordered attr from a style or inline merge — `value` is `None` for bare
-/// attrs. Used as intermediate storage before §12 specificity collapse.
+/// attrs. Used as intermediate storage before §13 specificity collapse.
 #[derive(Clone, Debug)]
 pub struct ResolvedAttr {
     pub name: String,
@@ -109,7 +108,7 @@ pub struct ResolvedAttr {
     pub span: Span,
 }
 
-/// Final attribute values after §12 specificity merging. Marker attrs are
+/// Final attribute values after §13 specificity merging. Marker attrs are
 /// extracted into `Markers` and not stored here.
 #[derive(Default, Clone, Debug)]
 pub struct AttrMap {
@@ -130,21 +129,15 @@ impl AttrMap {
     }
 }
 
-/// Attribute value with `var()` references resolved. Mirrors AST `Value`
-/// otherwise.
 #[derive(Clone, Debug)]
 pub enum ResolvedValue {
     Number(f64),
     String(String),
-    Hex(String), // hex digits (3/6/8) without leading '#'
+    Hex(String),
     Ident(String),
     Tuple(Vec<ResolvedValue>),
     List(Vec<ResolvedValue>),
     Call(ResolvedCall),
-    /// CSS variable reference. Emitted as `var(--plume-{name})` (or
-    /// `var(--{name})` when `raw`). `baked` carries the layout-time value for
-    /// Layout vars; it is `None` for Visual vars (which have no compile-time
-    /// numeric meaning).
     LiveVar {
         name: String,
         raw: bool,
@@ -173,9 +166,7 @@ pub struct VarEntry {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VarKind {
-    /// Baked at compile time — layout pass needs a concrete value.
     Layout,
-    /// Live in the emitted SVG — runtime CSS can theme it.
     Visual,
 }
 
@@ -226,11 +217,21 @@ impl MarkerKind {
             _ => return None,
         })
     }
+
+    pub fn from_marker(m: crate::ast::WireMarker) -> Self {
+        match m {
+            crate::ast::WireMarker::None => Self::None,
+            crate::ast::WireMarker::Arrow => Self::Arrow,
+            crate::ast::WireMarker::Crow => Self::Crow,
+            crate::ast::WireMarker::Dot => Self::Dot,
+            crate::ast::WireMarker::Diamond => Self::Diamond,
+        }
+    }
 }
 
 pub struct ResolvedWire {
     pub endpoints: Vec<ResolvedEndpoint>,
-    pub op: WireOp,
+    pub line: LineStyle,
     pub attrs: AttrMap,
     pub markers: Markers,
     pub texts: Vec<ResolvedText>,
@@ -238,7 +239,9 @@ pub struct ResolvedWire {
 }
 
 pub struct ResolvedEndpoint {
-    pub id: String,
+    /// Fully-qualified dot-path from scene root (e.g. `garden.outlet`).
+    pub path: String,
+    pub side: Option<Side>,
     pub span: Span,
 }
 
@@ -258,7 +261,6 @@ pub enum WireAt {
 }
 
 impl WireAt {
-    /// Default for wires-without-explicit-at (label sugar): mid-route.
     pub fn default_for_label() -> Self {
         Self::Mid
     }

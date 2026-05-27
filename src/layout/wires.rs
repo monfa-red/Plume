@@ -19,6 +19,7 @@
 
 use super::ir::{PlacedNode, RoutedText, RoutedWire};
 use super::values::layout_var;
+use crate::ast::Side;
 use crate::error::Error;
 use crate::resolve::{
     MarkerKind, Markers, Program, ResolvedText, ResolvedValue, ResolvedWire, VarTable, WireAt,
@@ -103,6 +104,10 @@ struct SegmentSpec<'a> {
     tgt_id: String,
     src_edge: Edge,
     tgt_edge: Edge,
+    /// Endpoint `.side` overrides — when `Some`, A* uses this edge instead of
+    /// picking the cheapest from the multi-edge candidate set.
+    src_forced: Option<Edge>,
+    tgt_forced: Option<Edge>,
     src_bbox: AbsBbox,
     tgt_bbox: AbsBbox,
     gap: f64,
@@ -122,12 +127,12 @@ fn plan_segments<'a>(
     let mut out = Vec::new();
     for wire in &program.wires {
         let n = wire.endpoints.len();
-        let from_id = wire.endpoints.first().unwrap().id.clone();
-        let to_id = wire.endpoints.last().unwrap().id.clone();
+        let from_id = wire.endpoints.first().unwrap().path.clone();
+        let to_id = wire.endpoints.last().unwrap().path.clone();
         let gap = wire_gap(wire, &program.vars);
         for i in 0..(n - 1) {
-            let src_id = wire.endpoints[i].id.clone();
-            let tgt_id = wire.endpoints[i + 1].id.clone();
+            let src_id = wire.endpoints[i].path.clone();
+            let tgt_id = wire.endpoints[i + 1].path.clone();
             if src_id == tgt_id {
                 return Err(Error::at(
                     wire.span,
@@ -140,14 +145,20 @@ fn plan_segments<'a>(
             let tgt = scene
                 .lookup(&tgt_id)
                 .ok_or_else(|| undefined_wire_id(&tgt_id, wire.endpoints[i + 1].span))?;
-            let src_edge = nearest_edge(&src.bbox, (tgt.bbox.cx(), tgt.bbox.cy()));
-            let tgt_edge = nearest_edge(&tgt.bbox, (src.bbox.cx(), src.bbox.cy()));
+            let src_forced = wire.endpoints[i].side.map(side_to_edge);
+            let tgt_forced = wire.endpoints[i + 1].side.map(side_to_edge);
+            let src_edge = src_forced
+                .unwrap_or_else(|| nearest_edge(&src.bbox, (tgt.bbox.cx(), tgt.bbox.cy())));
+            let tgt_edge = tgt_forced
+                .unwrap_or_else(|| nearest_edge(&tgt.bbox, (src.bbox.cx(), src.bbox.cy())));
             out.push(SegmentSpec {
                 wire,
                 src_id,
                 tgt_id,
                 src_edge,
                 tgt_edge,
+                src_forced,
+                tgt_forced,
                 src_bbox: src.bbox,
                 tgt_bbox: tgt.bbox,
                 gap,
@@ -173,13 +184,19 @@ fn route_segment_with_lanes(
     let blocked_by_shapes = grid.block_cells(&shape_obstacles);
     let blocked_by_wires = grid.flatten_soft(soft_blocked);
 
-    // Edge candidates: 3 per side. We drop the edge that strictly faces AWAY
-    // from the other shape (a path would loop all the way around the source
-    // to use it). The remaining 3 × 3 = 9 combos cover every shape that
-    // produced visibly bad routes during testing, including the
-    // `meter → hmi` case where the perpendicular Bottom edges save the day.
-    let src_edges = candidate_edges(&spec.src_bbox, &spec.tgt_bbox);
-    let tgt_edges = candidate_edges(&spec.tgt_bbox, &spec.src_bbox);
+    // Edge candidates: 3 per side normally. When the endpoint carries an
+    // explicit `.side` override, we pin to that single edge — the user has
+    // told us which side to use. Otherwise we drop the edge that strictly
+    // faces AWAY from the other shape (the path would loop all the way
+    // around the source to reach it).
+    let src_edges = match spec.src_forced {
+        Some(e) => vec![e],
+        None => candidate_edges(&spec.src_bbox, &spec.tgt_bbox),
+    };
+    let tgt_edges = match spec.tgt_forced {
+        Some(e) => vec![e],
+        None => candidate_edges(&spec.tgt_bbox, &spec.src_bbox),
+    };
     type Candidate = (i64, Edge, Edge, Vec<(usize, usize)>);
     let mut best: Option<Candidate> = None;
 
@@ -444,8 +461,9 @@ struct ShapeRef {
 struct SceneIndex {
     /// One entry per named (`id`-having) node, in source order.
     nodes: Vec<IndexedNode>,
-    /// `name → index in `nodes`. Names are unique per SPEC §15.
-    by_id: HashMap<String, usize>,
+    /// Fully-qualified dot-path → index in `nodes`. Resolver canonicalises
+    /// endpoint paths, so this is the lookup the routing pass needs.
+    by_path: HashMap<String, usize>,
 }
 
 struct IndexedNode {
@@ -459,15 +477,22 @@ impl SceneIndex {
     fn build(scene_nodes: &[PlacedNode]) -> Self {
         let mut idx = SceneIndex {
             nodes: Vec::new(),
-            by_id: HashMap::new(),
+            by_path: HashMap::new(),
         };
         for node in scene_nodes {
-            idx.walk(node, 0.0, 0.0, &[]);
+            idx.walk(node, 0.0, 0.0, &[], &mut Vec::new());
         }
         idx
     }
 
-    fn walk(&mut self, node: &PlacedNode, parent_cx: f64, parent_cy: f64, ancestors: &[usize]) {
+    fn walk(
+        &mut self,
+        node: &PlacedNode,
+        parent_cx: f64,
+        parent_cy: f64,
+        ancestors: &[usize],
+        path_stack: &mut Vec<String>,
+    ) {
         let abs_cx = parent_cx + node.cx;
         let abs_cy = parent_cy + node.cy;
         let bbox = AbsBbox {
@@ -477,24 +502,30 @@ impl SceneIndex {
             h: node.bbox.h(),
         };
         let mut next_ancestors = ancestors.to_vec();
+        let mut pushed_path = false;
         if let Some(id) = &node.id {
             let i = self.nodes.len();
+            path_stack.push(id.clone());
+            let full_path = path_stack.join(".");
+            pushed_path = true;
             self.nodes.push(IndexedNode {
                 bbox,
                 ancestors: ancestors.to_vec(),
                 is_leaf: node.children.is_empty(),
             });
-            let _ = id; // id is kept in `by_id` only
-            self.by_id.insert(id.clone(), i);
+            self.by_path.insert(full_path, i);
             next_ancestors.push(i);
         }
         for child in &node.children {
-            self.walk(child, abs_cx, abs_cy, &next_ancestors);
+            self.walk(child, abs_cx, abs_cy, &next_ancestors, path_stack);
+        }
+        if pushed_path {
+            path_stack.pop();
         }
     }
 
-    fn lookup(&self, id: &str) -> Option<ShapeRef> {
-        let i = *self.by_id.get(id)?;
+    fn lookup(&self, path: &str) -> Option<ShapeRef> {
+        let i = *self.by_path.get(path)?;
         Some(ShapeRef {
             bbox: self.nodes[i].bbox,
         })
@@ -533,8 +564,8 @@ impl SceneIndex {
     /// obstacle UNLESS it is an endpoint or an ancestor of an endpoint, in
     /// which case the path is allowed to cross its boundary.
     fn obstacles_for(&self, src_id: &str, tgt_id: &str, gap: f64) -> Vec<AbsBbox> {
-        let src_i = self.by_id.get(src_id).copied();
-        let tgt_i = self.by_id.get(tgt_id).copied();
+        let src_i = self.by_path.get(src_id).copied();
+        let tgt_i = self.by_path.get(tgt_id).copied();
         let mut passable: Vec<usize> = Vec::new();
         if let Some(i) = src_i {
             passable.push(i);
@@ -786,7 +817,9 @@ fn a_star(
                 None => continue,
             };
             let i = next.1 * grid.cols + next.0;
-            if blocked[i] && next != goal && next != start {
+            // `blocked` is empty on the final no-obstacles fallback tier — the
+            // bounds guard mirrors the one on `soft` below.
+            if i < blocked.len() && blocked[i] && next != goal && next != start {
                 continue;
             }
 
@@ -861,6 +894,15 @@ enum Edge {
     Bottom,
     Left,
     Top,
+}
+
+fn side_to_edge(s: Side) -> Edge {
+    match s {
+        Side::Top => Edge::Top,
+        Side::Bottom => Edge::Bottom,
+        Side::Left => Edge::Left,
+        Side::Right => Edge::Right,
+    }
 }
 
 fn nearest_edge(my: &AbsBbox, other: (f64, f64)) -> Edge {

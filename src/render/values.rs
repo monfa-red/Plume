@@ -1,7 +1,7 @@
 //! Attribute extraction + ResolvedValue → CSS-formatted string helpers used by
 //! every render submodule.
 
-use crate::resolve::{AttrMap, ResolvedCall, ResolvedValue, VarTable};
+use crate::resolve::{AttrMap, ResolvedCall, ResolvedValue, VarKind, VarTable};
 use crate::Options;
 
 /// Format a value for use inline in SVG/CSS (e.g. an attribute value).
@@ -25,10 +25,14 @@ pub fn format_value(value: &ResolvedValue, vars: &VarTable, opts: &Options) -> S
         }
         ResolvedValue::Call(c) => format_call(c, vars, opts),
         ResolvedValue::LiveVar { name, raw, baked } => {
-            if opts.bake_vars {
+            // Layout vars are language defaults, not CSS-themable: always
+            // bake them to a literal so renderers without `var()` support
+            // (and standalone SVG files) draw correctly. Visual vars stay
+            // live in non-bake mode.
+            let is_layout = !*raw && vars.get(name).is_some_and(|e| e.kind == VarKind::Layout);
+            if opts.bake_vars || is_layout {
                 if *raw {
                     // Raw CSS vars cannot be baked — we don't know their value.
-                    // Fall back to the var() form so output is at least valid CSS.
                     format!("var(--{})", name)
                 } else if let Some(entry) = vars.get(name) {
                     format_value(&entry.value, vars, opts)

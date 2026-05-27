@@ -1,8 +1,4 @@
-scene {
-  a :rect "A"
-  b :rect "B"
-}
+cat |rect| "Cat"
+dog |rect| "Dog"
 
-wires stroke=#444 thickness=1 {
-  a -> b
-}
+cat -> dog stroke:#444 thickness:1

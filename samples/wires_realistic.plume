@@ -4,47 +4,44 @@
 //   - shape-in-group   → shape-in-different-group
 //   - shape-in-group   → top-level shape (out of the group)
 //   - bidirectional with labels
-//   - parallel wires between the same pair (live + neutral)
+//   - parallel wires between the same pair
 //   - a wire that has to detour around an unrelated group
 
-styles {
-  power  stroke=red thickness=2
-  signal stroke=blue stroke-style=dashed
+{
+  |scene| layout:row gap:16
+
+  .loud stroke:red thickness:2
+  .quiet stroke:blue stroke-style:dashed
+  .happy stroke:green
+
+  |treat:rect| radius:4 fill:#eee
 }
 
-shapes {
-  unit :rect radius=4 fill=#f6f6f6
+cat |oval| "Cat"
+
+kitchen |group| "Kitchen" layout:column gap:15 padding:30 {
+  bowl  |treat| "Bowl"
+  water |treat| "Water"
 }
 
-scene layout=row gap=60 padding=30 {
-  mains :oval "Mains"
-
-  panel :group "Panel" layout=column gap=15 padding=20 {
-    breaker :unit "Breaker"
-    meter   :unit "Meter"
-  }
-
-  loads :group "Loads" layout=column gap=15 padding=20 {
-    motor :unit "Motor"
-    light :unit "Light"
-  }
-
-  hmi :unit "HMI"
+garden |group| "Garden" layout:column gap:15 padding:10 {
+  dog  |treat| "Dog"
+  bird |treat| "Bird"
 }
 
-wires {
-  // Top-level → group-interior
-  mains -> breaker .power
-  mains -> meter   .power
+roof |treat| "Roof"
 
-  // Parallel power feeds (live + neutral): same endpoint pair
-  breaker -> motor .power
-  breaker -> motor .power
+// Top-level → group-interior
+cat -> bowl .loud
+cat -> water .loud
 
-  // Cross-group with labels
-  meter <-> motor "rpm" .signal
-  meter <-> light "lux" .signal
+// Parallel feeds (e.g. two paths to the same target)
+bowl -> dog .loud
+bowl -> dog .loud
 
-  // Group-interior → top-level (must exit panel and reach hmi past loads)
-  meter -> hmi
-}
+// Cross-group with labels
+water <-> dog "shares" .quiet
+water <-> bird .quiet
+
+// Group-interior → top-level (must exit kitchen and reach roof past garden)
+water -> roof .happy

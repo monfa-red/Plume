@@ -17,10 +17,10 @@ name = "plume"
 path = "src/lib.rs"
 
 [dependencies]
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
 
 [dev-dependencies]
-insta = { version = "1", features = ["glob"] }
+insta = { version = "1.47", features = ["glob"] }
 
 [profile.release]
 lto = "thin"

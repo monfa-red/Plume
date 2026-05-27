@@ -118,7 +118,7 @@ fn geom_bbox(inst: &ResolvedInst, vars: &VarTable) -> Result<Bbox, Error> {
             let h = text::approx_height(label, size);
             Ok(Bbox::centered(w, h))
         }
-        ShapeKind::Line | ShapeKind::Arrow => {
+        ShapeKind::Line => {
             let points = attr_points(attrs, "points", inst.span)?.ok_or_else(|| {
                 Error::at(
                     inst.span,

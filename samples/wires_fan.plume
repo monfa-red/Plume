@@ -1,0 +1,19 @@
+// SPEC §10 fan-out / fan-in with `&` — cartesian expansion.
+
+{
+  |scene| layout:column gap:30 padding:20
+}
+
+mouse |rect| "Mouse"
+fox   |rect| "Fox"
+owl   |rect| "Owl"
+
+// fan-in: two predators converge on mouse
+fox & owl -> mouse "hunts"
+
+bowl |rect| "Bowl"
+apple |rect| "Apple"
+mug   |rect| "Mug"
+
+// fan-out: one shape feeds three
+bowl -> apple & mug & mouse

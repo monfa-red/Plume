@@ -5,8 +5,9 @@ mod values;
 mod wires;
 
 use crate::layout::{LaidOut, PlacedNode};
+use crate::resolve::ResolvedValue;
 use crate::Options;
-use values::{build_classes, escape_xml, num};
+use values::{build_classes, escape_xml, format_value, num};
 
 pub fn render(laid_out: &LaidOut, opts: &Options) -> String {
     let mut out = String::with_capacity(2048);
@@ -28,7 +29,19 @@ pub fn render(laid_out: &LaidOut, opts: &Options) -> String {
     style_block::emit(&mut out, &laid_out.vars, opts);
     out.push_str("  <defs/>\n");
 
-    out.push_str("  <g class=\"plume-scene\">\n");
+    // Root `color` seeds the SVG cascade for text: any descendant `|text|`
+    // with `fill="currentColor"` (our default) resolves to this color, and
+    // `color:X` on a closed shape overrides it for that subtree.
+    let root_color = format_value(
+        &ResolvedValue::LiveVar {
+            name: "text-color".to_string(),
+            raw: false,
+            baked: None,
+        },
+        &laid_out.vars,
+        opts,
+    );
+    writeln!(out, r#"  <g class="plume-scene" color="{}">"#, root_color).unwrap();
     for node in &laid_out.nodes {
         render_node(&mut out, node, 2, &laid_out.vars, opts);
     }
@@ -72,10 +85,19 @@ fn render_node(
         Some(id) => format!(r#" data-id="{}""#, escape_xml(id)),
         None => String::new(),
     };
+    // `color:X` cascades via SVG inheritance to descendant `|text|` nodes that
+    // default to `fill="currentColor"`. Source-order does not apply here — this
+    // is just the resolved attr surfacing onto the wrapper `<g>`.
+    let color_attr = match n.attrs.get("color") {
+        Some(v) if n.shape != crate::resolve::ShapeKind::Text => {
+            format!(r#" color="{}""#, format_value(v, vars, opts))
+        }
+        _ => String::new(),
+    };
     writeln!(
         out,
-        r#"{}<g class="{}"{}{}>"#,
-        indent, classes, id_attr, transform
+        r#"{}<g class="{}"{}{}{}>"#,
+        indent, classes, id_attr, color_attr, transform
     )
     .unwrap();
 

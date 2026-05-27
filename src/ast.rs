@@ -5,36 +5,82 @@
 
 use crate::span::Span;
 
+/// A Plume file: optional defs block, then a stream of root statements
+/// (node decls and wires) in any order.
 #[derive(Debug)]
 pub struct File {
-    pub blocks: Vec<Block>,
+    pub defs: Option<DefsBlock>,
+    pub stmts: Vec<Stmt>,
 }
 
+/// Top-level scene statement.
 #[derive(Debug)]
-pub enum Block {
-    Defaults(DefaultsBlock),
-    Styles(StylesBlock),
-    Shapes(ShapesBlock),
-    Scene(SceneBlock),
-    Wires(WiresBlock),
+pub enum Stmt {
+    Node(ShapeInst),
+    Wire(WireDecl),
 }
 
+// ─────────────────────────── Defs block ───────────────────────────
+
 #[derive(Debug)]
-pub struct DefaultsBlock {
-    pub entries: Vec<DefaultEntry>,
+pub struct DefsBlock {
+    pub entries: Vec<DefsEntry>,
     pub span: Span,
 }
 
 #[derive(Debug)]
-pub struct DefaultEntry {
+pub enum DefsEntry {
+    SceneConfig(SceneConfig),
+    WireConfig(WireConfig),
+    TypeDefaults(TypeDefaults),
+    VarOverride(VarOverride),
+    StyleDef(StyleDef),
+    ShapeDef(ShapeDef),
+}
+
+impl DefsEntry {
+    pub fn span(&self) -> Span {
+        match self {
+            DefsEntry::SceneConfig(s) => s.span,
+            DefsEntry::WireConfig(w) => w.span,
+            DefsEntry::TypeDefaults(t) => t.span,
+            DefsEntry::VarOverride(v) => v.span,
+            DefsEntry::StyleDef(s) => s.span,
+            DefsEntry::ShapeDef(s) => s.span,
+        }
+    }
+}
+
+/// `|scene|` line — root scene container config.
+#[derive(Debug)]
+pub struct SceneConfig {
+    pub items: Vec<AttrItem>,
+    pub span: Span,
+}
+
+/// `|wire|` line — global wire defaults (lowest specificity, layered under
+/// styles and per-wire attrs).
+#[derive(Debug)]
+pub struct WireConfig {
+    pub items: Vec<AttrItem>,
+    pub span: Span,
+}
+
+/// `|name|` line in the defs block — defaults applied to every instance of
+/// the named type (primitive, template, or user shape). Sits as the lowest
+/// specificity layer under inheritance, styles, and inline attrs.
+#[derive(Debug)]
+pub struct TypeDefaults {
+    pub name: String,
+    pub items: Vec<AttrItem>,
+    pub span: Span,
+}
+
+/// `--name:value` line — CSS variable override.
+#[derive(Debug)]
+pub struct VarOverride {
     pub name: String,
     pub value: Value,
-    pub span: Span,
-}
-
-#[derive(Debug)]
-pub struct StylesBlock {
-    pub styles: Vec<StyleDef>,
     pub span: Span,
 }
 
@@ -46,49 +92,76 @@ pub struct StyleDef {
 }
 
 #[derive(Debug)]
-pub struct ShapesBlock {
-    pub shapes: Vec<ShapeDef>,
-    pub span: Span,
-}
-
-#[derive(Debug)]
 pub struct ShapeDef {
     pub name: String,
-    pub base: Option<TypeRef>,
+    pub base: TypeRef,
     pub items: Vec<AttrItem>,
-    pub body: Option<Vec<ShapeInst>>,
+    pub body: Option<Vec<BodyItem>>,
     pub span: Span,
 }
 
-#[derive(Debug)]
-pub struct SceneBlock {
-    pub items: Vec<AttrItem>,
-    pub body: Vec<ShapeInst>,
-    pub span: Span,
-}
+// ─────────────────────────── Scene tree ───────────────────────────
 
-#[derive(Debug)]
-pub struct WiresBlock {
-    pub items: Vec<AttrItem>,
-    pub wires: Vec<WireDecl>,
-    pub span: Span,
-}
-
-/// Node or primitive instance. `id` is `Some` for node decls in a scene,
-/// `None` for anonymous primitives in a shape body or scene.
+/// Node or primitive instance. `id` is `Some` for declared scene nodes,
+/// `None` for anonymous primitives declared with `|type|` directly.
 #[derive(Debug, Clone)]
 pub struct ShapeInst {
     pub id: Option<String>,
     pub ty: TypeRef,
     pub label: Option<String>,
+    pub href: Option<String>,
     pub items: Vec<AttrItem>,
-    pub body: Option<Vec<ShapeInst>>,
+    pub body: Option<Vec<BodyItem>>,
     pub span: Span,
 }
 
-#[derive(Debug)]
+/// Items legal inside a shape/group body: child nodes/primitives, and
+/// internal wires (per SPEC §10 internal wires in shape definitions).
+#[derive(Debug, Clone)]
+pub enum BodyItem {
+    Inst(ShapeInst),
+    Wire(WireDecl),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeRef {
+    pub name: String,
+    pub span: Span,
+}
+
+// ─────────────────────────── Attrs / styles ───────────────────────────
+
+#[derive(Debug, Clone)]
+pub enum AttrItem {
+    Attr(Attr),
+    Style(StyleRef),
+}
+
+#[derive(Debug, Clone)]
+pub struct Attr {
+    pub name: String,
+    pub value: Option<Value>, // None = bare attr
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct StyleRef {
+    pub name: String,
+    pub span: Span,
+}
+
+// ─────────────────────────── Wires ───────────────────────────
+
+/// A wire declaration: a sequence of endpoint groups joined by a single
+/// operator (mixing operators within one chain is a parse error).
+///
+///   a -> b               (chain: [{a}, {b}])
+///   a -> b -> c          (chain: [{a}, {b}, {c}])
+///   a -> b & c           (chain: [{a}, {b,c}])  — fan-out
+///   a & b -> c & d       (chain: [{a,b}, {c,d}]) — cartesian
+#[derive(Debug, Clone)]
 pub struct WireDecl {
-    pub endpoints: Vec<WireEndpoint>,
+    pub chain: Vec<EndpointGroup>,
     pub op: WireOp,
     pub label: Option<String>,
     pub items: Vec<AttrItem>,
@@ -96,10 +169,40 @@ pub struct WireDecl {
     pub span: Span,
 }
 
-#[derive(Debug)]
-pub struct WireEndpoint {
-    pub id: String,
+/// A group of endpoints joined by `&` — the cartesian factor in a fan.
+#[derive(Debug, Clone)]
+pub struct EndpointGroup {
+    pub endpoints: Vec<WireEndpoint>,
     pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct WireEndpoint {
+    /// Dot-path from scene root: `cat` is `["cat"]`, `garden.frog` is
+    /// `["garden", "frog"]`.
+    pub path: Vec<String>,
+    pub side: Option<Side>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Side {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
+impl Side {
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "t" | "top" => Self::Top,
+            "b" | "bottom" => Self::Bottom,
+            "l" | "left" => Self::Left,
+            "r" | "right" => Self::Right,
+            _ => return None,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -109,34 +212,81 @@ pub struct TextDecl {
     pub span: Span,
 }
 
+// ─────────────────────────── Wire ops ───────────────────────────
+
+/// A composed wire operator: `[start_marker?][line][end_marker?]`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WireOp {
-    Arrow,
-    LArrow,
-    Biarrow,
-    ArrowDash,
-    LArrowDash,
-    BiarrowDash,
-    ArrowDot,
-    LArrowDot,
-    BiarrowDot,
+pub struct WireOp {
+    pub line: LineStyle,
+    pub start: WireMarker,
+    pub end: WireMarker,
 }
 
 impl WireOp {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Arrow => "->",
-            Self::LArrow => "<-",
-            Self::Biarrow => "<->",
-            Self::ArrowDash => "-->",
-            Self::LArrowDash => "<--",
-            Self::BiarrowDash => "<-->",
-            Self::ArrowDot => "-.->",
-            Self::LArrowDot => "<-.-",
-            Self::BiarrowDot => "<-.->",
+    pub fn plain(line: LineStyle) -> Self {
+        Self {
+            line,
+            start: WireMarker::None,
+            end: WireMarker::None,
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineStyle {
+    Solid,  // -
+    Dashed, // --
+    Dotted, // -.-
+    Double, // =
+    Wavy,   // ~
+}
+
+impl LineStyle {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Solid => "-",
+            Self::Dashed => "--",
+            Self::Dotted => "-.-",
+            Self::Double => "=",
+            Self::Wavy => "~",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WireMarker {
+    #[default]
+    None,
+    Arrow,   // < at start, > at end
+    Crow,    // > at start, < at end
+    Dot,     // o on either side
+    Diamond, // <> on either side
+}
+
+impl WireMarker {
+    /// Glyph for this marker when rendered at the start side of a wire op.
+    pub fn start_str(self) -> &'static str {
+        match self {
+            Self::None => "",
+            Self::Arrow => "<",
+            Self::Crow => ">",
+            Self::Dot => "o",
+            Self::Diamond => "<>",
+        }
+    }
+    /// Glyph for this marker when rendered at the end side of a wire op.
+    pub fn end_str(self) -> &'static str {
+        match self {
+            Self::None => "",
+            Self::Arrow => ">",
+            Self::Crow => "<",
+            Self::Dot => "o",
+            Self::Diamond => "<>",
+        }
+    }
+}
+
+// ─────────────────────────── Anchors ───────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnchorName {
@@ -166,30 +316,7 @@ impl AnchorName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct TypeRef {
-    pub name: String,
-    pub span: Span,
-}
-
-#[derive(Debug, Clone)]
-pub enum AttrItem {
-    Attr(Attr),
-    Style(StyleRef),
-}
-
-#[derive(Debug, Clone)]
-pub struct Attr {
-    pub name: String,
-    pub value: Option<Value>, // None = bare attr
-    pub span: Span,
-}
-
-#[derive(Debug, Clone)]
-pub struct StyleRef {
-    pub name: String,
-    pub span: Span,
-}
+// ─────────────────────────── Values ───────────────────────────
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -200,7 +327,7 @@ pub enum Value {
     Tuple(Vec<Value>),
     List(Vec<Value>),
     Call(FnCall),
-    RawCssVar(String), // only valid inside var()
+    RawCssVar(String), // `--name` reference to a Plume CSS var
 }
 
 #[derive(Debug, Clone)]

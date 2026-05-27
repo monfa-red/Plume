@@ -1,8 +1,7 @@
 use std::ffi::OsStr;
 use std::path::PathBuf;
 
-/// Every sample must lex, parse, and resolve cleanly. Layout/render coverage is
-/// sprint-specific; this gate is just on Sprint 2's resolver.
+/// Every sample must lex, parse, and resolve cleanly.
 #[test]
 fn all_samples_resolve() {
     let samples_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples");
@@ -42,93 +41,86 @@ fn assert_resolve_error(src: &str, expect_msg_substr: &str) {
 }
 
 #[test]
-fn err_block_order_shapes_after_scene() {
-    assert_resolve_error(
-        "scene { :rect \"x\" }\nshapes { my :rect }\n",
-        "'shapes' must appear before",
-    );
-}
-
-#[test]
-fn err_duplicate_block() {
-    assert_resolve_error(
-        "scene { :rect \"a\" }\nscene { :rect \"b\" }\n",
-        "duplicate 'scene' block",
-    );
-}
-
-#[test]
-fn err_missing_scene_block() {
-    assert_resolve_error(
-        "styles { bold weight=bold }\n",
-        "missing required 'scene' block",
-    );
-}
-
-#[test]
 fn err_duplicate_scene_id() {
     assert_resolve_error(
-        "scene { a :rect \"1\"\n a :rect \"2\" }\n",
-        "duplicate scene id 'a'",
+        "cat |rect| \"1\"\ncat |rect| \"2\"\n",
+        "duplicate scene id 'cat'",
     );
 }
 
 #[test]
 fn err_unknown_shape_type() {
-    assert_resolve_error("scene { :nosuch \"x\" }\n", "unknown type ':nosuch'");
+    assert_resolve_error("cat |nosuch| \"x\"\n", "unknown type '|nosuch|'");
 }
 
 #[test]
 fn err_unknown_style() {
-    assert_resolve_error("scene { :rect \"x\" .nope }\n", "unknown style '.nope'");
+    assert_resolve_error("cat |rect| \"x\" .nope\n", "unknown style '.nope'");
 }
 
 #[test]
 fn err_style_cycle() {
     assert_resolve_error(
-        "styles { a .b\n b .a }\nscene { :rect \"x\" }\n",
+        "{ .alpha .beta\n  .beta .alpha }\ncat |rect|\n",
         "cycle in style",
     );
 }
 
 #[test]
 fn err_shape_cycle() {
-    assert_resolve_error("shapes { loop :loop }\nscene { :rect \"x\" }\n", "cycle in");
+    assert_resolve_error("{ |looper:looper| }\ncat |rect|\n", "cycle in");
 }
 
 #[test]
 fn err_shape_name_collides_with_primitive() {
-    assert_resolve_error(
-        "shapes { rect :oval }\nscene { :rect \"x\" }\n",
-        "'rect' is reserved",
-    );
+    assert_resolve_error("{ |rect:oval| }\ncat |rect|\n", "'rect' is reserved");
 }
 
 #[test]
 fn err_shape_name_collides_with_template() {
-    assert_resolve_error(
-        "shapes { card :rect }\nscene { :rect \"x\" }\n",
-        "'card' is reserved",
-    );
-}
-
-#[test]
-fn err_wire_unknown_endpoint() {
-    assert_resolve_error(
-        "scene { a :rect \"A\" }\nwires { a -> ghost }\n",
-        "wire references undefined id 'ghost'",
-    );
+    assert_resolve_error("{ |card:rect| }\ncat |rect|\n", "'card' is reserved");
 }
 
 #[test]
 fn err_reserved_scene_id() {
-    assert_resolve_error("scene { rect :rect \"x\" }\n", "'rect' is reserved");
+    assert_resolve_error("rect |rect| \"x\"\n", "'rect' is reserved");
 }
 
 #[test]
 fn err_reserved_style_name() {
-    assert_resolve_error(
-        "styles { card weight=bold }\nscene { :rect \"x\" }\n",
-        "'card' is reserved",
-    );
+    assert_resolve_error("{ .card weight:bold }\ncat |rect|\n", "'card' is reserved");
+}
+
+#[test]
+fn wire_endpoint_dotpath_navigates_into_groups() {
+    plume::check("garden |group| { frog |rect| }\noutside |rect|\ngarden.frog -> outside\n")
+        .expect("dot-path resolves");
+}
+
+#[test]
+fn type_defaults_apply_to_every_instance() {
+    // `|rect| radius:5` in defs gives every rect a default radius of 5.
+    plume::check("{ |rect| radius:5 }\ncat |rect| \"Cat\"\n").expect("rect defaults");
+}
+
+#[test]
+fn type_defaults_unknown_type_errors() {
+    let err = plume::check("{ |frog| fill:green }\ncat |rect|\n").expect_err("unknown");
+    assert!(err.to_string().contains("unknown type"), "got: {}", err);
+}
+
+#[test]
+fn type_defaults_duplicate_errors() {
+    let err = plume::check("{ |rect| radius:5\n  |rect| radius:9 }\ncat |rect|\n")
+        .expect_err("duplicate");
+    assert!(err.to_string().contains("duplicate"), "got: {}", err);
+}
+
+#[test]
+fn wire_endpoint_ambiguous_path_errors() {
+    let err = plume::check(
+        "kitchen |group| { mouse |rect| }\ngarden |group| { mouse |rect| }\nmouse -> kitchen\n",
+    )
+    .expect_err("ambiguous");
+    assert!(err.to_string().contains("ambiguous"), "got: {}", err);
 }

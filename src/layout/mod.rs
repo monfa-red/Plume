@@ -351,19 +351,16 @@ mod tests {
 
     #[test]
     fn rect_with_explicit_size_keeps_those_dims() {
-        let l = lay_out("scene { :rect size=(200, 80) }\n");
+        let l = lay_out("|rect| size:(200, 80)\n");
         let n = &l.nodes[0];
-        // bbox includes stroke contribution of thickness/2 each side (= 0.5).
         assert!((n.bbox.w() - 201.0).abs() < 0.01, "bbox.w={}", n.bbox.w());
         assert!((n.bbox.h() - 81.0).abs() < 0.01, "bbox.h={}", n.bbox.h());
     }
 
     #[test]
     fn rect_with_label_auto_sizes_to_text_plus_pad() {
-        let l = lay_out("scene { :rect \"hi\" }\n");
+        let l = lay_out("|rect| \"hi\"\n");
         let n = &l.nodes[0];
-        // "hi" ≈ 2 × 13 × 0.55 = 14.3 wide. + 16 text-pad each side = 46.3.
-        // Plus stroke (1) = 47.3.
         assert!(
             n.bbox.w() > 30.0 && n.bbox.w() < 60.0,
             "got w={}",
@@ -373,7 +370,7 @@ mod tests {
 
     #[test]
     fn rect_with_size_and_text_overrides_auto_size() {
-        let l = lay_out("scene { :rect \"hello\" size=(200, 40) }\n");
+        let l = lay_out("|rect| \"hello\" size:(200, 40)\n");
         let n = &l.nodes[0];
         assert!((n.bbox.w() - 201.0).abs() < 0.01, "bbox.w={}", n.bbox.w());
         assert!((n.bbox.h() - 41.0).abs() < 0.01, "bbox.h={}", n.bbox.h());
@@ -381,8 +378,7 @@ mod tests {
 
     #[test]
     fn rect_with_scalar_size() {
-        // `size=N` = N × N square.
-        let l = lay_out("scene { :rect \"sq\" size=100 }\n");
+        let l = lay_out("|rect| \"sq\" size:100\n");
         let n = &l.nodes[0];
         assert!((n.bbox.w() - 101.0).abs() < 0.01, "bbox.w={}", n.bbox.w());
         assert!((n.bbox.h() - 101.0).abs() < 0.01, "bbox.h={}", n.bbox.h());
@@ -390,8 +386,7 @@ mod tests {
 
     #[test]
     fn oval_uses_size() {
-        // Bbox semantics: size=(60, 40) means a 60×40 ellipse (rx=30 ry=20).
-        let l = lay_out("scene { :oval size=(100, 50) }\n");
+        let l = lay_out("|oval| size:(100, 50)\n");
         let n = &l.nodes[0];
         assert!((n.bbox.w() - 101.0).abs() < 0.01);
         assert!((n.bbox.h() - 51.0).abs() < 0.01);
@@ -400,14 +395,12 @@ mod tests {
     #[test]
     fn row_layout_stacks_horizontally() {
         let l = lay_out(
-            "scene layout=row gap=10 {\n\
-               :rect size=(100, 40)\n\
-               :rect size=(60, 40)\n\
-             }\n",
+            "{ |scene| layout:row gap:10 }\n\
+             |rect| size:(100, 40)\n\
+             |rect| size:(60, 40)\n",
         );
         assert_eq!(l.nodes.len(), 2);
         let dx = l.nodes[1].cx - l.nodes[0].cx;
-        // gap (10) + 100/2 + 60/2 (centers) = 10 + 80 = 90; allow stroke
         assert!((dx - 90.0).abs() < 2.0, "dx={}", dx);
         assert!((l.nodes[0].cy - l.nodes[1].cy).abs() < 0.01);
     }
@@ -415,25 +408,21 @@ mod tests {
     #[test]
     fn column_layout_stacks_vertically() {
         let l = lay_out(
-            "scene layout=column gap=20 {\n\
-               :rect size=(100, 40)\n\
-               :rect size=(100, 60)\n\
-             }\n",
+            "{ |scene| layout:column gap:20 }\n\
+             |rect| size:(100, 40)\n\
+             |rect| size:(100, 60)\n",
         );
         let dy = l.nodes[1].cy - l.nodes[0].cy;
-        // gap (20) + 40/2 + 60/2 = 20 + 50 = 70
         assert!((dy - 70.0).abs() < 2.0, "dy={}", dy);
         assert!((l.nodes[0].cx - l.nodes[1].cx).abs() < 0.01);
     }
 
     #[test]
     fn grid_cells_default_to_center_alignment() {
-        // SPEC §5: grid cells default to h=center v=center for their content.
         let l = lay_out(
-            "scene layout=(2, 1) col-widths=[200, 200] row-heights=100 gap=0 {\n\
-               a :rect size=(40, 40) cell=(1, 1)\n\
-               b :rect size=(40, 40) cell=(2, 1)\n\
-             }\n",
+            "{ |scene| layout:(2, 1) col-widths:[200, 200] row-heights:100 gap:0 }\n\
+             cat |rect| size:(40, 40) cell:(1, 1)\n\
+             dog |rect| size:(40, 40) cell:(2, 1)\n",
         );
         let dx = l.nodes[1].cx - l.nodes[0].cx;
         assert!((dx - 200.0).abs() < 0.01, "dx={}", dx);
@@ -443,11 +432,10 @@ mod tests {
     #[test]
     fn grid_places_by_cell() {
         let l = lay_out(
-            "scene layout=(3, 2) gap=20 {\n\
-               :rect size=(80, 40) cell=(1, 1)\n\
-               :rect size=(80, 40) cell=(3, 1)\n\
-               :rect size=(80, 40) cell=(2, 2)\n\
-             }\n",
+            "{ |scene| layout:(3, 2) gap:20 }\n\
+             |rect| size:(80, 40) cell:(1, 1)\n\
+             |rect| size:(80, 40) cell:(3, 1)\n\
+             |rect| size:(80, 40) cell:(2, 2)\n",
         );
         assert_eq!(l.nodes.len(), 3);
         assert!(l.nodes[0].cx < l.nodes[1].cx);
@@ -456,7 +444,7 @@ mod tests {
 
     #[test]
     fn at_coord_places_absolutely() {
-        let l = lay_out("scene { :rect size=(40, 40) at=(100, 50) }\n");
+        let l = lay_out("|rect| size:(40, 40) at:(100, 50)\n");
         let n = &l.nodes[0];
         assert!((n.cx - 100.0).abs() < 0.01, "cx={}", n.cx);
         assert!((n.cy - 50.0).abs() < 0.01, "cy={}", n.cy);
@@ -464,8 +452,7 @@ mod tests {
 
     #[test]
     fn viewbox_wraps_content_with_canvas_pad() {
-        let l = lay_out("scene { :rect size=(100, 40) }\n");
-        // canvas-pad defaults to 20. Content is 101 × 41 (stroke).
+        let l = lay_out("|rect| size:(100, 40)\n");
         assert!((l.viewbox.w - 141.0).abs() < 0.01, "w={}", l.viewbox.w);
         assert!((l.viewbox.h - 81.0).abs() < 0.01, "h={}", l.viewbox.h);
     }
@@ -473,11 +460,9 @@ mod tests {
     #[test]
     fn defaults_override_layout_var_changes_layout_math() {
         let l = lay_out(
-            "defaults { gap=60 }\n\
-             scene layout=row {\n\
-               :rect size=(40, 40)\n\
-               :rect size=(40, 40)\n\
-             }\n",
+            "{ |scene| layout:row\n  --gap:60 }\n\
+             |rect| size:(40, 40)\n\
+             |rect| size:(40, 40)\n",
         );
         let dx = l.nodes[1].cx - l.nodes[0].cx;
         assert!((dx - 100.0).abs() < 2.0, "dx={}", dx);
@@ -486,16 +471,14 @@ mod tests {
     #[test]
     fn wire_between_two_rects_produces_path() {
         let l = lay_out(
-            "scene layout=row gap=80 {\n\
-               a :rect size=(60, 40)\n\
-               b :rect size=(60, 40)\n\
-             }\n\
-             wires { a -> b }\n",
+            "{ |scene| layout:row gap:80 }\n\
+             cat |rect| size:(60, 40)\n\
+             dog |rect| size:(60, 40)\n\
+             cat -> dog\n",
         );
         assert_eq!(l.wires.len(), 1);
         let w = &l.wires[0];
         assert!(w.path.len() >= 2, "path={:?}", w.path);
-        // Markers: `->` defaults to end=Arrow, start=None.
         assert_eq!(w.markers.start, crate::resolve::MarkerKind::None);
         assert_eq!(w.markers.end, crate::resolve::MarkerKind::Arrow);
     }
@@ -503,38 +486,31 @@ mod tests {
     #[test]
     fn chain_wire_splits_into_subwires_with_markers_on_outer_ends() {
         let l = lay_out(
-            "scene layout=row gap=40 {\n\
-               a :rect w=40 h=40\n\
-               b :rect w=40 h=40\n\
-               c :rect w=40 h=40\n\
-             }\n\
-             wires { a -> b -> c }\n",
+            "{ |scene| layout:row gap:40 }\n\
+             cat  |rect| size:(40, 40)\n\
+             dog  |rect| size:(40, 40)\n\
+             bird |rect| size:(40, 40)\n\
+             cat -> dog -> bird\n",
         );
-        assert_eq!(l.wires.len(), 2, "expected 2 sub-wires for a→b→c");
-        // First sub-wire keeps the start (None for `->`); end is suppressed.
+        assert_eq!(l.wires.len(), 2, "expected 2 sub-wires for cat→dog→bird");
         assert_eq!(l.wires[0].markers.end, crate::resolve::MarkerKind::None);
-        // Last sub-wire keeps the end (Arrow).
         assert_eq!(l.wires[1].markers.end, crate::resolve::MarkerKind::Arrow);
     }
 
     #[test]
     fn auto_edge_picks_right_when_target_to_the_right() {
         let l = lay_out(
-            "scene layout=row gap=80 {\n\
-               a :rect size=(60, 40)\n\
-               b :rect size=(60, 40)\n\
-             }\n\
-             wires { a -> b }\n",
+            "{ |scene| layout:row gap:80 }\n\
+             cat |rect| size:(60, 40)\n\
+             dog |rect| size:(60, 40)\n\
+             cat -> dog\n",
         );
         let w = &l.wires[0];
-        // Source (a) sits to the left of target (b); auto-edge picks the
-        // right edge of a as the exit. First point should be on a's right
-        // boundary (x ≈ a.cx + w/2).
         let a = &l.nodes[0];
         let a_right = a.cx + a.bbox.w() / 2.0;
         assert!(
             (w.path[0].0 - a_right).abs() < 1.0,
-            "first point x={} != a's right edge {}",
+            "first point x={} != cat's right edge {}",
             w.path[0].0,
             a_right
         );
@@ -542,44 +518,37 @@ mod tests {
 
     #[test]
     fn wire_routes_around_intermediate_shape() {
-        // SPEC v2.1 §9: shapes other than endpoints are obstacles. A wire
-        // from `a` to `c` with `b` sitting between them should not pass
-        // through `b`'s bbox.
         let l = lay_out(
-            "scene padding=20 {\n\
-               a :rect size=(40, 40) at=(0, 0)\n\
-               b :rect size=(40, 40) at=(100, 0)\n\
-               c :rect size=(40, 40) at=(200, 0)\n\
-             }\n\
-             wires { a -> c }\n",
+            "{ |scene| padding:20 }\n\
+             cat  |rect| size:(40, 40) at:(0, 0)\n\
+             dog  |rect| size:(40, 40) at:(100, 0)\n\
+             bird |rect| size:(40, 40) at:(200, 0)\n\
+             cat -> bird\n",
         );
         let w = &l.wires[0];
-        let b = &l.nodes[1];
-        let b_left = b.cx - b.bbox.w() / 2.0;
-        let b_right = b.cx + b.bbox.w() / 2.0;
-        let b_top = b.cy - b.bbox.h() / 2.0;
-        let b_bot = b.cy + b.bbox.h() / 2.0;
-        // No path point should sit strictly inside b's bbox.
+        let mid = &l.nodes[1];
+        let m_left = mid.cx - mid.bbox.w() / 2.0;
+        let m_right = mid.cx + mid.bbox.w() / 2.0;
+        let m_top = mid.cy - mid.bbox.h() / 2.0;
+        let m_bot = mid.cy + mid.bbox.h() / 2.0;
         for &(x, y) in &w.path {
             let inside =
-                x > b_left + 0.5 && x < b_right - 0.5 && y > b_top + 0.5 && y < b_bot - 0.5;
-            assert!(!inside, "path point ({}, {}) inside b's bbox", x, y);
+                x > m_left + 0.5 && x < m_right - 0.5 && y > m_top + 0.5 && y < m_bot - 0.5;
+            assert!(!inside, "path point ({}, {}) inside dog's bbox", x, y);
         }
     }
 
     #[test]
     fn wire_label_lands_on_path() {
         let l = lay_out(
-            "scene layout=row gap=80 {\n\
-               a :rect size=(60, 40)\n\
-               b :rect size=(60, 40)\n\
-             }\n\
-             wires { a -> b \"CAN\" }\n",
+            "{ |scene| layout:row gap:80 }\n\
+             cat |rect| size:(60, 40)\n\
+             dog |rect| size:(60, 40)\n\
+             cat -> dog \"CAN\"\n",
         );
         let w = &l.wires[0];
         assert_eq!(w.texts.len(), 1);
         assert_eq!(w.texts[0].content, "CAN");
-        // Mid-position should sit between path endpoints (approximately).
         let mid_x = (w.path[0].0 + w.path.last().unwrap().0) / 2.0;
         assert!(
             (w.texts[0].position.0 - mid_x).abs() < 30.0,
@@ -596,12 +565,12 @@ mod tests {
         let file = crate::parser::parse(&tokens).expect("parse");
         let program = crate::resolve::resolve(file).expect("resolve");
         let l = layout(&program).expect("layout");
-        // §20 has 5 wire decls totalling 10 sub-segments:
-        //   outlet→drive→bus48→fuse→caps (4)
-        //   outlet→ctrl→bus24            (2)
-        //   bus48→ssr→bands              (2)
-        //   fadec↔drive                  (1)
-        //   estop→fuse                   (1)
+        // The §20 example has 5 wire decls totalling 10 sub-segments:
+        //   cat→bowl→water→rabbit→carrot (4)
+        //   cat→apple→mug                (2)
+        //   water→frog→fish              (2)
+        //   treehouse↔kitchen            (1)
+        //   owl→rabbit                   (1)
         assert_eq!(l.wires.len(), 10, "got {} routed wires", l.wires.len());
     }
 
@@ -613,7 +582,7 @@ mod tests {
         let program = crate::resolve::resolve(file).expect("resolve");
         let l = layout(&program).expect("layout");
         // Smoke check: scene viewbox should be non-trivial and there should be
-        // at least the top-level nodes we expect (outlet/rails/consumers/fadec/fd1).
+        // at least the top-level nodes we expect (cat/kitchen/garden/treehouse/diagram1).
         assert!(l.viewbox.w > 100.0);
         assert!(l.viewbox.h > 100.0);
         assert!(l.nodes.len() >= 5);

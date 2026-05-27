@@ -1,8 +1,10 @@
-// `rotation=` rotates around the bbox center (SPEC §7 visual modifiers).
+// `rotation:N` rotates around the bbox center (SPEC §8 visual modifiers).
 
-scene layout=row gap=24 padding=20 {
-  :rect "0deg"   size=(60, 40) rotation=0
-  :rect "15deg"  size=(60, 40) rotation=15
-  :rect "-30deg" size=(60, 40) rotation=-30
-  :rect "45deg"  size=(60, 40) rotation=45
+{
+  |scene| layout:row gap:24 padding:20
 }
+
+|rect| "0deg"   size:(60, 40) rotation:0
+|rect| "15deg"  size:(60, 40) rotation:15
+|rect| "-30deg" size:(60, 40) rotation:-30
+|rect| "45deg"  size:(60, 40) rotation:45

@@ -1,23 +1,19 @@
-styles {
-  power stroke=red thickness=2
+{
+  .loud stroke:red thickness:2
 }
 
-scene {
-  outlet :rect "Outlet"
-  drive  :rect "Drive"
-  bus48  :rect "Bus 48V"
-  fuse   :rect "Fuse"
-  caps   :rect "Caps"
-}
+cat  |rect| "Cat"
+dog  |rect| "Dog"
+bird |rect| "Bird"
+fish |rect| "Fish"
+frog |rect| "Frog"
 
-wires {
-  outlet -> drive -> bus48 -> fuse -> caps .power
-  outlet --> drive
-  outlet -.-> drive
-  outlet <- drive
-  outlet <-- drive
-  outlet <-.- drive
-  outlet <-> drive
-  outlet <--> drive
-  outlet <-.-> drive
-}
+cat -> dog -> bird -> fish -> frog .loud
+cat --> dog
+cat -.-> dog
+cat <- dog
+cat <-- dog
+cat <-.- dog
+cat <-> dog
+cat <--> dog
+cat <-.-> dog

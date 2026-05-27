@@ -1,5 +1,5 @@
 use super::ir::{ResolvedCall, ResolvedValue, VarEntry, VarKind, VarTable};
-use crate::ast::{DefaultEntry, FnCall, Value};
+use crate::ast::{FnCall, Value, VarOverride};
 use crate::error::Error;
 
 /// Built-in CSS variable defaults per SPEC §11.1. Names are stored without the
@@ -157,10 +157,10 @@ fn convert_value(v: &crate::ast::Value) -> Option<ResolvedValue> {
     })
 }
 
-/// Apply a `defaults {}` block on top of the table. Each entry overrides the
-/// previous value; unknown names are introduced as Visual vars so user-defined
-/// `--plume-*` vars can be themed at runtime.
-pub fn apply_defaults_block(table: &mut VarTable, entries: &[DefaultEntry]) -> Result<(), Error> {
+/// Apply a sequence of `--name:value` defs-block overrides on top of the
+/// table. Each entry overrides the previous value; unknown names are introduced
+/// as Visual vars so user-defined `--plume-*` vars can be themed at runtime.
+pub fn apply_var_overrides(table: &mut VarTable, entries: &[&VarOverride]) -> Result<(), Error> {
     for entry in entries {
         let value = resolve_value(&entry.value, table)?;
         let kind = match table.get(&entry.name) {

@@ -1,15 +1,11 @@
-scene {
-  a :rect "A"
-  b :rect "B"
-}
+cat |rect| "Cat"
+dog |rect| "Dog"
 
-wires {
-  a -> b "label"
-  a -> b {
-    :text "label" at=mid size=10
-    :text "↓"     at=0.75
-  }
-  a -> b marker=dot
-  a -> b marker-end=dot
-  a <-> b marker-start=crow
+cat -> dog "label"
+cat -> dog {
+  |text| "label" at:mid size:10
+  |text| "↓"     at:0.75
 }
+cat -> dog marker:dot
+cat -> dog marker-end:dot
+cat <-> dog marker-start:crow

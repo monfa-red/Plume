@@ -125,7 +125,15 @@ fn wire_dash(attrs: &crate::resolve::AttrMap) -> String {
 
 fn render_wire_text(out: &mut String, t: &RoutedText, vars: &VarTable, opts: &Options) {
     let size = attr_num(&t.attrs, "size").unwrap_or(11.0);
-    let fill = attr_or_var(&t.attrs, "fill", "text-color", vars, opts);
+    // Same cascade rule as the primitive `|text|` emitter — own `fill`, then
+    // own `color`, then inherit via `currentColor`.
+    let fill = if let Some(v) = t.attrs.get("fill") {
+        crate::render::values::format_value(v, vars, opts)
+    } else if let Some(v) = t.attrs.get("color") {
+        crate::render::values::format_value(v, vars, opts)
+    } else {
+        "currentColor".to_string()
+    };
     let font = attr_or_var(&t.attrs, "font", "font", vars, opts);
     // Background-coloured stroke painted UNDER the glyph fill. The wire path
     // visually disappears behind the label without us having to clip the path.

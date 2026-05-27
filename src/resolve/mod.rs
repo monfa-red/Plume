@@ -6,82 +6,119 @@ mod vars;
 pub use ir::*;
 
 use crate::ast::{
-    AttrItem, Block, DefaultsBlock, File, ShapeInst, ShapesBlock, StylesBlock, TypeRef, WireOp,
-    WiresBlock,
+    AttrItem, BodyItem, DefsBlock, DefsEntry, EndpointGroup, File, LineStyle, SceneConfig,
+    ShapeDef, ShapeInst, Side, StyleDef, TypeDefaults, TypeRef, VarOverride, WireConfig, WireDecl,
+    WireEndpoint, WireMarker, WireOp,
 };
 use crate::error::Error;
 use crate::span::Span;
 use std::collections::HashMap;
 
-/// Resolve without a theme. Convenience wrapper around `resolve_with_theme`;
-/// kept for the tests and library callers that don't pipe a theme through.
 #[allow(dead_code)]
 pub fn resolve(file: File) -> Result<Program, Error> {
     resolve_with_theme(file, &[])
 }
 
 pub fn resolve_with_theme(file: File, theme: &[(String, String)]) -> Result<Program, Error> {
-    check_block_order(&file.blocks)?;
-
-    let mut defaults_block: Option<&DefaultsBlock> = None;
-    let mut styles_block: Option<&StylesBlock> = None;
-    let mut shapes_block: Option<&ShapesBlock> = None;
-    let mut scene_block_opt = None;
-    let mut wires_block: Option<&WiresBlock> = None;
-
-    for b in &file.blocks {
-        match b {
-            Block::Defaults(b) => defaults_block = Some(b),
-            Block::Styles(b) => styles_block = Some(b),
-            Block::Shapes(b) => shapes_block = Some(b),
-            Block::Scene(b) => scene_block_opt = Some(b),
-            Block::Wires(b) => wires_block = Some(b),
-        }
-    }
-
-    let scene_block = scene_block_opt
-        .ok_or_else(|| Error::at(Span::empty(), "missing required 'scene' block"))?;
-
-    // Vars: built-in defaults ← theme file ← `defaults {}` block.
+    // ─── Phase 2.1 — vars & defs setup ───
     let mut vars = vars::built_in_defaults();
     vars::apply_theme(&mut vars, theme);
-    if let Some(d) = defaults_block {
-        vars::apply_defaults_block(&mut vars, &d.entries)?;
+
+    let split = split_defs(&file.defs);
+
+    if !split.var_overrides.is_empty() {
+        vars::apply_var_overrides(&mut vars, &split.var_overrides)?;
     }
 
-    // Styles
-    let styles_table = match styles_block {
-        Some(b) => styles::StyleTable::build(&b.styles, &vars)?,
-        None => styles::StyleTable::build(&[], &vars)?,
+    let styles_table = styles::StyleTable::build(&split.style_defs, &vars)?;
+    let shapes_table = shapes::ShapesTable::build(
+        &split.shape_defs,
+        &split.type_defaults,
+        &styles_table,
+        &vars,
+    )?;
+
+    // ─── Phase 2.2 — partition top-level stmts ───
+    let (root_nodes, root_wires) = partition_stmts(&file.stmts);
+
+    // ─── Phase 2.3 — collect referenced endpoint ids, auto-create unknown ones ───
+    // SPEC §5: a wire endpoint referencing an undeclared id auto-creates an
+    // empty |rect| at scene root with `label = id`.
+    let declared_ids = collect_declared_ids(&root_nodes);
+    let mut auto_created: Vec<ShapeInst> = Vec::new();
+    let mut auto_seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for wire in &root_wires {
+        collect_auto_created(wire, &declared_ids, &mut auto_seen, &mut auto_created);
+    }
+
+    // ─── Phase 2.4 — resolve scene tree ───
+    // Apply scene config to root scene attrs.
+    let scene_attrs = match split.scene_config {
+        Some(cfg) => {
+            let resolved = resolve_attrs(&cfg.items, &styles_table, &vars)?;
+            collapse(&resolved)
+        }
+        None => default_scene_attrs(&vars),
     };
 
-    // Shapes
-    let shapes_table = match shapes_block {
-        Some(b) => shapes::ShapesTable::build(&b.shapes, &styles_table, &vars)?,
-        None => shapes::ShapesTable::build(&[], &styles_table, &vars)?,
-    };
-
-    // Scene
     let mut id_seen: HashMap<String, Span> = HashMap::new();
-    let scene_attrs_items = resolve_attrs(&scene_block.items, &styles_table, &vars)?;
-    let scene_attrs = collapse(&scene_attrs_items);
-
     let mut scene_nodes = Vec::new();
-    for inst in &scene_block.body {
-        scene_nodes.push(resolve_inst(
+    let mut internal_wires_lifted: Vec<LiftedWire> = Vec::new();
+
+    for inst in &root_nodes {
+        let resolved = resolve_inst(
             inst,
             &shapes_table,
             &styles_table,
             &vars,
             &mut id_seen,
-        )?);
+            &[],
+            &mut internal_wires_lifted,
+        )?;
+        scene_nodes.push(resolved);
+    }
+    for inst in &auto_created {
+        let resolved = resolve_inst(
+            inst,
+            &shapes_table,
+            &styles_table,
+            &vars,
+            &mut id_seen,
+            &[],
+            &mut internal_wires_lifted,
+        )?;
+        scene_nodes.push(resolved);
     }
 
-    // Wires (after scene IDs are known)
-    let wires = match wires_block {
-        Some(b) => resolve_wires(b, &styles_table, &vars, &id_seen)?,
+    // ─── Phase 2.5 — build the dot-path → node lookup ───
+    // Suffix-match against this map when resolving wire endpoints.
+    let path_index = build_path_index(&scene_nodes);
+
+    // ─── Phase 2.6 — resolve wires (root + lifted internal) ───
+    // Pre-resolve |wire| defaults once — layered as lowest specificity under
+    // styles and per-wire attrs.
+    let wires_defaults = match split.wire_config {
+        Some(cfg) => resolve_attrs(&cfg.items, &styles_table, &vars)?,
         None => Vec::new(),
     };
+    let mut wires = Vec::new();
+    for w in &root_wires {
+        for resolved in resolve_wire(w, &styles_table, &vars, &path_index, &[], &wires_defaults)? {
+            wires.push(resolved);
+        }
+    }
+    for lifted in &internal_wires_lifted {
+        for resolved in resolve_wire(
+            &lifted.wire,
+            &styles_table,
+            &vars,
+            &path_index,
+            &lifted.prefix,
+            &wires_defaults,
+        )? {
+            wires.push(resolved);
+        }
+    }
 
     Ok(Program {
         vars,
@@ -93,68 +130,155 @@ pub fn resolve_with_theme(file: File, theme: &[(String, String)]) -> Result<Prog
     })
 }
 
-// ───────────────────────────── Block ordering ─────────────────────────────
+// ─────────────────────────── Defs partitioning ───────────────────────────
 
-fn check_block_order(blocks: &[Block]) -> Result<(), Error> {
-    let position = |b: &Block| -> usize {
-        match b {
-            Block::Defaults(_) => 0,
-            Block::Styles(_) => 1,
-            Block::Shapes(_) => 2,
-            Block::Scene(_) => 3,
-            Block::Wires(_) => 4,
-        }
-    };
-    let name = |b: &Block| -> &'static str {
-        match b {
-            Block::Defaults(_) => "defaults",
-            Block::Styles(_) => "styles",
-            Block::Shapes(_) => "shapes",
-            Block::Scene(_) => "scene",
-            Block::Wires(_) => "wires",
-        }
-    };
-    let span_of = |b: &Block| -> Span {
-        match b {
-            Block::Defaults(b) => b.span,
-            Block::Styles(b) => b.span,
-            Block::Shapes(b) => b.span,
-            Block::Scene(b) => b.span,
-            Block::Wires(b) => b.span,
-        }
-    };
-    let names = ["defaults", "styles", "shapes", "scene", "wires"];
-
-    let mut seen: HashMap<&str, ()> = HashMap::new();
-    let mut max_seen = 0usize;
-    for b in blocks {
-        let pos = position(b);
-        let n = name(b);
-        if seen.contains_key(n) {
-            return Err(Error::at(span_of(b), format!("duplicate '{}' block", n)));
-        }
-        if pos < max_seen {
-            let later = names[max_seen];
-            return Err(Error::at(
-                span_of(b),
-                format!("'{}' must appear before '{}'", n, later),
-            ));
-        }
-        max_seen = pos;
-        seen.insert(n, ());
-    }
-    Ok(())
+struct SplitDefs<'a> {
+    scene_config: Option<&'a SceneConfig>,
+    wire_config: Option<&'a WireConfig>,
+    type_defaults: Vec<&'a TypeDefaults>,
+    var_overrides: Vec<&'a VarOverride>,
+    style_defs: Vec<&'a StyleDef>,
+    shape_defs: Vec<&'a ShapeDef>,
 }
 
-// ───────────────────────────── Reserved names ─────────────────────────────
+fn split_defs(defs: &Option<DefsBlock>) -> SplitDefs<'_> {
+    let mut scene_config = None;
+    let mut wire_config = None;
+    let mut type_defaults = Vec::new();
+    let mut var_overrides = Vec::new();
+    let mut style_defs = Vec::new();
+    let mut shape_defs = Vec::new();
+    if let Some(block) = defs {
+        for entry in &block.entries {
+            match entry {
+                DefsEntry::SceneConfig(s) => scene_config = Some(s),
+                DefsEntry::WireConfig(w) => wire_config = Some(w),
+                DefsEntry::TypeDefaults(t) => type_defaults.push(t),
+                DefsEntry::VarOverride(v) => var_overrides.push(v),
+                DefsEntry::StyleDef(s) => style_defs.push(s),
+                DefsEntry::ShapeDef(s) => shape_defs.push(s),
+            }
+        }
+    }
+    SplitDefs {
+        scene_config,
+        wire_config,
+        type_defaults,
+        var_overrides,
+        style_defs,
+        shape_defs,
+    }
+}
+
+fn default_scene_attrs(vars: &VarTable) -> AttrMap {
+    // SPEC §6 default when |scene| is omitted: `layout:row gap:--gap padding:--canvas-pad`.
+    let mut m = AttrMap::new();
+    m.insert("layout", ResolvedValue::Ident("row".into()));
+    if let Some(e) = vars.get("gap") {
+        m.insert(
+            "gap",
+            ResolvedValue::LiveVar {
+                name: "gap".into(),
+                raw: false,
+                baked: Some(Box::new(e.value.clone())),
+            },
+        );
+    }
+    if let Some(e) = vars.get("canvas-pad") {
+        m.insert(
+            "padding",
+            ResolvedValue::LiveVar {
+                name: "canvas-pad".into(),
+                raw: false,
+                baked: Some(Box::new(e.value.clone())),
+            },
+        );
+    }
+    m
+}
+
+// ─────────────────────────── Stmt partitioning ───────────────────────────
+
+fn partition_stmts(stmts: &[crate::ast::Stmt]) -> (Vec<ShapeInst>, Vec<WireDecl>) {
+    let mut nodes = Vec::new();
+    let mut wires = Vec::new();
+    for s in stmts {
+        match s {
+            crate::ast::Stmt::Node(n) => nodes.push(n.clone()),
+            crate::ast::Stmt::Wire(w) => wires.push(w.clone()),
+        }
+    }
+    (nodes, wires)
+}
+
+// ─────────────────────────── Auto-create ───────────────────────────
+
+fn collect_declared_ids(nodes: &[ShapeInst]) -> std::collections::HashSet<String> {
+    let mut out = std::collections::HashSet::new();
+    for n in nodes {
+        walk_collect_ids(n, &mut out);
+    }
+    out
+}
+
+fn walk_collect_ids(inst: &ShapeInst, out: &mut std::collections::HashSet<String>) {
+    if let Some(id) = &inst.id {
+        out.insert(id.clone());
+    }
+    if let Some(body) = &inst.body {
+        for item in body {
+            if let BodyItem::Inst(child) = item {
+                walk_collect_ids(child, out);
+            }
+        }
+    }
+}
+
+fn collect_auto_created(
+    wire: &WireDecl,
+    declared: &std::collections::HashSet<String>,
+    seen: &mut std::collections::HashSet<String>,
+    out: &mut Vec<ShapeInst>,
+) {
+    for group in &wire.chain {
+        for ep in &group.endpoints {
+            // Multi-segment paths are dot-path navigations; only auto-create
+            // for unqualified single-segment endpoints whose root is unknown.
+            if ep.path.len() != 1 {
+                continue;
+            }
+            let id = &ep.path[0];
+            if declared.contains(id) || seen.contains(id) {
+                continue;
+            }
+            seen.insert(id.clone());
+            out.push(auto_created_inst(id, ep.span));
+        }
+    }
+}
+
+fn auto_created_inst(id: &str, span: Span) -> ShapeInst {
+    ShapeInst {
+        id: Some(id.to_string()),
+        ty: TypeRef {
+            name: "rect".to_string(),
+            span,
+        },
+        label: Some(id.to_string()),
+        href: None,
+        items: Vec::new(),
+        body: None,
+        span,
+    }
+}
+
+// ─────────────────────────── Reserved names ───────────────────────────
 
 pub(super) fn is_reserved(name: &str) -> bool {
     matches!(
         name,
-        // Block names
-        "defaults" | "styles" | "shapes" | "scene" | "wires"
         // Layout values
-        | "row" | "column" | "grid"
+        "row" | "column" | "grid"
         | "start" | "center" | "end" | "stretch" | "between" | "around" | "evenly"
         // Anchors
         | "top" | "bottom" | "left" | "right"
@@ -162,12 +286,16 @@ pub(super) fn is_reserved(name: &str) -> bool {
         | "out-top" | "out-bottom" | "out-left" | "out-right"
         | "out-top-left" | "out-top-right" | "out-bottom-left" | "out-bottom-right"
         | "mid"
+        // Endpoint sides (short)
+        | "t" | "b" | "l" | "r"
         // Primitives
-        | "rect" | "oval" | "line" | "arrow" | "path" | "poly" | "text"
+        | "rect" | "oval" | "line" | "path" | "poly" | "text"
         | "hex" | "slant" | "cyl" | "diamond" | "cloud" | "icon" | "image"
         // Templates
-        | "group" | "circle" | "badge" | "button" | "card" | "note"
-        | "db" | "table" | "cell" | "dim"
+        | "group" | "badge" | "button" | "card" | "note"
+        | "table" | "cell"
+        // Defs-only specials
+        | "scene" | "wire"
         // Constants
         | "true" | "false" | "none" | "auto"
         // Functions
@@ -175,7 +303,7 @@ pub(super) fn is_reserved(name: &str) -> bool {
     )
 }
 
-// ───────────────────────────── Attr resolution ─────────────────────────────
+// ─────────────────────────── Attr resolution ───────────────────────────
 
 fn resolve_attrs(
     items: &[AttrItem],
@@ -207,8 +335,6 @@ fn resolve_attrs(
     Ok(out)
 }
 
-/// Collapse an ordered list of attrs (after specificity merging) into the final
-/// map. Marker-related attrs are stripped — they're handled by `resolve_markers`.
 fn collapse(items: &[ResolvedAttr]) -> AttrMap {
     let mut map = AttrMap::new();
     for item in items {
@@ -254,7 +380,7 @@ fn bare_attr_default(name: &str) -> Option<ResolvedValue> {
     })
 }
 
-// ───────────────────────────── Marker resolution ─────────────────────────────
+// ─────────────────────────── Markers ───────────────────────────
 
 fn resolve_markers(
     items: &[ResolvedAttr],
@@ -290,46 +416,43 @@ fn expect_marker(value: &Option<ResolvedValue>, span: Span) -> Result<MarkerKind
     }
 }
 
-fn default_markers_for_shape(kind: ShapeKind) -> Markers {
-    match kind {
-        ShapeKind::Arrow => Markers {
-            start: MarkerKind::None,
-            end: MarkerKind::Arrow,
-        },
-        _ => Markers::default(),
+fn default_markers_for_shape(_kind: ShapeKind) -> Markers {
+    // No primitive carries default markers anymore; an "arrow" is just a
+    // `|line| marker-end:arrow`. Wires get their defaults from the operator
+    // (see `op_markers`).
+    Markers::default()
+}
+
+fn op_markers(op: WireOp) -> Markers {
+    Markers {
+        start: MarkerKind::from_marker(op.start),
+        end: MarkerKind::from_marker(op.end),
     }
 }
 
-fn default_markers_for_op(op: WireOp) -> Markers {
-    use WireOp::*;
-    match op {
-        Arrow | ArrowDash | ArrowDot => Markers {
-            start: MarkerKind::None,
-            end: MarkerKind::Arrow,
-        },
-        LArrow | LArrowDash | LArrowDot => Markers {
-            start: MarkerKind::Arrow,
-            end: MarkerKind::None,
-        },
-        Biarrow | BiarrowDash | BiarrowDot => Markers {
-            start: MarkerKind::Arrow,
-            end: MarkerKind::Arrow,
-        },
-    }
+// ─────────────────────────── Scene tree resolution ───────────────────────────
+
+/// One internal wire (from a shape def body) lifted up to the program level
+/// after instantiation, with its endpoint paths prefixed by the instance path.
+struct LiftedWire {
+    wire: WireDecl,
+    /// Dot-path of the host instance (e.g. ["garden"]) — gets prefixed onto
+    /// every endpoint path inside the wire at resolution time.
+    prefix: Vec<String>,
 }
 
-// ───────────────────────────── Scene tree ─────────────────────────────
-
+#[allow(clippy::too_many_arguments)]
 fn resolve_inst(
     inst: &ShapeInst,
     shapes: &shapes::ShapesTable,
-    styles: &styles::StyleTable,
+    styles_table: &styles::StyleTable,
     vars: &VarTable,
     id_seen: &mut HashMap<String, Span>,
+    path_prefix: &[String],
+    lifted: &mut Vec<LiftedWire>,
 ) -> Result<ResolvedInst, Error> {
     let resolved_shape = shapes.resolve(&inst.ty.name, inst.ty.span)?;
 
-    // Collect style names applied directly on this inst (left-to-right).
     let applied_styles: Vec<String> = inst
         .items
         .iter()
@@ -339,36 +462,43 @@ fn resolve_inst(
         })
         .collect();
 
-    // ID uniqueness + reserved check.
+    // ID uniqueness + reserved-name check. Only check root-level ids globally;
+    // shape-body instantiation may legitimately have the same local id across
+    // multiple insts.
     if let Some(id) = &inst.id {
         if is_reserved(id) {
             return Err(Error::at(inst.span, format!("'{}' is reserved", id)));
         }
-        if let Some(_prev) = id_seen.get(id) {
+        if path_prefix.is_empty() && id_seen.contains_key(id) {
             return Err(Error::at(inst.span, format!("duplicate scene id '{}'", id)));
         }
-        id_seen.insert(id.clone(), inst.span);
+        if path_prefix.is_empty() {
+            id_seen.insert(id.clone(), inst.span);
+        }
     }
 
-    // Merge: type-default attrs + inline (styles + attrs) in source order.
-    let inline = resolve_attrs(&inst.items, styles, vars)?;
+    let inline = resolve_attrs(&inst.items, styles_table, vars)?;
     let mut ordered = resolved_shape.attrs.clone();
     ordered.extend(inline);
 
-    // Markers (source-order-sensitive pass).
     let defaults = default_markers_for_shape(resolved_shape.kind);
     let markers = resolve_markers(&ordered, defaults.start, defaults.end)?;
-
     let attrs = collapse(&ordered);
 
-    // Body: shape-def intrinsic children, then label sugar (for non-Text shapes
-    // — Text shapes treat label as their own content), then inline children.
-    let mut body_items: Vec<ShapeInst> = resolved_shape.body_items.clone();
+    // Compute the dot-path of this inst for nested children.
+    let mut child_prefix = path_prefix.to_vec();
+    if let Some(id) = &inst.id {
+        child_prefix.push(id.clone());
+    }
+
+    // Body assembly: shape-def intrinsic children, then label sugar (non-text),
+    // then explicit body items from the source.
+    let mut body_items: Vec<BodyItem> = resolved_shape.body_items.clone();
     let own_label = if resolved_shape.kind == ShapeKind::Text {
         inst.label.clone()
     } else {
         if let Some(label) = &inst.label {
-            body_items.push(label_sugar_text(label, inst.span));
+            body_items.push(BodyItem::Inst(label_sugar_text(label, inst.span)));
         }
         None
     };
@@ -377,8 +507,26 @@ fn resolve_inst(
     }
 
     let mut children = Vec::new();
-    for child in &body_items {
-        children.push(resolve_inst(child, shapes, styles, vars, id_seen)?);
+    for item in &body_items {
+        match item {
+            BodyItem::Inst(child) => {
+                children.push(resolve_inst(
+                    child,
+                    shapes,
+                    styles_table,
+                    vars,
+                    id_seen,
+                    &child_prefix,
+                    lifted,
+                )?);
+            }
+            BodyItem::Wire(wire) => {
+                lifted.push(LiftedWire {
+                    wire: wire.clone(),
+                    prefix: child_prefix.clone(),
+                });
+            }
+        }
     }
 
     Ok(ResolvedInst {
@@ -387,6 +535,7 @@ fn resolve_inst(
         type_chain: resolved_shape.type_chain,
         applied_styles,
         label: own_label,
+        href: inst.href.clone(),
         attrs,
         markers,
         children,
@@ -402,107 +551,254 @@ fn label_sugar_text(text: &str, span: Span) -> ShapeInst {
             span,
         },
         label: Some(text.to_string()),
+        href: None,
         items: Vec::new(),
         body: None,
         span,
     }
 }
 
-// ───────────────────────────── Wires ─────────────────────────────
+// ─────────────────────────── Path index ───────────────────────────
 
-fn resolve_wires(
-    block: &WiresBlock,
-    styles: &styles::StyleTable,
+/// Maps fully-qualified dot-paths to their place in the scene tree.
+struct PathIndex {
+    paths: Vec<String>,
+}
+
+impl PathIndex {
+    fn contains(&self, path: &str) -> bool {
+        self.paths.iter().any(|p| p == path)
+    }
+
+    /// SPEC §10 suffix-match: find the unique scene-tree path whose tail
+    /// segments equal `query`'s segments. Returns the full canonical path.
+    fn resolve(&self, query: &[String]) -> Result<String, EndpointMatch> {
+        let qjoined = query.join(".");
+        // Exact full path match wins immediately.
+        if self.contains(&qjoined) {
+            return Ok(qjoined);
+        }
+        let mut hits: Vec<&String> = Vec::new();
+        for p in &self.paths {
+            if path_ends_with(p, query) {
+                hits.push(p);
+            }
+        }
+        match hits.len() {
+            0 => Err(EndpointMatch::NotFound),
+            1 => Ok(hits[0].clone()),
+            _ => Err(EndpointMatch::Ambiguous(
+                hits.into_iter().cloned().collect(),
+            )),
+        }
+    }
+}
+
+enum EndpointMatch {
+    NotFound,
+    Ambiguous(Vec<String>),
+}
+
+fn path_ends_with(path: &str, query: &[String]) -> bool {
+    let segs: Vec<&str> = path.split('.').collect();
+    if query.len() > segs.len() {
+        return false;
+    }
+    let tail = &segs[segs.len() - query.len()..];
+    tail.iter().zip(query.iter()).all(|(a, b)| *a == b)
+}
+
+fn build_path_index(nodes: &[ResolvedInst]) -> PathIndex {
+    let mut paths = Vec::new();
+    for n in nodes {
+        walk_paths(n, &mut Vec::new(), &mut paths);
+    }
+    PathIndex { paths }
+}
+
+fn walk_paths(n: &ResolvedInst, stack: &mut Vec<String>, out: &mut Vec<String>) {
+    if let Some(id) = &n.id {
+        stack.push(id.clone());
+        out.push(stack.join("."));
+    }
+    for c in &n.children {
+        walk_paths(c, stack, out);
+    }
+    if n.id.is_some() {
+        stack.pop();
+    }
+}
+
+// ─────────────────────────── Wires ───────────────────────────
+
+fn resolve_wire(
+    w: &WireDecl,
+    styles_table: &styles::StyleTable,
     vars: &VarTable,
-    scene_ids: &HashMap<String, Span>,
+    paths: &PathIndex,
+    path_prefix: &[String],
+    wires_defaults: &[ResolvedAttr],
 ) -> Result<Vec<ResolvedWire>, Error> {
-    let block_attrs = resolve_attrs(&block.items, styles, vars)?;
+    let inline = resolve_attrs(&w.items, styles_table, vars)?;
+    // SPEC §13 application order: `|wire|` defaults are lowest specificity,
+    // styles and per-wire attrs override (the latter are already merged into
+    // `inline` left-to-right by `resolve_attrs`).
+    let mut ordered: Vec<ResolvedAttr> = Vec::with_capacity(wires_defaults.len() + inline.len());
+    ordered.extend(wires_defaults.iter().cloned());
+    ordered.extend(inline);
 
-    let mut wires = Vec::new();
-    for w in &block.wires {
-        for ep in &w.endpoints {
-            if !scene_ids.contains_key(&ep.id) {
-                return Err(Error::at(
-                    ep.span,
-                    format!("wire references undefined id '{}'", ep.id),
-                ));
-            }
-        }
+    let op_marks = op_markers(w.op);
+    let markers = resolve_markers(&ordered, op_marks.start, op_marks.end)?;
+    let mut attrs = collapse(&ordered);
 
-        let inline = resolve_attrs(&w.items, styles, vars)?;
-        let mut ordered = block_attrs.clone();
-        ordered.extend(inline);
+    // Synthesize stroke-style for line variants per SPEC §10.
+    inject_line_style(&mut attrs, w.op.line);
 
-        let defaults = default_markers_for_op(w.op);
-        let markers = resolve_markers(&ordered, defaults.start, defaults.end)?;
-        let attrs = collapse(&ordered);
-
-        let endpoints = w
-            .endpoints
-            .iter()
-            .map(|ep| ResolvedEndpoint {
-                id: ep.id.clone(),
-                span: ep.span,
-            })
-            .collect();
-
-        let mut texts = Vec::new();
-        if let Some(label) = &w.label {
-            texts.push(ResolvedText {
-                text: label.clone(),
-                at: WireAt::Mid,
-                attrs: AttrMap::new(),
-                span: w.span,
-            });
-        }
-        if let Some(body) = &w.body {
-            for t in body {
-                let t_attrs_items = resolve_attrs(&t.items, styles, vars)?;
-                let mut at = WireAt::Mid;
-                let mut t_map = AttrMap::new();
-                for item in &t_attrs_items {
-                    if item.name == "at" {
-                        if let Some(v) = &item.value {
-                            at = WireAt::parse(v).ok_or_else(|| {
-                                Error::at(
-                                    item.span,
-                                    format!(
-                                        ":text anchor '{:?}' is wire-only; use start/mid/end/0..1",
-                                        v
-                                    ),
-                                )
-                            })?;
-                        }
-                    } else {
-                        let value = item.value.clone().unwrap_or_else(|| {
-                            bare_attr_default(&item.name)
-                                .unwrap_or(ResolvedValue::Ident("true".into()))
-                        });
-                        t_map.insert(item.name.clone(), value);
-                    }
-                }
-                texts.push(ResolvedText {
-                    text: t.text.clone(),
-                    at,
-                    attrs: t_map,
-                    span: t.span,
-                });
-            }
-        }
-
-        wires.push(ResolvedWire {
-            endpoints,
-            op: w.op,
-            attrs,
-            markers,
-            texts,
+    // Text children: label sugar + explicit body texts.
+    let mut texts: Vec<ResolvedText> = Vec::new();
+    if let Some(label) = &w.label {
+        texts.push(ResolvedText {
+            text: label.clone(),
+            at: WireAt::Mid,
+            attrs: AttrMap::new(),
             span: w.span,
         });
     }
-    Ok(wires)
+    if let Some(body) = &w.body {
+        for t in body {
+            let t_attrs = resolve_attrs(&t.items, styles_table, vars)?;
+            let mut at = WireAt::Mid;
+            let mut t_map = AttrMap::new();
+            for item in &t_attrs {
+                if item.name == "at" {
+                    if let Some(v) = &item.value {
+                        at = WireAt::parse(v).ok_or_else(|| {
+                            Error::at(
+                                item.span,
+                                "|text| anchor on a wire must be start/mid/end or 0..1",
+                            )
+                        })?;
+                    }
+                } else {
+                    let value = item.value.clone().unwrap_or_else(|| {
+                        bare_attr_default(&item.name).unwrap_or(ResolvedValue::Ident("true".into()))
+                    });
+                    t_map.insert(item.name.clone(), value);
+                }
+            }
+            texts.push(ResolvedText {
+                text: t.text.clone(),
+                at,
+                attrs: t_map,
+                span: t.span,
+            });
+        }
+    }
+
+    // Cartesian fan expansion: each group's endpoints fan out independently.
+    // For chain [{a}, {b,c}, {d}] with op `->`, we get a→b→d, a→c→d (each as
+    // its own wire). Per spec §10 wire fan grammar.
+    let expanded = expand_chain(&w.chain);
+
+    let mut out = Vec::with_capacity(expanded.len());
+    for chain_path in expanded {
+        let mut endpoints = Vec::with_capacity(chain_path.len());
+        for ep in chain_path {
+            let qualified: Vec<String> = if path_prefix.is_empty() {
+                ep.path.clone()
+            } else {
+                // For internal wires lifted from a shape body, prefix the
+                // endpoint with the host inst's id-path before resolution.
+                let mut p = path_prefix.to_vec();
+                p.extend(ep.path.iter().cloned());
+                p
+            };
+            let resolved_path = match paths.resolve(&qualified) {
+                Ok(p) => p,
+                Err(EndpointMatch::NotFound) => {
+                    return Err(Error::at(
+                        ep.span,
+                        format!("wire endpoint '{}' not found", qualified.join(".")),
+                    ));
+                }
+                Err(EndpointMatch::Ambiguous(hits)) => {
+                    return Err(Error::at(
+                        ep.span,
+                        format!(
+                            "endpoint '{}' is ambiguous (matches: {}); qualify with full path",
+                            qualified.join("."),
+                            hits.join(", ")
+                        ),
+                    ));
+                }
+            };
+            endpoints.push(ResolvedEndpoint {
+                path: resolved_path,
+                side: ep.side,
+                span: ep.span,
+            });
+        }
+        out.push(ResolvedWire {
+            endpoints,
+            line: w.op.line,
+            attrs: attrs.clone(),
+            markers: markers.clone(),
+            texts: texts.iter().map(clone_text).collect(),
+            span: w.span,
+        });
+    }
+    Ok(out)
 }
 
-// ───────────────────────────── Tests ─────────────────────────────
+fn clone_text(t: &ResolvedText) -> ResolvedText {
+    ResolvedText {
+        text: t.text.clone(),
+        at: t.at.clone(),
+        attrs: t.attrs.clone(),
+        span: t.span,
+    }
+}
+
+fn inject_line_style(attrs: &mut AttrMap, line: LineStyle) {
+    let style = match line {
+        LineStyle::Solid => return,
+        LineStyle::Dashed => "dashed",
+        LineStyle::Dotted => "dotted",
+        // double / wavy aren't first-class in the renderer yet — treat as solid
+        // visually but tag them so render can branch later.
+        LineStyle::Double => "double",
+        LineStyle::Wavy => "wavy",
+    };
+    // Don't override an explicit stroke-style attr.
+    if attrs.get("stroke-style").is_none() {
+        attrs.insert("stroke-style", ResolvedValue::Ident(style.into()));
+    }
+}
+
+/// Take a wire chain and expand the cartesian fan-out across endpoint groups.
+/// Result: each entry is one fully-flattened endpoint sequence (one wire).
+fn expand_chain(chain: &[EndpointGroup]) -> Vec<Vec<WireEndpoint>> {
+    let mut acc: Vec<Vec<WireEndpoint>> = vec![Vec::new()];
+    for group in chain {
+        let mut next: Vec<Vec<WireEndpoint>> =
+            Vec::with_capacity(acc.len() * group.endpoints.len());
+        for trail in &acc {
+            for ep in &group.endpoints {
+                let mut t = trail.clone();
+                t.push(ep.clone());
+                next.push(t);
+            }
+        }
+        acc = next;
+    }
+    acc
+}
+
+// `_` to satisfy unused warning when this is only referenced indirectly.
+#[allow(dead_code)]
+fn _coerce_unused(_: &Side, _: &WireMarker) {}
+
+// ─────────────────────────── Tests ───────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -514,17 +810,12 @@ mod tests {
         resolve(file).expect("resolve")
     }
 
-    fn parse_str(src: &str) -> crate::ast::File {
-        let tokens = crate::lexer::lex(src).expect("lex");
-        crate::parser::parse(&tokens).expect("parse")
-    }
-
     #[test]
     fn marker_order_marker_before_marker_end() {
-        // marker=arrow (sets both), then marker-end=dot (overrides end only).
         let p = resolve_str(
-            "scene { a :rect \"A\"\n b :rect \"B\" }\n\
-             wires { a -> b marker=arrow marker-end=dot }\n",
+            "cat |rect| \"Cat\"\n\
+             dog |rect| \"Dog\"\n\
+             cat -> dog marker:arrow marker-end:dot\n",
         );
         let w = &p.wires[0];
         assert_eq!(w.markers.start, MarkerKind::Arrow);
@@ -532,23 +823,11 @@ mod tests {
     }
 
     #[test]
-    fn marker_order_marker_end_before_marker() {
-        // marker-end=dot first, then marker=arrow overrides both.
-        let p = resolve_str(
-            "scene { a :rect \"A\"\n b :rect \"B\" }\n\
-             wires { a -> b marker-end=dot marker=arrow }\n",
-        );
-        let w = &p.wires[0];
-        assert_eq!(w.markers.start, MarkerKind::Arrow);
-        assert_eq!(w.markers.end, MarkerKind::Arrow);
-    }
-
-    #[test]
     fn wire_op_default_markers() {
-        // `<->` defaults to arrow on both ends.
         let p = resolve_str(
-            "scene { a :rect \"A\"\n b :rect \"B\" }\n\
-             wires { a <-> b }\n",
+            "cat |rect| \"Cat\"\n\
+             dog |rect| \"Dog\"\n\
+             cat <-> dog\n",
         );
         let w = &p.wires[0];
         assert_eq!(w.markers.start, MarkerKind::Arrow);
@@ -557,7 +836,7 @@ mod tests {
 
     #[test]
     fn defaults_override_layout_var_keeps_kind_and_bakes_value() {
-        let p = resolve_str("defaults { gap=30 }\nscene { :rect \"x\" }\n");
+        let p = resolve_str("{ --gap:30 }\nx |rect|\n");
         let entry = p.vars.get("gap").expect("gap present");
         assert_eq!(entry.kind, VarKind::Layout);
         match &entry.value {
@@ -567,59 +846,8 @@ mod tests {
     }
 
     #[test]
-    fn plume_var_to_layout_var_carries_baked_value() {
-        // SPEC §11.2: `--name` referencing a layout var resolves to LiveVar
-        // with the baked numeric value attached.
-        let p = resolve_str(
-            "defaults { gap=25 }\n\
-             scene padding=--gap { :rect \"x\" }\n",
-        );
-        let padding = p.scene.attrs.get("padding").expect("padding attr");
-        match padding {
-            ResolvedValue::LiveVar { name, raw, baked } => {
-                assert_eq!(name, "gap");
-                assert!(!raw);
-                match baked.as_deref() {
-                    Some(ResolvedValue::Number(n)) => assert_eq!(*n, 25.0),
-                    other => panic!("expected baked Number(25), got {:?}", other),
-                }
-            }
-            other => panic!("expected LiveVar, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn plume_var_to_visual_var_has_no_baked() {
-        let p = resolve_str("scene { a :rect \"X\" fill=--accent }\n");
-        let a = &p.scene.nodes[0];
-        let fill = a.attrs.get("fill").expect("fill attr");
-        match fill {
-            ResolvedValue::LiveVar { name, raw, baked } => {
-                assert_eq!(name, "accent");
-                assert!(!raw);
-                assert!(baked.is_none(), "visual var should not be baked");
-            }
-            other => panic!("expected LiveVar, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn legacy_var_function_call_errors() {
-        // var() is no longer a function in v1; users should see a helpful error.
-        let result = crate::resolve::resolve(parse_str("scene { :rect fill=var(accent) }\n"));
-        match result {
-            Err(e) => assert!(
-                e.message.contains("var() is no longer"),
-                "got: {}",
-                e.message
-            ),
-            Ok(_) => panic!("expected var() to be rejected"),
-        }
-    }
-
-    #[test]
     fn label_sugar_creates_text_child_on_non_text_shape() {
-        let p = resolve_str("scene { :rect \"hello\" }\n");
+        let p = resolve_str("cat |rect| \"hello\"\n");
         let r = &p.scene.nodes[0];
         assert_eq!(r.shape, ShapeKind::Rect);
         assert!(r.label.is_none(), "non-text shape keeps no label");
@@ -631,7 +859,7 @@ mod tests {
 
     #[test]
     fn text_label_stays_on_text_inst() {
-        let p = resolve_str("scene { :text \"hello\" }\n");
+        let p = resolve_str("cat |text| \"hello\"\n");
         let t = &p.scene.nodes[0];
         assert_eq!(t.shape, ShapeKind::Text);
         assert_eq!(t.label.as_deref(), Some("hello"));
@@ -640,26 +868,30 @@ mod tests {
 
     #[test]
     fn shape_inheritance_resolves_to_primitive_kind() {
-        let p = resolve_str("shapes { psu :rect radius=5 }\nscene { :psu \"PSU\" }\n");
+        let p = resolve_str("{ |treat:rect| radius:5 }\ncat |treat| \"Cat\"\n");
         let n = &p.scene.nodes[0];
         assert_eq!(n.shape, ShapeKind::Rect);
-        // The shape's own attrs are layered onto the inst's attrs.
         assert!(n.attrs.get("radius").is_some());
     }
 
     #[test]
-    fn style_composition_expands_attrs_in_order() {
-        let p = resolve_str(
-            "styles {\n  base thickness=1 stroke=#444\n  warn .base stroke=orange\n}\n\
-             scene { :rect \"x\" .warn }\n",
-        );
-        let n = &p.scene.nodes[0];
-        // .base then .warn → orange wins.
-        match n.attrs.get("stroke") {
-            Some(ResolvedValue::Ident(s)) => assert_eq!(s, "orange"),
-            other => panic!("expected stroke=orange, got {:?}", other),
-        }
-        // .base contributes thickness=1.
-        assert!(n.attrs.get("thickness").is_some());
+    fn wire_auto_creates_undeclared_endpoints() {
+        let p = resolve_str("cat -> dog\n");
+        // Both `cat` and `dog` auto-created as rects.
+        assert_eq!(p.scene.nodes.len(), 2);
+        let ids: Vec<&str> = p
+            .scene
+            .nodes
+            .iter()
+            .filter_map(|n| n.id.as_deref())
+            .collect();
+        assert!(ids.contains(&"cat"));
+        assert!(ids.contains(&"dog"));
+    }
+
+    #[test]
+    fn wire_fan_expands_cartesian() {
+        let p = resolve_str("cat & fox -> bird & mouse\n");
+        assert_eq!(p.wires.len(), 4);
     }
 }

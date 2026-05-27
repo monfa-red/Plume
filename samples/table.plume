@@ -1,7 +1,5 @@
-scene {
-  specs :table layout=(3, 3) col-widths=[80, 140, 80] row-heights=28 {
-    :cell "Voltage" weight=bold; :cell "Current" weight=bold; :cell "Power" weight=bold
-    :cell "48 V";                :cell "20 A";               :cell "960 W"
-    :cell "24 V";                :cell "10 A";               :cell "240 W"
-  }
+basket |table| layout:(3, 3) col-widths:[80, 140, 80] row-heights:28 {
+  |cell| "Fruit"  weight:bold; |cell| "Quantity" weight:bold; |cell| "Notes" weight:bold
+  |cell| "Apple"; |cell| "12";                                |cell| "fresh"
+  |cell| "Mango"; |cell| "3";                                 |cell| "ripe"
 }

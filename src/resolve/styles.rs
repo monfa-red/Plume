@@ -12,7 +12,7 @@ pub struct StyleTable {
 }
 
 impl StyleTable {
-    pub fn build(defs: &[StyleDef], vars: &VarTable) -> Result<Self, Error> {
+    pub fn build(defs: &[&StyleDef], vars: &VarTable) -> Result<Self, Error> {
         // First pass: index by name; reject duplicates and reserved names.
         let mut by_name: HashMap<&str, &StyleDef> = HashMap::new();
         for def in defs {

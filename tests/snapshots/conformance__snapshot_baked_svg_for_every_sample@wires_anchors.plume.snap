@@ -4,38 +4,38 @@ assertion_line: 26
 expression: svg
 input_file: samples/wires_anchors.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-211.775 -44.8 423.55 89.6" width="423.55" height="89.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-186.75 -44.8 373.5 108" width="373.5" height="108" class="plume">
   <defs/>
-  <g class="plume-scene">
-    <g class="plume-node plume-shape-rect" data-id="fadec" transform="translate(-156.9,0)">
-      <rect x="-34.375" y="-24.3" width="68.75" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+  <g class="plume-scene" color="#222">
+    <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-139.025,0)">
+      <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">FADEC</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Cat</text>
       </g>
     </g>
-    <g class="plume-node plume-shape-rect" data-id="drive" transform="translate(-7.15,0)">
-      <rect x="-34.375" y="-24.3" width="68.75" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+    <g class="plume-node plume-shape-rect" data-id="dog" transform="translate(-3.575,0)">
+      <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Drive</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Dog</text>
       </g>
     </g>
-    <g class="plume-node plume-shape-rect" data-id="bus48" transform="translate(149.75,0)">
-      <rect x="-41.525" y="-24.3" width="83.05" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+    <g class="plume-node plume-shape-rect" data-id="bird" transform="translate(135.45,0)">
+      <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Bus 48V</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Bird</text>
       </g>
     </g>
   </g>
   <g class="plume-wires">
-    <g class="plume-wire" data-from="fadec" data-to="drive">
-      <path d="M -118.025 3.2 L -46.025 3.2" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-121.025,3.2 -115.025,0.2 -115.025,6.2" fill="#444"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-43.025,3.2 -49.025,6.2 -49.025,0.2" fill="#444"/>
-      <text x="-82.025" y="3.2" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="#222" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">CAN</text>
+    <g class="plume-wire" data-from="cat" data-to="dog">
+      <path d="M -107.3 3.2 L -35.3 3.2" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-110.3,3.2 -104.3,0.2 -104.3,6.2" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-32.3,3.2 -38.3,6.2 -38.3,0.2" fill="#444"/>
+      <text x="-71.3" y="3.2" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">chats</text>
     </g>
-    <g class="plume-wire" data-from="drive" data-to="bus48">
-      <path d="M 27.725 3.2 L 103.725 3.2" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="106.725,3.2 100.725,6.2 100.725,0.2" fill="#444"/>
+    <g class="plume-wire" data-from="dog" data-to="bird">
+      <path d="M -2.75 24.8 L -2.75 43.2 L 133.25 43.2 L 133.25 -20.8" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="133.25,-23.8 136.25,-17.8 130.25,-17.8" fill="#444"/>
     </g>
   </g>
 </svg>

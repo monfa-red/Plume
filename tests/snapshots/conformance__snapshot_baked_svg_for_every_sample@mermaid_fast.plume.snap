@@ -1,0 +1,96 @@
+---
+source: tests/conformance.rs
+assertion_line: 26
+expression: svg
+input_file: samples/mermaid_fast.plume
+---
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-412.275 -64.8 824.55 109.6" width="824.55" height="109.6" class="plume">
+  <defs/>
+  <g class="plume-scene" color="#222">
+    <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-364.55,0)">
+      <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">cat</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" data-id="dog" transform="translate(-289.1,0)">
+      <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">dog</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" data-id="bird" transform="translate(-210.075,0)">
+      <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">bird</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" data-id="fox" transform="translate(-131.05,0)">
+      <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">fox</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" data-id="owl" transform="translate(-55.6,0)">
+      <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">owl</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" data-id="mouse" transform="translate(27,0)">
+      <rect x="-34.375" y="-24.3" width="68.75" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">mouse</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" data-id="frog" transform="translate(113.175,0)">
+      <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">frog</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" data-id="pond" transform="translate(195.775,0)">
+      <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">pond</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" data-id="fish" transform="translate(278.375,0)">
+      <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">fish</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" data-id="bowl" transform="translate(360.975,0)">
+      <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">bowl</text>
+      </g>
+    </g>
+  </g>
+  <g class="plume-wires">
+    <g class="plume-wire" data-from="cat" data-to="bird">
+      <path d="M -336.825 3.2 L -316.825 3.2" fill="none" stroke="#444" stroke-width="1"/>
+    </g>
+    <g class="plume-wire" data-from="cat" data-to="bird">
+      <path d="M -261.375 3.2 L -245.375 3.2" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-242.375,3.2 -248.375,6.2 -248.375,0.2" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="fox" data-to="mouse">
+      <path d="M -132.275 -24.8 L -132.275 -44.8 L 19.725 -44.8 L 19.725 -28.8" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="19.725,-25.8 16.725,-31.8 22.725,-31.8" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="owl" data-to="mouse">
+      <path d="M -27.875 3.2 L -11.875 3.2" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-8.875,3.2 -14.875,6.2 -14.875,0.2" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="frog" data-to="pond">
+      <path d="M 144.475 3.2 L 160.475 3.2" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="163.475,3.2 157.475,6.2 157.475,0.2" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="fish" data-to="bowl">
+      <path d="M 309.675 3.2 L 325.675 3.2" fill="none" stroke="#444" stroke-width="1"/>
+      <circle class="plume-marker plume-marker-dot" cx="328.675" cy="3.2" r="2" fill="#444"/>
+    </g>
+  </g>
+</svg>

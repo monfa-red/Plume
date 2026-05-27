@@ -59,17 +59,15 @@ fn formatted_output_resolves_identically() {
 #[test]
 fn fmt_preserves_section_comments_and_blank_lines() {
     let src = "\
-defaults {
-  gap=24
+{
+  --gap:24
 }
 
 // Top-level comment.
-scene {
-  // Inside scene.
-  a :rect
+// Comment on root statement.
+cat |rect|
 
-  b :rect
-}
+dog |rect|
 ";
     let formatted = plume::format_source(src).expect("fmt");
     assert!(
@@ -77,14 +75,9 @@ scene {
         "missing top-level comment in:\n{}",
         formatted
     );
+    // Blank line between cat and dog should be preserved.
     assert!(
-        formatted.contains("// Inside scene."),
-        "missing inner comment in:\n{}",
-        formatted
-    );
-    // Blank line between `a` and `b` must be preserved (a single blank line).
-    assert!(
-        formatted.contains("a :rect\n\n  b :rect"),
+        formatted.contains("|rect|\n\ndog"),
         "blank line not preserved between siblings:\n{}",
         formatted
     );
@@ -93,15 +86,15 @@ scene {
 #[test]
 fn fmt_canonicalizes_numeric_forms() {
     // `+3` and `.5` are legal but non-canonical; formatter normalizes.
-    let src = "defaults { a=+3\n  b=.5\n}\n";
+    let src = "{ --a:+3\n  --b:.5 }\n";
     let formatted = plume::format_source(src).expect("fmt");
     assert!(
-        formatted.contains("a=3"),
+        formatted.contains("--a:3"),
         "expected +3 → 3, got:\n{}",
         formatted
     );
     assert!(
-        formatted.contains("b=0.5"),
+        formatted.contains("--b:0.5"),
         "expected .5 → 0.5, got:\n{}",
         formatted
     );
@@ -109,10 +102,10 @@ fn fmt_canonicalizes_numeric_forms() {
 
 #[test]
 fn fmt_normalizes_tuple_spacing() {
-    let src = "defaults { p=( 2 ,  4 ) }\n";
+    let src = "|rect| size:( 2 ,  4 )\n";
     let formatted = plume::format_source(src).expect("fmt");
     assert!(
-        formatted.contains("p=(2, 4)"),
+        formatted.contains("size:(2, 4)"),
         "expected canonical tuple spacing, got:\n{}",
         formatted
     );

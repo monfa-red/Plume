@@ -1,72 +1,72 @@
 ---
 source: tests/conformance.rs
-assertion_line: 27
+assertion_line: 26
 expression: svg
 input_file: samples/anchors.plume
 ---
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-120.5 -80.5 241 161" width="241" height="161" class="plume">
   <defs/>
-  <g class="plume-scene">
+  <g class="plume-scene" color="#222">
     <g class="plume-node plume-shape-rect" data-id="base" transform="translate(0,0)">
       <rect x="-100" y="-60" width="200" height="120" rx="0" ry="0" fill="#eee" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-rect" transform="translate(0,0)">
         <rect x="-9" y="-7" width="18" height="14" rx="0" ry="0" fill="red" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">C</text>
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">C</text>
         </g>
       </g>
       <g class="plume-node plume-shape-rect" transform="translate(0,-60)">
         <rect x="-9" y="-7" width="18" height="14" rx="0" ry="0" fill="red" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">T</text>
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">T</text>
         </g>
       </g>
       <g class="plume-node plume-shape-rect" transform="translate(0,60)">
         <rect x="-9" y="-7" width="18" height="14" rx="0" ry="0" fill="red" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">B</text>
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">B</text>
         </g>
       </g>
       <g class="plume-node plume-shape-rect" transform="translate(-100,0)">
         <rect x="-9" y="-7" width="18" height="14" rx="0" ry="0" fill="red" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">L</text>
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">L</text>
         </g>
       </g>
       <g class="plume-node plume-shape-rect" transform="translate(100,0)">
         <rect x="-9" y="-7" width="18" height="14" rx="0" ry="0" fill="red" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">R</text>
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">R</text>
         </g>
       </g>
       <g class="plume-node plume-shape-rect" transform="translate(-100,-60)">
         <rect x="-10" y="-7" width="20" height="14" rx="0" ry="0" fill="blue" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">TL</text>
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">TL</text>
         </g>
       </g>
       <g class="plume-node plume-shape-rect" transform="translate(100,-60)">
         <rect x="-10" y="-7" width="20" height="14" rx="0" ry="0" fill="blue" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">TR</text>
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">TR</text>
         </g>
       </g>
       <g class="plume-node plume-shape-rect" transform="translate(-100,60)">
         <rect x="-10" y="-7" width="20" height="14" rx="0" ry="0" fill="blue" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">BL</text>
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">BL</text>
         </g>
       </g>
       <g class="plume-node plume-shape-rect" transform="translate(100,60)">
         <rect x="-10" y="-7" width="20" height="14" rx="0" ry="0" fill="blue" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">BR</text>
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">BR</text>
         </g>
       </g>
       <g class="plume-node plume-shape-rect" transform="translate(40,20)">
         <rect x="-9" y="-7" width="18" height="14" rx="0" ry="0" fill="green" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Co</text>
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Co</text>
         </g>
       </g>
     </g>

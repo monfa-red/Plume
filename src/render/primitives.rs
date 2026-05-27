@@ -1,5 +1,5 @@
-//! Per-primitive SVG geometry. Sprint 5 implements all 14 shape kinds — most
-//! emit a single element; `cyl` and `cloud` emit a small composition.
+//! Per-primitive SVG geometry. One emitter per `ShapeKind`; most produce a
+//! single SVG element, `cyl` and `cloud` build a small composition.
 
 use super::values::{attr_num, attr_or_var, attr_points, attr_str, escape_xml, num};
 use crate::layout::PlacedNode;
@@ -28,8 +28,7 @@ pub fn render_geometry(
         ShapeKind::Cloud => emit_cloud(out, n, &indent, &fill, &stroke, thickness),
         ShapeKind::Oval => emit_oval(out, n, &indent, &fill, &stroke, thickness),
         ShapeKind::Text => emit_text(out, n, &indent, vars, opts),
-        ShapeKind::Line => emit_line(out, n, &indent, &stroke, thickness, false),
-        ShapeKind::Arrow => emit_line(out, n, &indent, &stroke, thickness, true),
+        ShapeKind::Line => emit_line(out, n, &indent, &stroke, thickness),
         ShapeKind::Poly => emit_poly(out, n, &indent, &fill, &stroke, thickness),
         ShapeKind::Path => emit_path(out, n, &indent, &fill, &stroke, thickness),
         ShapeKind::Icon => emit_icon(out, n, &indent, &stroke, vars, opts),
@@ -239,7 +238,16 @@ fn emit_cloud(
 fn emit_text(out: &mut String, n: &PlacedNode, indent: &str, vars: &VarTable, opts: &Options) {
     let size = attr_num(&n.attrs, "size").unwrap_or(13.0);
     let label = n.label.as_deref().unwrap_or("");
-    let fill = attr_or_var(&n.attrs, "fill", "text-color", vars, opts);
+    // On |text|, `color` is an alias for `fill` (CSS-style). If neither is set,
+    // fall back to `currentColor` so SVG inheritance from any ancestor `color`
+    // takes over — the root scene seeds this with `--plume-text-color`.
+    let fill = if let Some(v) = n.attrs.get("fill") {
+        crate::render::values::format_value(v, vars, opts)
+    } else if let Some(v) = n.attrs.get("color") {
+        crate::render::values::format_value(v, vars, opts)
+    } else {
+        "currentColor".to_string()
+    };
     let font = attr_or_var(&n.attrs, "font", "font", vars, opts);
     let weight = attr_str(&n.attrs, "weight", "normal", vars, opts);
     let weight_attr = if weight != "normal" {
@@ -270,14 +278,7 @@ fn wrap_font(font: &str) -> String {
     }
 }
 
-fn emit_line(
-    out: &mut String,
-    n: &PlacedNode,
-    indent: &str,
-    stroke: &str,
-    thickness: f64,
-    arrow_default: bool,
-) {
+fn emit_line(out: &mut String, n: &PlacedNode, indent: &str, stroke: &str, thickness: f64) {
     let points = attr_points(&n.attrs, "points").unwrap_or_default();
     if points.len() < 2 {
         return;
@@ -320,7 +321,7 @@ fn emit_line(
     // Markers go at the first and last points.
     let from = points[0];
     let to = points[points.len() - 1];
-    super::markers::emit_inline_markers(out, indent, n, from, to, stroke, thickness, arrow_default);
+    super::markers::emit_inline_markers(out, indent, n, from, to, stroke, thickness);
 }
 
 /// Emit `stroke-dasharray="..."` for `stroke-style=dashed|dotted`, else empty.

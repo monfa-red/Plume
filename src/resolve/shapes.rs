@@ -1,134 +1,91 @@
 use super::ir::{ResolvedAttr, ShapeKind, VarTable};
 use super::styles::StyleTable;
 use super::vars::resolve_value;
-use crate::ast::{AttrItem, ShapeDef, ShapeInst};
+use crate::ast::{AttrItem, BodyItem, ShapeDef, TypeDefaults};
 use crate::error::Error;
 use crate::span::Span;
 use std::collections::HashMap;
 
 const MAX_INHERITANCE_DEPTH: usize = 16;
 
-/// Built-in templates per SPEC §8. Each maps to a base primitive.
-/// Default attrs from §8 are added in later sprints; Sprint 2 only needs the
-/// base relationship for chain walking.
+/// Built-in templates per SPEC §9. Each maps to a base primitive.
 const TEMPLATES: &[(&str, &str)] = &[
     ("group", "rect"),
-    ("circle", "oval"),
     ("badge", "rect"),
     ("button", "rect"),
     ("card", "rect"),
     ("note", "rect"),
-    ("db", "cyl"),
     ("table", "group"),
     ("cell", "rect"),
-    ("dim", "line"),
 ];
 
-/// Result of resolving a `:type` reference. `kind` is the underlying primitive;
-/// `attrs` and `body_items` accumulate from the inheritance chain.
+pub fn is_template(name: &str) -> bool {
+    TEMPLATES.iter().any(|(n, _)| *n == name)
+}
+
+/// Result of resolving a `|type|` reference. `kind` is the underlying primitive;
+/// `attrs` and `body_items` accumulate from the inheritance chain (built-in →
+/// defs-block type-defaults → shape definitions, walked top-down).
 #[derive(Clone)]
 pub struct ResolvedShape {
     pub kind: ShapeKind,
     pub attrs: Vec<ResolvedAttr>,
-    pub body_items: Vec<ShapeInst>,
-    /// User-shape and template names walked, from the inst's declared type back
-    /// toward the primitive. Excludes the primitive itself (which is in `kind`).
+    pub body_items: Vec<BodyItem>,
+    /// Names walked, from the inst's declared type back toward the primitive.
+    /// Excludes the primitive itself (which is in `kind`).
     pub type_chain: Vec<String>,
 }
 
 pub struct ShapesTable {
     user: HashMap<String, ResolvedShapeDef>,
+    /// `|name|` defaults from the defs block, keyed by type name. Applied
+    /// during inheritance walking as the lowest-specificity attr layer for
+    /// each type in the chain.
+    type_defaults: HashMap<String, Vec<ResolvedAttr>>,
 }
 
 struct ResolvedShapeDef {
-    base: Option<String>,
+    base: String,
     attrs: Vec<ResolvedAttr>,
-    body_items: Vec<ShapeInst>,
+    body_items: Vec<BodyItem>,
     span: Span,
 }
 
 impl ShapesTable {
-    pub fn build(defs: &[ShapeDef], styles: &StyleTable, vars: &VarTable) -> Result<Self, Error> {
-        let mut user: HashMap<String, ResolvedShapeDef> = HashMap::new();
+    pub fn build(
+        defs: &[&ShapeDef],
+        type_defaults: &[&TypeDefaults],
+        styles: &StyleTable,
+        vars: &VarTable,
+    ) -> Result<Self, Error> {
+        let user = build_user_shapes(defs, styles, vars)?;
+        let type_defaults = build_type_defaults(type_defaults, &user, styles, vars)?;
+        let table = Self {
+            user,
+            type_defaults,
+        };
 
-        for def in defs {
-            if super::is_reserved(&def.name) {
-                return Err(Error::at(def.span, format!("'{}' is reserved", def.name)));
-            }
-            if ShapeKind::parse(&def.name).is_some() {
-                return Err(Error::at(
-                    def.span,
-                    format!("'{}' shadows a built-in primitive", def.name),
-                ));
-            }
-            if is_template_name(&def.name) {
-                return Err(Error::at(
-                    def.span,
-                    format!("'{}' shadows a built-in template", def.name),
-                ));
-            }
-            if user.contains_key(&def.name) {
-                return Err(Error::at(
-                    def.span,
-                    format!("duplicate shape '{}'", def.name),
-                ));
-            }
-
-            // Resolve items into attrs (expanding styles).
-            let mut attrs: Vec<ResolvedAttr> = Vec::new();
-            for item in &def.items {
-                match item {
-                    AttrItem::Attr(a) => {
-                        let value = match &a.value {
-                            Some(v) => Some(resolve_value(v, vars)?),
-                            None => None,
-                        };
-                        attrs.push(ResolvedAttr {
-                            name: a.name.clone(),
-                            value,
-                            span: a.span,
-                        });
-                    }
-                    AttrItem::Style(s) => {
-                        let inner = styles.lookup(&s.name).ok_or_else(|| {
-                            Error::at(s.span, format!("unknown style '.{}'", s.name))
-                        })?;
-                        attrs.extend(inner.iter().cloned());
-                    }
-                }
-            }
-
-            let base = def.base.as_ref().map(|t| t.name.clone());
-            let body_items = def.body.clone().unwrap_or_default();
-
-            user.insert(
-                def.name.clone(),
-                ResolvedShapeDef {
-                    base,
-                    attrs,
-                    body_items,
-                    span: def.span,
-                },
-            );
-        }
-
-        let table = Self { user };
-
-        // Validate inheritance: every user shape's chain walks cleanly.
+        // Validate every user shape's inheritance chain walks cleanly.
         for def in defs {
             let mut visiting: Vec<String> = Vec::new();
             table.walk_chain(&def.name, def.span, &mut visiting, 0)?;
         }
-
         Ok(table)
     }
 
-    /// Resolve a `:type` reference into a primitive kind and inherited attrs.
+    /// Resolve a `|type|` reference into a primitive kind and inherited attrs.
     pub fn resolve(&self, name: &str, use_span: Span) -> Result<ResolvedShape, Error> {
         let mut visiting: Vec<String> = Vec::new();
         self.walk_chain(name, use_span, &mut visiting, 0)
     }
 
+    /// Walk the inheritance chain from `name` down to its primitive base,
+    /// layering in attrs and body items at each level. The order is:
+    ///
+    ///   primitive < defs-block-type-defaults < template attrs < user-shape attrs
+    ///
+    /// so per [SPEC §13] the most-specific type's own attrs win against the
+    /// less-specific layers below it.
     fn walk_chain(
         &self,
         name: &str,
@@ -147,55 +104,171 @@ impl ShapesTable {
             return Err(Error::at(use_span, format!("cycle in '{}'", chain)));
         }
 
-        // Primitive — leaf, no further inheritance.
+        // Primitive — leaf. Only defs-block type-defaults attach here; the
+        // primitive itself has no built-in attrs (those are constants in the
+        // layout/render layers).
         if let Some(kind) = ShapeKind::parse(name) {
             return Ok(ResolvedShape {
                 kind,
-                attrs: Vec::new(),
+                attrs: self.defaults_for(name),
                 body_items: Vec::new(),
                 type_chain: Vec::new(),
             });
         }
 
-        // Template — built-in, walk its base.
+        // Template — built-in. Walk its base then layer defs-block type-defaults.
         if let Some((_, base)) = TEMPLATES.iter().find(|(n, _)| *n == name) {
             visiting.push(name.to_string());
             let mut resolved = self.walk_chain(base, use_span, visiting, depth + 1)?;
             visiting.pop();
+            resolved.attrs.extend(self.defaults_for(name));
             resolved.type_chain.insert(0, name.to_string());
             return Ok(resolved);
         }
 
-        // User shape — walk base (if any), then layer this shape's own attrs +
-        // body items on top.
+        // User shape — walk base, then layer defs-block type-defaults, then
+        // the shape's own definition attrs.
         let def = self
             .user
             .get(name)
-            .ok_or_else(|| Error::at(use_span, format!("unknown type ':{}'", name)))?;
+            .ok_or_else(|| Error::at(use_span, format!("unknown type '|{}|'", name)))?;
 
         visiting.push(name.to_string());
-        let (kind, mut attrs, mut body_items, mut type_chain) = match &def.base {
-            Some(base_name) => {
-                let base = self.walk_chain(base_name, def.span, visiting, depth + 1)?;
-                (base.kind, base.attrs, base.body_items, base.type_chain)
-            }
-            None => (ShapeKind::Rect, Vec::new(), Vec::new(), Vec::new()),
-        };
+        let base = self.walk_chain(&def.base, def.span, visiting, depth + 1)?;
         visiting.pop();
 
+        let mut attrs = base.attrs;
+        attrs.extend(self.defaults_for(name));
         attrs.extend(def.attrs.iter().cloned());
+
+        let mut body_items = base.body_items;
         body_items.extend(def.body_items.iter().cloned());
+
+        let mut type_chain = base.type_chain;
         type_chain.insert(0, name.to_string());
 
         Ok(ResolvedShape {
-            kind,
+            kind: base.kind,
             attrs,
             body_items,
             type_chain,
         })
     }
+
+    fn defaults_for(&self, name: &str) -> Vec<ResolvedAttr> {
+        self.type_defaults.get(name).cloned().unwrap_or_default()
+    }
 }
 
-fn is_template_name(name: &str) -> bool {
-    TEMPLATES.iter().any(|(n, _)| *n == name)
+// ───────────────────────── Build helpers ─────────────────────────
+
+fn build_user_shapes(
+    defs: &[&ShapeDef],
+    styles: &StyleTable,
+    vars: &VarTable,
+) -> Result<HashMap<String, ResolvedShapeDef>, Error> {
+    let mut user: HashMap<String, ResolvedShapeDef> = HashMap::new();
+    for def in defs {
+        if super::is_reserved(&def.name) {
+            return Err(Error::at(def.span, format!("'{}' is reserved", def.name)));
+        }
+        if ShapeKind::parse(&def.name).is_some() {
+            return Err(Error::at(
+                def.span,
+                format!("'{}' shadows a built-in primitive", def.name),
+            ));
+        }
+        if is_template(&def.name) {
+            return Err(Error::at(
+                def.span,
+                format!("'{}' shadows a built-in template", def.name),
+            ));
+        }
+        if user.contains_key(&def.name) {
+            return Err(Error::at(
+                def.span,
+                format!("duplicate shape '{}'", def.name),
+            ));
+        }
+
+        let attrs = resolve_attr_items(&def.items, styles, vars)?;
+        let body_items = def.body.clone().unwrap_or_default();
+
+        user.insert(
+            def.name.clone(),
+            ResolvedShapeDef {
+                base: def.base.name.clone(),
+                attrs,
+                body_items,
+                span: def.span,
+            },
+        );
+    }
+    Ok(user)
+}
+
+/// Resolve and validate the `|name|` type-defaults entries from the defs
+/// block. Each entry must reference a known type — primitive, template, or
+/// user-defined shape. Duplicates are rejected.
+fn build_type_defaults(
+    entries: &[&TypeDefaults],
+    user: &HashMap<String, ResolvedShapeDef>,
+    styles: &StyleTable,
+    vars: &VarTable,
+) -> Result<HashMap<String, Vec<ResolvedAttr>>, Error> {
+    let mut out: HashMap<String, Vec<ResolvedAttr>> = HashMap::new();
+    for entry in entries {
+        if !is_known_type(&entry.name, user) {
+            return Err(Error::at(
+                entry.span,
+                format!(
+                    "unknown type '|{}|' in defs (no such primitive, template, or shape)",
+                    entry.name
+                ),
+            ));
+        }
+        if out.contains_key(&entry.name) {
+            return Err(Error::at(
+                entry.span,
+                format!("duplicate type-defaults entry '|{}|'", entry.name),
+            ));
+        }
+        let attrs = resolve_attr_items(&entry.items, styles, vars)?;
+        out.insert(entry.name.clone(), attrs);
+    }
+    Ok(out)
+}
+
+fn is_known_type(name: &str, user: &HashMap<String, ResolvedShapeDef>) -> bool {
+    ShapeKind::parse(name).is_some() || is_template(name) || user.contains_key(name)
+}
+
+fn resolve_attr_items(
+    items: &[AttrItem],
+    styles: &StyleTable,
+    vars: &VarTable,
+) -> Result<Vec<ResolvedAttr>, Error> {
+    let mut out: Vec<ResolvedAttr> = Vec::new();
+    for item in items {
+        match item {
+            AttrItem::Attr(a) => {
+                let value = match &a.value {
+                    Some(v) => Some(resolve_value(v, vars)?),
+                    None => None,
+                };
+                out.push(ResolvedAttr {
+                    name: a.name.clone(),
+                    value,
+                    span: a.span,
+                });
+            }
+            AttrItem::Style(s) => {
+                let inner = styles
+                    .lookup(&s.name)
+                    .ok_or_else(|| Error::at(s.span, format!("unknown style '.{}'", s.name)))?;
+                out.extend(inner.iter().cloned());
+            }
+        }
+    }
+    Ok(out)
 }

@@ -1,14 +1,13 @@
 //! Marker geometry (arrow / dot / diamond / crow). Shared between inline
-//! `:line` / `:arrow` primitives and wire rendering.
+//! `|line|` primitives and wire rendering.
 
 use super::values::num;
 use crate::layout::PlacedNode;
-use crate::resolve::{MarkerKind, Markers};
+use crate::resolve::MarkerKind;
 use std::fmt::Write;
 
-/// Markers for inline `:line` / `:arrow` primitives. Source-order marker
-/// resolution already lives in `resolve`; here we just emit shapes.
-#[allow(clippy::too_many_arguments)]
+/// Emit markers for inline `|line|` primitives. Resolve has already settled
+/// `n.markers` per source-order rules — we just paint what's there.
 pub fn emit_inline_markers(
     out: &mut String,
     indent: &str,
@@ -17,31 +16,15 @@ pub fn emit_inline_markers(
     to: (f64, f64),
     stroke: &str,
     thickness: f64,
-    arrow_default: bool,
 ) {
-    let m = if n.markers.start == MarkerKind::None && n.markers.end == MarkerKind::None {
-        // Fall back to the `:line` (none) / `:arrow` (end=arrow) defaults if
-        // resolve produced an empty Markers struct.
-        if arrow_default {
-            Markers {
-                start: MarkerKind::None,
-                end: MarkerKind::Arrow,
-            }
-        } else {
-            return;
-        }
-    } else {
-        n.markers.clone()
-    };
-
-    if m.start != MarkerKind::None {
+    if n.markers.start != MarkerKind::None {
         if let Some((tip, dir)) = marker_anchor(from, to, true) {
-            emit_marker(out, indent, m.start, tip, dir, stroke, thickness);
+            emit_marker(out, indent, n.markers.start, tip, dir, stroke, thickness);
         }
     }
-    if m.end != MarkerKind::None {
+    if n.markers.end != MarkerKind::None {
         if let Some((tip, dir)) = marker_anchor(from, to, false) {
-            emit_marker(out, indent, m.end, tip, dir, stroke, thickness);
+            emit_marker(out, indent, n.markers.end, tip, dir, stroke, thickness);
         }
     }
 }

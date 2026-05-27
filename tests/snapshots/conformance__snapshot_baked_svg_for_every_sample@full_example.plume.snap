@@ -4,116 +4,116 @@ assertion_line: 26
 expression: svg
 input_file: samples/full_example.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-415.9 -171.1 832 442.95" width="832" height="442.95" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-381.6 -171.1 763.2 442.95" width="763.2" height="442.95" class="plume">
   <defs/>
-  <g class="plume-scene">
-    <g class="plume-node plume-shape-oval" data-id="outlet" transform="translate(-294.55,-60.3)">
-      <ellipse cx="0" cy="0" rx="80.85" ry="24.3" fill="white" stroke="#444" stroke-width="1"/>
+  <g class="plume-scene" color="#222">
+    <g class="plume-node plume-shape-oval" data-id="cat" transform="translate(-273.1,-60.3)">
+      <ellipse cx="0" cy="0" rx="88" ry="24.3" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Outlet 120-240 VAC</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Cat — patient hunter</text>
       </g>
     </g>
-    <g class="plume-node plume-shape-group plume-shape-rect" data-id="rails" transform="translate(-31.175,-60.3)">
-      <rect x="-141.525" y="-78.9" width="283.05" height="157.8" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+    <g class="plume-node plume-shape-group plume-shape-rect" data-id="kitchen" transform="translate(-13.3,-60.3)">
+      <rect x="-130.8" y="-78.9" width="261.6" height="157.8" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,-70.6)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Power Rails</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Kitchen</text>
       </g>
-      <g class="plume-node plume-shape-group plume-shape-rect" data-id="rail48" transform="translate(0,-17)">
-        <rect x="-133.875" y="-24.8" width="267.75" height="49.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-group plume-shape-rect" data-id="counter" transform="translate(0,-17)">
+        <rect x="-130.3" y="-24.8" width="260.6" height="49.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(-104.775,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">48V Rail</text>
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Counter</text>
         </g>
-        <g class="plume-node plume-shape-psu plume-shape-rect" data-id="drive" transform="translate(1.375,0)">
-          <rect x="-66.55" y="-24.3" width="133.1" height="48.6" rx="5" ry="5" fill="white" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-treat plume-shape-rect" data-id="bowl" transform="translate(-9.35,0)">
+          <rect x="-59.4" y="-24.3" width="118.8" height="48.6" rx="5" ry="5" fill="white" stroke="#444" stroke-width="1"/>
           <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Drive PSU 960W</text>
+            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Bowl of oats</text>
           </g>
         </g>
-        <g class="plume-node plume-shape-bus plume-shape-slant" data-id="bus48" transform="translate(106.15,0)">
-          <polygon points="-20.7138,-24.3 33.7362,-24.3 20.7138,24.3 -33.7362,24.3" fill="gray" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-nest plume-shape-slant" data-id="water" transform="translate(95.425,0)">
+          <polygon points="-27.8638,-24.3 40.8862,-24.3 27.8638,24.3 -40.8862,24.3" fill="gray" stroke="#444" stroke-width="1"/>
           <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Bus</text>
+            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Water</text>
           </g>
         </g>
       </g>
-      <g class="plume-node plume-shape-group plume-shape-rect" data-id="rail24" transform="translate(0,53.6)">
-        <rect x="-141.025" y="-24.8" width="282.05" height="49.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-        <g class="plume-node plume-shape-text" transform="translate(-111.925,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">24V Rail</text>
+      <g class="plume-node plume-shape-group plume-shape-rect" data-id="shelf" transform="translate(0,53.6)">
+        <rect x="-90.975" y="-24.8" width="181.95" height="49.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(-72.6,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Shelf</text>
         </g>
-        <g class="plume-node plume-shape-psu plume-shape-rect" data-id="ctrl" transform="translate(1.375,0)">
-          <rect x="-73.7" y="-24.3" width="147.4" height="48.6" rx="5" ry="5" fill="white" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-treat plume-shape-rect" data-id="apple" transform="translate(-9.35,0)">
+          <rect x="-34.375" y="-24.3" width="68.75" height="48.6" rx="5" ry="5" fill="white" stroke="#444" stroke-width="1"/>
           <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Control PSU 240W</text>
+            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Apple</text>
           </g>
         </g>
-        <g class="plume-node plume-shape-bus plume-shape-slant" data-id="bus24" transform="translate(113.3,0)">
+        <g class="plume-node plume-shape-nest plume-shape-slant" data-id="mug" transform="translate(63.25,0)">
           <polygon points="-20.7138,-24.3 33.7362,-24.3 20.7138,24.3 -33.7362,24.3" fill="gray" stroke="#444" stroke-width="1"/>
           <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Bus</text>
+            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Mug</text>
           </g>
         </g>
       </g>
     </g>
-    <g class="plume-node plume-shape-group plume-shape-rect" data-id="consumers" transform="translate(263.375,-60.3)">
-      <rect x="-112.025" y="-90.3" width="224.05" height="180.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+    <g class="plume-node plume-shape-group plume-shape-rect" data-id="garden" transform="translate(259.8,-60.3)">
+      <rect x="-101.3" y="-90.3" width="202.6" height="180.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,-82)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Consumers</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Garden</text>
       </g>
-      <g class="plume-node plume-shape-group plume-shape-rect" data-id="booster" transform="translate(0,-12.7)">
-        <rect x="-99.525" y="-20.5" width="199.05" height="41" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-group plume-shape-rect" data-id="den" transform="translate(0,-12.7)">
+        <rect x="-85.225" y="-20.5" width="170.45" height="41" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(-74,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Booster</text>
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Den</text>
         </g>
-        <g class="plume-node plume-shape-alert plume-shape-circle plume-shape-oval" data-id="fuse" transform="translate(-14.975,0)">
+        <g class="plume-node plume-shape-alert plume-shape-oval" data-id="rabbit" transform="translate(-29.275,0)">
           <ellipse cx="0" cy="0" rx="18" ry="18" fill="white" stroke="red" stroke-width="1"/>
-          <g class="plume-node plume-shape-text" transform="translate(0,-36.8)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">60A Fuse</text>
+          <g class="plume-node plume-shape-text" transform="translate(0,-34.8)">
+            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Rabbit</text>
           </g>
-          <g class="plume-node plume-shape-badge plume-shape-rect" transform="translate(0,20.3)">
-            <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+          <g class="plume-node plume-shape-badge plume-shape-rect" transform="translate(0,18.3)">
+            <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
             <g class="plume-node plume-shape-text" transform="translate(0,0)">
-              <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">HOT</text>
+              <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">FAST</text>
             </g>
           </g>
         </g>
-        <g class="plume-node plume-shape-rect" data-id="caps" transform="translate(59.025,0)">
+        <g class="plume-node plume-shape-rect" data-id="carrot" transform="translate(44.725,0)">
           <rect x="-40" y="-20" width="80" height="40" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
           <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">MOSFET</text>
+            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Carrot patch</text>
           </g>
         </g>
       </g>
-      <g class="plume-node plume-shape-group plume-shape-rect" data-id="heaters" transform="translate(0,69.3)">
-        <rect x="-111.525" y="-20.5" width="223.05" height="41" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-group plume-shape-rect" data-id="pond" transform="translate(0,69.3)">
+        <rect x="-100.8" y="-20.5" width="201.6" height="41" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(-86,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Heaters</text>
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Pond</text>
         </g>
-        <g class="plume-node plume-shape-rect" data-id="ssr" transform="translate(-14.975,0)">
+        <g class="plume-node plume-shape-rect" data-id="frog" transform="translate(-25.7,0)">
           <rect x="-30" y="-20" width="60" height="40" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
           <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">3x SSR</text>
+            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Frog</text>
           </g>
         </g>
-        <g class="plume-node plume-shape-rect" data-id="bands" transform="translate(71.025,0)">
+        <g class="plume-node plume-shape-rect" data-id="fish" transform="translate(60.3,0)">
           <rect x="-40" y="-20" width="80" height="40" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
           <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">Heaters</text>
+            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Goldfish</text>
           </g>
         </g>
       </g>
     </g>
-    <g class="plume-node plume-shape-group plume-shape-rect" data-id="fadec" transform="translate(-294.55,110.8)">
-      <rect x="-28.375" y="-39.8" width="56.75" height="79.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+    <g class="plume-node plume-shape-group plume-shape-rect" data-id="treehouse" transform="translate(-273.1,110.8)">
+      <rect x="-42.675" y="-39.8" width="85.35" height="79.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,-21.5)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="#222">FADEC</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Treehouse</text>
       </g>
-      <g class="plume-node plume-shape-icon" data-id="estop" transform="translate(0,13.3)">
+      <g class="plume-node plume-shape-icon" data-id="owl" transform="translate(0,13.3)">
         <rect x="-16" y="-16" width="32" height="32" fill="none" stroke="#444" stroke-width="1"/>
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="12.8" fill="#444">power_settings_new</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="12.8" fill="#444">visibility</text>
       </g>
     </g>
-    <g class="plume-node plume-shape-force_diagram plume-shape-rect" data-id="fd1" transform="translate(300,200)">
+    <g class="plume-node plume-shape-widget plume-shape-group plume-shape-rect" data-id="diagram1" transform="translate(300,200)">
       <rect x="-58.5" y="-51.35" width="117" height="102.7" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-rect" transform="translate(0,-19)">
         <rect x="-50" y="-20" width="100" height="40" rx="4" ry="4" fill="lightblue" stroke="#444" stroke-width="1"/>
@@ -121,52 +121,52 @@ input_file: samples/full_example.plume
       <g class="plume-node plume-shape-line plume-style-thin" transform="translate(0,10)">
         <line x1="-50" y1="0" x2="50" y2="0" stroke="#444" stroke-width="1"/>
       </g>
-      <g class="plume-node plume-shape-arrow" transform="translate(-25,19)">
+      <g class="plume-node plume-shape-line" transform="translate(-25,19)">
         <line x1="0" y1="0" x2="50" y2="20" stroke="#444" stroke-width="1"/>
         <polygon class="plume-marker plume-marker-arrow" points="49.0715,19.6286 42.3865,20.1857 44.6148,14.6148" fill="#444"/>
       </g>
       <g class="plume-node plume-shape-text" transform="translate(0,-39.5)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="12" font-family="system-ui, -apple-system, sans-serif" fill="#222">Cavity</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="12" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Den</text>
       </g>
     </g>
   </g>
   <g class="plume-wires">
-    <g class="plume-wire" data-from="outlet" data-to="caps">
-      <path d="M -213.2 -67.1 L -115.9 -67.1 L -115.9 -83.1 L -96.85 -83.1" fill="none" stroke="red" stroke-width="2"/>
+    <g class="plume-wire" data-from="cat" data-to="garden.den.carrot">
+      <path d="M -184.6 -67.1 L -101.6 -67.1 L -101.6 -75.1 L -82.55 -75.1" fill="none" stroke="red" stroke-width="2"/>
     </g>
-    <g class="plume-wire" data-from="outlet" data-to="caps">
+    <g class="plume-wire" data-from="cat" data-to="garden.den.carrot">
       <path d="M 37.25 -75.1 L 47.25 -75.1" fill="none" stroke="red" stroke-width="2"/>
     </g>
-    <g class="plume-wire" data-from="outlet" data-to="caps">
-      <path d="M 102.7 -83.1 L 212.1 -83.1 L 212.1 -75.1 L 229.9 -75.1" fill="none" stroke="red" stroke-width="2"/>
+    <g class="plume-wire" data-from="cat" data-to="garden.den.carrot">
+      <path d="M 117 -83.1 L 194.4 -83.1 L 194.4 -75.1 L 212.025 -75.1" fill="none" stroke="red" stroke-width="2"/>
     </g>
-    <g class="plume-wire" data-from="outlet" data-to="caps">
-      <path d="M 266.9 -75.1 L 277.9 -75.1" fill="none" stroke="red" stroke-width="2"/>
-      <polygon class="plume-marker plume-marker-arrow" points="280.9,-75.1 270.9,-70.1 270.9,-80.1" fill="red"/>
+    <g class="plume-wire" data-from="cat" data-to="garden.den.carrot">
+      <path d="M 249.025 -75.1 L 260.025 -75.1" fill="none" stroke="red" stroke-width="2"/>
+      <polygon class="plume-marker plume-marker-arrow" points="263.025,-75.1 253.025,-70.1 253.025,-80.1" fill="red"/>
     </g>
-    <g class="plume-wire" data-from="outlet" data-to="bus24">
-      <path d="M -213.2 -59.1 L -187.9 -59.1 L -187.9 -3.1 L -104 -3.1" fill="none" stroke="#444" stroke-width="1"/>
+    <g class="plume-wire" data-from="cat" data-to="kitchen.shelf.mug">
+      <path d="M -184.6 -59.1 L -165.6 -59.1 L -165.6 -3.1 L -57.525 -3.1" fill="none" stroke="#444" stroke-width="1"/>
     </g>
-    <g class="plume-wire" data-from="outlet" data-to="bus24">
-      <path d="M 44.4 -3.1 L 50.4 -3.1" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="53.4,-3.1 47.4,-0.1 47.4,-6.1" fill="#444"/>
+    <g class="plume-wire" data-from="cat" data-to="kitchen.shelf.mug">
+      <path d="M 12.225 -3.1 L 18.225 -3.1" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="21.225,-3.1 15.225,-0.1 15.225,-6.1" fill="#444"/>
     </g>
-    <g class="plume-wire" data-from="bus48" data-to="bands">
-      <path d="M 102.7 -75.1 L 140.1 -75.1 L 140.1 12.9 L 217.9 12.9" fill="none" stroke="#444" stroke-width="1"/>
+    <g class="plume-wire" data-from="kitchen.counter.water" data-to="garden.pond.fish">
+      <path d="M 117 -75.1 L 146.4 -75.1 L 146.4 12.9 L 203.6 12.9" fill="none" stroke="#444" stroke-width="1"/>
     </g>
-    <g class="plume-wire" data-from="bus48" data-to="bands">
-      <path d="M 278.9 12.9 L 289.9 12.9" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="292.9,12.9 286.9,15.9 286.9,9.9" fill="#444"/>
+    <g class="plume-wire" data-from="kitchen.counter.water" data-to="garden.pond.fish">
+      <path d="M 264.6 12.9 L 275.6 12.9" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="278.6,12.9 272.6,15.9 272.6,9.9" fill="#444"/>
     </g>
-    <g class="plume-wire" data-from="fadec" data-to="drive">
-      <path d="M -291.9 66.5 L -291.9 -11.1 L -395.9 -11.1 L -395.9 -107.1 L -123.9 -107.1 L -123.9 -75.1 L -100.85 -75.1" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-291.9,69.5 -294.9,63.5 -288.9,63.5" fill="#444"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-97.85,-75.1 -103.85,-72.1 -103.85,-78.1" fill="#444"/>
-      <text x="-371.175" y="-107.1" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="#222" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">CAN</text>
+    <g class="plume-wire" data-from="treehouse" data-to="kitchen">
+      <path d="M -225.925 108.9 L -13.6 108.9 L -13.6 23.1" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-228.925,108.9 -222.925,105.9 -222.925,111.9" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-13.6,20.1 -10.6,26.1 -16.6,26.1" fill="#444"/>
+      <text x="-76.8625" y="108.9" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">watches</text>
     </g>
-    <g class="plume-wire" data-from="estop" data-to="fuse">
-      <path d="M -278.05 124.9 L 396.1 124.9 L 396.1 -115.1 L 252.1 -115.1 L 252.1 -58.5" fill="none" stroke="orange" stroke-width="2"/>
-      <circle class="plume-marker plume-marker-dot" cx="252.1" cy="-55.5" r="3.3333" fill="orange"/>
+    <g class="plume-wire" data-from="treehouse.owl" data-to="garden.den.rabbit">
+      <path d="M -256.6 124.9 L 138.4 124.9 L 138.4 -67.1 L 208.025 -67.1" fill="none" stroke="orange" stroke-width="2" stroke-dasharray="8,8"/>
+      <circle class="plume-marker plume-marker-dot" cx="211.025" cy="-67.1" r="3.3333" fill="orange"/>
     </g>
   </g>
 </svg>

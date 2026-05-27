@@ -8,18 +8,26 @@ pub fn parse(tokens: &[Token]) -> Result<File, Error> {
         toks: tokens,
         pos: 0,
     };
-    let mut blocks = Vec::new();
     p.skip_newlines();
+
+    // Optional defs block: must be the very first non-trivia token.
+    let defs = if matches!(p.peek_kind(), Some(TokKind::LBrace)) {
+        Some(p.parse_defs_block()?)
+    } else {
+        None
+    };
+    p.skip_newlines();
+
+    let mut stmts = Vec::new();
     while p.peek().is_some() {
-        blocks.push(p.parse_block()?);
+        stmts.push(p.parse_stmt()?);
         p.skip_newlines();
     }
-    Ok(File { blocks })
+    Ok(File { defs, stmts })
 }
 
 /// Parse a single Plume value from a complete token stream. Used by the theme
-/// loader to interpret `--plume-NAME: VALUE;` declarations as Plume values
-/// (numbers, hex, tuples, calls, …) rather than opaque CSS strings.
+/// loader to interpret `--plume-NAME: VALUE;` declarations as Plume values.
 pub fn parse_value_only(tokens: &[Token]) -> Result<Value, Error> {
     let mut p = Parser {
         toks: tokens,
@@ -61,6 +69,22 @@ impl<'a> Parser<'a> {
             .get(self.pos.saturating_sub(1))
             .map(|t| t.span)
             .unwrap_or_default()
+    }
+
+    fn prev_end(&self) -> Option<usize> {
+        if self.pos == 0 {
+            None
+        } else {
+            self.toks.get(self.pos - 1).map(|t| t.span.end)
+        }
+    }
+
+    /// True iff the current token is glued to the previous one (no whitespace).
+    fn current_glued_to_prev(&self) -> bool {
+        match (self.prev_end(), self.peek()) {
+            (Some(prev_end), Some(tok)) => prev_end == tok.span.start,
+            _ => false,
+        }
     }
 
     fn skip_newlines(&mut self) {
@@ -120,11 +144,8 @@ impl<'a> Parser<'a> {
     fn expect_rbracket(&mut self) -> Result<Span, Error> {
         self.expect_kind(|k| matches!(k, TokKind::RBracket), "']'")
     }
-    fn expect_colon(&mut self) -> Result<Span, Error> {
-        self.expect_kind(|k| matches!(k, TokKind::Colon), "':'")
-    }
-    fn expect_equals(&mut self) -> Result<Span, Error> {
-        self.expect_kind(|k| matches!(k, TokKind::Equals), "'='")
+    fn expect_pipe(&mut self) -> Result<Span, Error> {
+        self.expect_kind(|k| matches!(k, TokKind::Pipe), "'|'")
     }
     fn expect_dot(&mut self) -> Result<Span, Error> {
         self.expect_kind(|k| matches!(k, TokKind::Dot), "'.'")
@@ -225,8 +246,6 @@ impl<'a> Parser<'a> {
             TokKind::LParen => self.parse_tuple_value(),
             TokKind::LBracket => self.parse_list_value(),
             TokKind::RawCssVar(name) => {
-                // SPEC §11.2: `--name` resolves to var(--plume-name) — the only
-                // CSS-var reference syntax in v1.
                 let v = name.clone();
                 self.pos += 1;
                 Ok(Value::RawCssVar(v))
@@ -242,10 +261,10 @@ impl<'a> Parser<'a> {
         self.expect_lparen()?;
         let mut args = Vec::new();
         if !matches!(self.peek_kind(), Some(TokKind::RParen)) {
-            args.push(self.parse_call_arg(&name)?);
+            args.push(self.parse_value()?);
             while matches!(self.peek_kind(), Some(TokKind::Comma)) {
                 self.pos += 1;
-                args.push(self.parse_call_arg(&name)?);
+                args.push(self.parse_value()?);
             }
         }
         let end = self.expect_rparen()?;
@@ -254,11 +273,6 @@ impl<'a> Parser<'a> {
             args,
             span: Span::new(name_span.start, end.end),
         })
-    }
-
-    fn parse_call_arg(&mut self, _fn_name: &str) -> Result<Value, Error> {
-        // `--name` is a top-level value in v1; `parse_value` handles it directly.
-        self.parse_value()
     }
 
     fn parse_tuple_value(&mut self) -> Result<Value, Error> {
@@ -295,40 +309,20 @@ impl<'a> Parser<'a> {
         let mut items = Vec::new();
         loop {
             match self.peek_kind() {
-                Some(TokKind::Dot) => items.push(AttrItem::Style(self.parse_style_ref()?)),
-                Some(TokKind::Ident(_)) => items.push(AttrItem::Attr(self.parse_attr()?)),
-                Some(TokKind::Newline) => {
-                    // SPEC §2 line continuation: a newline mid-declaration is
-                    // ignored when the next significant token starts a continuation
-                    // (key=value, .style, bare attr, or `{`).
-                    let mut peek = self.pos + 1;
-                    while matches!(self.toks.get(peek).map(|t| &t.kind), Some(TokKind::Newline)) {
-                        peek += 1;
-                    }
-                    if self.is_continuation_start(peek) {
-                        self.pos = peek;
-                    } else {
+                Some(TokKind::Dot) => {
+                    // SPEC §2: style refs require whitespace before `.`. A no-WS
+                    // dot would mean an endpoint side, which is wire-only — stop
+                    // and let the caller decide.
+                    if self.current_glued_to_prev() {
                         break;
                     }
+                    items.push(AttrItem::Style(self.parse_style_ref()?));
                 }
+                Some(TokKind::Ident(_)) => items.push(AttrItem::Attr(self.parse_attr()?)),
                 _ => break,
             }
         }
         Ok(items)
-    }
-
-    fn is_continuation_start(&self, pos: usize) -> bool {
-        // SPEC §2: a non-blank line continues the previous declaration if it
-        // starts with `key=value`, `.style`, or `{`.
-        match self.toks.get(pos).map(|t| &t.kind) {
-            Some(TokKind::Dot) => true,
-            Some(TokKind::LBrace) => true,
-            Some(TokKind::Ident(_)) => matches!(
-                self.toks.get(pos + 1).map(|t| &t.kind),
-                Some(TokKind::Equals)
-            ),
-            _ => false,
-        }
     }
 
     fn parse_style_ref(&mut self) -> Result<StyleRef, Error> {
@@ -342,14 +336,29 @@ impl<'a> Parser<'a> {
 
     fn parse_attr(&mut self) -> Result<Attr, Error> {
         let (name, name_span) = self.expect_ident()?;
-        // SPEC v1: every attr is `name=value`. No bare attrs.
-        if !matches!(self.peek_kind(), Some(TokKind::Equals)) {
+        // SPEC §2: `name:value` — binding `:` has no whitespace on either side.
+        let next_is_colon = matches!(self.peek_kind(), Some(TokKind::Colon));
+        if !next_is_colon {
             return Err(Error::at(
                 name_span,
-                format!("attr '{}' requires a value: write '{}=...'", name, name),
+                format!("attr '{}' requires a value: write '{}:VALUE'", name, name),
             ));
         }
+        if !self.current_glued_to_prev() {
+            return Err(Error::at(
+                self.next_span(),
+                "binding ':' must have no whitespace before it",
+            ));
+        }
+        let colon_span = self.next_span();
         self.pos += 1;
+        // Check no whitespace after the colon (value must be glued).
+        if !self.current_glued_to_prev() {
+            return Err(Error::at(
+                colon_span,
+                "binding ':' must have no whitespace after it",
+            ));
+        }
         let value = self.parse_value()?;
         let end = self.last_span();
         Ok(Attr {
@@ -359,241 +368,335 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_type_ref(&mut self) -> Result<TypeRef, Error> {
-        let start = self.expect_colon()?;
-        let (name, end) = self.expect_ident()?;
+    // ───────────────────────── Type refs (`|name|`) ─────────────────────────
+
+    fn parse_type_use(&mut self) -> Result<TypeRef, Error> {
+        let start = self.expect_pipe()?;
+        let (name, _) = self.expect_ident()?;
+        // Disallow `name:base` inside a type-use ref (that's defs syntax).
+        if matches!(self.peek_kind(), Some(TokKind::Colon)) {
+            return Err(Error::at(
+                self.next_span(),
+                format!(
+                    "type-use ref '|{}|' cannot carry ':base' (only valid in the defs block)",
+                    name
+                ),
+            ));
+        }
+        let end = self.expect_pipe()?;
         Ok(TypeRef {
             name,
             span: Span::new(start.start, end.end),
         })
     }
 
-    // ───────────────────────── Top-level block ─────────────────────────
+    // ───────────────────────── Defs block ─────────────────────────
 
-    fn parse_block(&mut self) -> Result<Block, Error> {
-        let (name, name_span) = self.expect_ident()?;
-        match name.as_str() {
-            "defaults" => {
-                self.expect_lbrace()?;
-                let entries = self.parse_defaults_body()?;
-                let end = self.expect_rbrace()?;
-                Ok(Block::Defaults(DefaultsBlock {
-                    entries,
-                    span: Span::new(name_span.start, end.end),
+    fn parse_defs_block(&mut self) -> Result<DefsBlock, Error> {
+        let start = self.expect_lbrace()?;
+        let mut entries = Vec::new();
+        self.skip_newlines();
+        while !matches!(self.peek_kind(), Some(TokKind::RBrace) | None) {
+            entries.push(self.parse_defs_entry()?);
+            self.consume_terminator()?;
+        }
+        let end = self.expect_rbrace()?;
+        Ok(DefsBlock {
+            entries,
+            span: Span::new(start.start, end.end),
+        })
+    }
+
+    fn parse_defs_entry(&mut self) -> Result<DefsEntry, Error> {
+        let start = self.next_span();
+        match self.peek_kind() {
+            // `--name:value`
+            Some(TokKind::RawCssVar(_)) => {
+                let name = match self.peek_kind() {
+                    Some(TokKind::RawCssVar(n)) => n.clone(),
+                    _ => unreachable!(),
+                };
+                self.pos += 1;
+                if !matches!(self.peek_kind(), Some(TokKind::Colon)) {
+                    return Err(Error::at(
+                        self.next_span(),
+                        format!("expected ':' after --{}", name),
+                    ));
+                }
+                if !self.current_glued_to_prev() {
+                    return Err(Error::at(
+                        self.next_span(),
+                        "binding ':' must have no whitespace before it",
+                    ));
+                }
+                let colon_span = self.next_span();
+                self.pos += 1;
+                if !self.current_glued_to_prev() {
+                    return Err(Error::at(
+                        colon_span,
+                        "binding ':' must have no whitespace after it",
+                    ));
+                }
+                let value = self.parse_value()?;
+                let end = self.last_span();
+                Ok(DefsEntry::VarOverride(VarOverride {
+                    name,
+                    value,
+                    span: Span::new(start.start, end.end),
                 }))
             }
-            "styles" => {
-                self.expect_lbrace()?;
-                let styles = self.parse_styles_body()?;
-                let end = self.expect_rbrace()?;
-                Ok(Block::Styles(StylesBlock {
-                    styles,
-                    span: Span::new(name_span.start, end.end),
-                }))
-            }
-            "shapes" => {
-                self.expect_lbrace()?;
-                let shapes = self.parse_shapes_body()?;
-                let end = self.expect_rbrace()?;
-                Ok(Block::Shapes(ShapesBlock {
-                    shapes,
-                    span: Span::new(name_span.start, end.end),
-                }))
-            }
-            "scene" => {
+            // `.style attrs...`
+            Some(TokKind::Dot) => {
+                let _ = self.expect_dot()?;
+                let (name, _) = self.expect_ident()?;
                 let items = self.parse_attr_items()?;
-                self.expect_lbrace()?;
-                let body = self.parse_inst_body_items()?;
-                let end = self.expect_rbrace()?;
-                Ok(Block::Scene(SceneBlock {
+                let end = self.last_span();
+                Ok(DefsEntry::StyleDef(StyleDef {
+                    name,
                     items,
-                    body,
-                    span: Span::new(name_span.start, end.end),
+                    span: Span::new(start.start, end.end),
                 }))
             }
-            "wires" => {
-                let items = self.parse_attr_items()?;
-                self.expect_lbrace()?;
-                let wires = self.parse_wires_body()?;
-                let end = self.expect_rbrace()?;
-                Ok(Block::Wires(WiresBlock {
-                    items,
-                    wires,
-                    span: Span::new(name_span.start, end.end),
-                }))
-            }
+            // `|scene| ...`, `|name:base| ...`
+            Some(TokKind::Pipe) => self.parse_pipe_defs_entry(start),
             other => Err(Error::at(
-                name_span,
+                self.next_span(),
                 format!(
-                    "unknown top-level block '{}' (expected defaults, styles, shapes, scene, wires)",
-                    other
+                    "expected defs entry (|scene|, |name:base|, .style, or --name:value), found {}",
+                    other.map_or("end of file".to_string(), tok_desc)
                 ),
             )),
         }
     }
 
-    // ───────────────────────── Block bodies ─────────────────────────
-
-    fn parse_defaults_body(&mut self) -> Result<Vec<DefaultEntry>, Error> {
-        let mut entries = Vec::new();
-        self.skip_newlines();
-        while !matches!(self.peek_kind(), Some(TokKind::RBrace) | None) {
-            entries.push(self.parse_default_entry()?);
-            self.consume_terminator()?;
+    fn parse_pipe_defs_entry(&mut self, start: Span) -> Result<DefsEntry, Error> {
+        // Peek inside the pipes to decide between scene config / shape def.
+        // Expected: `|` Ident (`:` Ident)? `|` …
+        // After parsing the first ident, if next is Pipe → scene config (or
+        // shorthand). If next is Colon → shape def.
+        self.expect_pipe()?;
+        let (first, _first_span) = self.expect_ident()?;
+        match self.peek_kind() {
+            Some(TokKind::Pipe) => {
+                // `|first|` — three roles, dispatched by name:
+                //   `|scene|`  — root container config
+                //   `|wire|`   — global wire defaults
+                //   `|name|`   — type-defaults for any other recognised type
+                // (Validation that `name` is a known type happens in resolve;
+                // the parser accepts any identifier here.)
+                let close = self.expect_pipe()?;
+                let items = self.parse_attr_items()?;
+                let end = if items.is_empty() {
+                    close
+                } else {
+                    self.last_span()
+                };
+                let span = Span::new(start.start, end.end);
+                Ok(match first.as_str() {
+                    "scene" => DefsEntry::SceneConfig(SceneConfig { items, span }),
+                    "wire" => DefsEntry::WireConfig(WireConfig { items, span }),
+                    _ => DefsEntry::TypeDefaults(TypeDefaults {
+                        name: first,
+                        items,
+                        span,
+                    }),
+                })
+            }
+            Some(TokKind::Colon) => {
+                if !self.current_glued_to_prev() {
+                    return Err(Error::at(
+                        self.next_span(),
+                        "binding ':' must have no whitespace before it",
+                    ));
+                }
+                let colon_span = self.next_span();
+                self.pos += 1;
+                if !self.current_glued_to_prev() {
+                    return Err(Error::at(
+                        colon_span,
+                        "binding ':' must have no whitespace after it",
+                    ));
+                }
+                let (base_name, base_span) = self.expect_ident()?;
+                let end_pipe = self.expect_pipe()?;
+                let items = self.parse_attr_items()?;
+                let body = self.parse_optional_body()?;
+                let end = self.last_span();
+                Ok(DefsEntry::ShapeDef(ShapeDef {
+                    name: first,
+                    base: TypeRef {
+                        name: base_name,
+                        span: base_span,
+                    },
+                    items,
+                    body,
+                    span: Span::new(start.start, end.end.max(end_pipe.end)),
+                }))
+            }
+            other => Err(Error::at(
+                self.next_span(),
+                format!(
+                    "expected '|' or ':' after '|{}', found {}",
+                    first,
+                    other.map_or("end of file".to_string(), tok_desc)
+                ),
+            )),
         }
-        Ok(entries)
     }
 
-    fn parse_default_entry(&mut self) -> Result<DefaultEntry, Error> {
-        let (name, name_span) = self.expect_ident()?;
-        self.expect_equals()?;
-        let value = self.parse_value()?;
-        let end = self.last_span();
-        Ok(DefaultEntry {
-            name,
-            value,
-            span: Span::new(name_span.start, end.end),
-        })
-    }
+    // ───────────────────────── Statements (scene root + bodies) ─────────────────────────
 
-    fn parse_styles_body(&mut self) -> Result<Vec<StyleDef>, Error> {
-        let mut styles = Vec::new();
-        self.skip_newlines();
-        while !matches!(self.peek_kind(), Some(TokKind::RBrace) | None) {
-            styles.push(self.parse_style_def()?);
-            self.consume_terminator()?;
+    fn parse_stmt(&mut self) -> Result<Stmt, Error> {
+        // Anonymous primitive: `|type| …`
+        if matches!(self.peek_kind(), Some(TokKind::Pipe)) {
+            let inst = self.parse_anonymous_inst()?;
+            return Ok(Stmt::Node(inst));
         }
-        Ok(styles)
-    }
-
-    fn parse_style_def(&mut self) -> Result<StyleDef, Error> {
-        let (name, name_span) = self.expect_ident()?;
-        let items = self.parse_attr_items()?;
-        let end = self.last_span();
-        Ok(StyleDef {
-            name,
-            items,
-            span: Span::new(name_span.start, end.end),
-        })
-    }
-
-    fn parse_shapes_body(&mut self) -> Result<Vec<ShapeDef>, Error> {
-        let mut shapes = Vec::new();
-        self.skip_newlines();
-        while !matches!(self.peek_kind(), Some(TokKind::RBrace) | None) {
-            shapes.push(self.parse_shape_def()?);
-            self.consume_terminator()?;
-        }
-        Ok(shapes)
-    }
-
-    fn parse_shape_def(&mut self) -> Result<ShapeDef, Error> {
-        let (name, name_span) = self.expect_ident()?;
-        let base = if matches!(self.peek_kind(), Some(TokKind::Colon)) {
-            Some(self.parse_type_ref()?)
-        } else {
-            None
-        };
-        let items = self.parse_attr_items()?;
-        let body = if matches!(self.peek_kind(), Some(TokKind::LBrace)) {
-            Some(self.parse_inst_body()?)
-        } else {
-            None
-        };
-        if base.is_none() && body.is_none() {
+        // Otherwise must start with an ident.
+        if !matches!(self.peek_kind(), Some(TokKind::Ident(_))) {
             return Err(Error::at(
-                name_span,
-                format!("shape '{}' requires :base or a body", name),
+                self.next_span(),
+                format!(
+                    "expected statement, found {}",
+                    self.peek_kind().map_or("end of file".to_string(), tok_desc)
+                ),
             ));
         }
-        let end = self.last_span();
-        Ok(ShapeDef {
-            name,
-            base,
-            items,
-            body,
-            span: Span::new(name_span.start, end.end),
-        })
+
+        // We need lookahead to decide between a node decl and a wire decl.
+        // The deciding token: WireOp/Amp/glued-Dot → wire; everything else → node.
+        let save = self.pos;
+        let (id, id_span) = self.expect_ident()?;
+
+        let next = self.peek_kind();
+        let is_glued_dot = matches!(next, Some(TokKind::Dot)) && self.current_glued_to_prev();
+
+        if matches!(next, Some(TokKind::WireOp(_)) | Some(TokKind::Amp)) || is_glued_dot {
+            // Wire: rewind and let parse_wire_decl re-parse the first endpoint.
+            self.pos = save;
+            let wire = self.parse_wire_decl()?;
+            return Ok(Stmt::Wire(wire));
+        }
+
+        // Node decl continuing from this id.
+        let inst = self.parse_node_inst_after_id(Some(id), id_span)?;
+        Ok(Stmt::Node(inst))
     }
 
-    fn parse_inst_body(&mut self) -> Result<Vec<ShapeInst>, Error> {
+    fn parse_body(&mut self) -> Result<Vec<BodyItem>, Error> {
         self.expect_lbrace()?;
-        let items = self.parse_inst_body_items()?;
+        let mut items = Vec::new();
+        self.skip_newlines();
+        while !matches!(self.peek_kind(), Some(TokKind::RBrace) | None) {
+            items.push(self.parse_body_item()?);
+            self.consume_terminator()?;
+        }
         self.expect_rbrace()?;
         Ok(items)
     }
 
-    fn parse_inst_body_items(&mut self) -> Result<Vec<ShapeInst>, Error> {
-        let mut items = Vec::new();
-        self.skip_newlines();
-        while !matches!(self.peek_kind(), Some(TokKind::RBrace) | None) {
-            items.push(self.parse_shape_inst()?);
-            self.consume_terminator()?;
-        }
-        Ok(items)
+    fn parse_body_item(&mut self) -> Result<BodyItem, Error> {
+        let stmt = self.parse_stmt()?;
+        Ok(match stmt {
+            Stmt::Node(n) => BodyItem::Inst(n),
+            Stmt::Wire(w) => BodyItem::Wire(w),
+        })
     }
 
-    fn parse_shape_inst(&mut self) -> Result<ShapeInst, Error> {
+    fn parse_optional_body(&mut self) -> Result<Option<Vec<BodyItem>>, Error> {
+        if matches!(self.peek_kind(), Some(TokKind::LBrace)) {
+            Ok(Some(self.parse_body()?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    // ─────────── Node decls ───────────
+
+    /// Parse an anonymous primitive: `|type| [label [href]] (attr|style)* [{body}]`.
+    fn parse_anonymous_inst(&mut self) -> Result<ShapeInst, Error> {
         let start = self.next_span();
-        let id = if matches!(self.peek_kind(), Some(TokKind::Ident(_))) {
-            Some(self.expect_ident()?.0)
-        } else {
-            None
-        };
-        let ty = self.parse_type_ref()?;
-        let label = self.eat_string();
+        let ty = self.parse_type_use()?;
+        let (label, href) = self.parse_label_and_href();
         let items = self.parse_attr_items()?;
-        let body = if matches!(self.peek_kind(), Some(TokKind::LBrace)) {
-            Some(self.parse_inst_body()?)
-        } else {
-            None
-        };
+        let body = self.parse_optional_body()?;
         let end = self.last_span();
         Ok(ShapeInst {
-            id,
+            id: None,
             ty,
             label,
+            href,
             items,
             body,
             span: Span::new(start.start, end.end),
         })
     }
 
-    // ───────────────────────── Wires ─────────────────────────
-
-    fn parse_wires_body(&mut self) -> Result<Vec<WireDecl>, Error> {
-        let mut wires = Vec::new();
-        self.skip_newlines();
-        while !matches!(self.peek_kind(), Some(TokKind::RBrace) | None) {
-            wires.push(self.parse_wire_decl()?);
-            self.consume_terminator()?;
-        }
-        Ok(wires)
+    /// Parse a node decl after the id has been consumed. The id may be `None`
+    /// only when called from `parse_anonymous_inst` — here always Some.
+    fn parse_node_inst_after_id(
+        &mut self,
+        id: Option<String>,
+        id_span: Span,
+    ) -> Result<ShapeInst, Error> {
+        // Optional `|type|` next.
+        let ty = if matches!(self.peek_kind(), Some(TokKind::Pipe)) {
+            self.parse_type_use()?
+        } else {
+            // SPEC §1 default: omitted type → |rect|.
+            TypeRef {
+                name: "rect".to_string(),
+                span: id_span,
+            }
+        };
+        let (label, href) = self.parse_label_and_href();
+        let items = self.parse_attr_items()?;
+        let body = self.parse_optional_body()?;
+        let end = self.last_span();
+        Ok(ShapeInst {
+            id,
+            ty,
+            label,
+            href,
+            items,
+            body,
+            span: Span::new(id_span.start, end.end),
+        })
     }
+
+    fn parse_label_and_href(&mut self) -> (Option<String>, Option<String>) {
+        let label = self.eat_string();
+        let href = if label.is_some() {
+            self.eat_string()
+        } else {
+            None
+        };
+        (label, href)
+    }
+
+    // ─────────── Wire decls ───────────
 
     fn parse_wire_decl(&mut self) -> Result<WireDecl, Error> {
         let start = self.next_span();
-        let mut endpoints = vec![self.parse_wire_endpoint()?];
-        let op = self.parse_wire_op()?;
-        endpoints.push(self.parse_wire_endpoint()?);
+        let first = self.parse_endpoint_group()?;
+        let op = self.expect_wire_op()?;
+        let mut chain = vec![first];
+        chain.push(self.parse_endpoint_group()?);
 
-        loop {
-            match self.try_peek_wire_op() {
-                Some(next_op) if next_op == op => {
-                    self.pos += 1;
-                    endpoints.push(self.parse_wire_endpoint()?);
-                }
-                Some(next_op) => {
-                    return Err(Error::at(
-                        self.next_span(),
-                        format!(
-                            "wire chain mixes operators '{}' and '{}'",
-                            op.as_str(),
-                            next_op.as_str()
-                        ),
-                    ));
-                }
-                None => break,
+        while let Some(TokKind::WireOp(next_op)) = self.peek_kind() {
+            let next_op = *next_op;
+            if next_op == op {
+                self.pos += 1;
+                chain.push(self.parse_endpoint_group()?);
+            } else {
+                return Err(Error::at(
+                    self.next_span(),
+                    format!(
+                        "wire chain mixes operators '{}' and '{}'",
+                        wire_op_str(op),
+                        wire_op_str(next_op)
+                    ),
+                ));
             }
         }
 
@@ -606,7 +709,7 @@ impl<'a> Parser<'a> {
         };
         let end = self.last_span();
         Ok(WireDecl {
-            endpoints,
+            chain,
             op,
             label,
             items,
@@ -615,37 +718,73 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_wire_endpoint(&mut self) -> Result<WireEndpoint, Error> {
-        let (id, id_span) = self.expect_ident()?;
+    fn parse_endpoint_group(&mut self) -> Result<EndpointGroup, Error> {
+        let start = self.next_span();
+        let mut endpoints = vec![self.parse_endpoint()?];
+        while matches!(self.peek_kind(), Some(TokKind::Amp)) {
+            self.pos += 1;
+            endpoints.push(self.parse_endpoint()?);
+        }
         let end = self.last_span();
-        Ok(WireEndpoint {
-            id,
-            span: Span::new(id_span.start, end.end),
+        Ok(EndpointGroup {
+            endpoints,
+            span: Span::new(start.start, end.end),
         })
     }
 
-    fn try_peek_wire_op(&self) -> Option<WireOp> {
-        match self.peek_kind() {
-            Some(TokKind::Arrow) => Some(WireOp::Arrow),
-            Some(TokKind::LArrow) => Some(WireOp::LArrow),
-            Some(TokKind::Biarrow) => Some(WireOp::Biarrow),
-            Some(TokKind::ArrowDash) => Some(WireOp::ArrowDash),
-            Some(TokKind::LArrowDash) => Some(WireOp::LArrowDash),
-            Some(TokKind::BiarrowDash) => Some(WireOp::BiarrowDash),
-            Some(TokKind::ArrowDot) => Some(WireOp::ArrowDot),
-            Some(TokKind::LArrowDot) => Some(WireOp::LArrowDot),
-            Some(TokKind::BiarrowDot) => Some(WireOp::BiarrowDot),
-            _ => None,
+    fn parse_endpoint(&mut self) -> Result<WireEndpoint, Error> {
+        let (first, first_span) = self.expect_ident()?;
+        let mut path = vec![first];
+        let mut end_span = first_span;
+
+        // Consume any number of `.ident` segments — but only if glued (no WS).
+        while matches!(self.peek_kind(), Some(TokKind::Dot)) && self.current_glued_to_prev() {
+            self.pos += 1; // dot
+                           // Next must be a glued ident.
+            if !matches!(self.peek_kind(), Some(TokKind::Ident(_))) {
+                return Err(Error::at(
+                    self.next_span(),
+                    "expected identifier after '.' in endpoint path",
+                ));
+            }
+            if !self.current_glued_to_prev() {
+                return Err(Error::at(
+                    self.next_span(),
+                    "endpoint '.' must have no whitespace after it",
+                ));
+            }
+            let (seg, seg_span) = self.expect_ident()?;
+            path.push(seg);
+            end_span = seg_span;
         }
+
+        // Per SPEC §10: if the LAST segment matches a side name, peel it off.
+        let side = if path.len() > 1 {
+            if let Some(s) = Side::parse(path.last().unwrap()) {
+                path.pop();
+                Some(s)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Ok(WireEndpoint {
+            path,
+            side,
+            span: Span::new(first_span.start, end_span.end),
+        })
     }
 
-    fn parse_wire_op(&mut self) -> Result<WireOp, Error> {
-        match self.try_peek_wire_op() {
-            Some(op) => {
+    fn expect_wire_op(&mut self) -> Result<WireOp, Error> {
+        match self.peek_kind() {
+            Some(TokKind::WireOp(op)) => {
+                let op = *op;
                 self.pos += 1;
                 Ok(op)
             }
-            None => Err(Error::at(
+            _ => Err(Error::at(
                 self.next_span(),
                 format!(
                     "expected wire operator, found {}",
@@ -661,14 +800,16 @@ impl<'a> Parser<'a> {
         let mut texts = Vec::new();
         while !matches!(self.peek_kind(), Some(TokKind::RBrace) | None) {
             let start = self.next_span();
-            self.expect_colon()?;
+            // Must be `|text| "string" attrs...`.
+            self.expect_pipe()?;
             let (kw, kw_span) = self.expect_ident()?;
             if kw != "text" {
                 return Err(Error::at(
                     kw_span,
-                    "wire body may only contain :text primitives",
+                    "wire body may only contain |text| primitives",
                 ));
             }
+            self.expect_pipe()?;
             let text = self.expect_string()?;
             let items = self.parse_attr_items()?;
             let end = self.last_span();
@@ -684,6 +825,15 @@ impl<'a> Parser<'a> {
     }
 }
 
+fn wire_op_str(op: WireOp) -> String {
+    format!(
+        "{}{}{}",
+        op.start.start_str(),
+        op.line.as_str(),
+        op.end.end_str()
+    )
+}
+
 fn tok_desc(k: &TokKind) -> String {
     match k {
         TokKind::Ident(s) => format!("identifier '{}'", s),
@@ -691,9 +841,10 @@ fn tok_desc(k: &TokKind) -> String {
         TokKind::Number(_) => "number".to_string(),
         TokKind::Hex(_) => "hex color".to_string(),
         TokKind::RawCssVar(s) => format!("'--{}'", s),
+        TokKind::Pipe => "'|'".to_string(),
         TokKind::Colon => "':'".to_string(),
         TokKind::Dot => "'.'".to_string(),
-        TokKind::Equals => "'='".to_string(),
+        TokKind::Amp => "'&'".to_string(),
         TokKind::Semi => "';'".to_string(),
         TokKind::Comma => "','".to_string(),
         TokKind::LBrace => "'{'".to_string(),
@@ -702,15 +853,7 @@ fn tok_desc(k: &TokKind) -> String {
         TokKind::RParen => "')'".to_string(),
         TokKind::LBracket => "'['".to_string(),
         TokKind::RBracket => "']'".to_string(),
-        TokKind::Arrow => "'->'".to_string(),
-        TokKind::LArrow => "'<-'".to_string(),
-        TokKind::Biarrow => "'<->'".to_string(),
-        TokKind::ArrowDash => "'-->'".to_string(),
-        TokKind::LArrowDash => "'<--'".to_string(),
-        TokKind::BiarrowDash => "'<-->'".to_string(),
-        TokKind::ArrowDot => "'-.->'".to_string(),
-        TokKind::LArrowDot => "'<-.-'".to_string(),
-        TokKind::BiarrowDot => "'<-.->'".to_string(),
+        TokKind::WireOp(op) => format!("'{}'", wire_op_str(*op)),
         TokKind::Newline => "newline".to_string(),
     }
 }

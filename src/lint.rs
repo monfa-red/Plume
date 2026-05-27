@@ -1,12 +1,12 @@
 //! AST-level lint pass. Emits warnings for stylistic smells that aren't
-//! parse/resolve errors — most notably inline visual attrs that belong in
-//! `styles {}` (SPEC §15 visual-attr table).
+//! parse/resolve errors — most notably inline visual attrs that belong in a
+//! `.style` def (SPEC §16 visual-attr lint category).
 
-use crate::ast::{AttrItem, Block, File, ShapeInst, TypeRef, WireDecl};
+use crate::ast::{AttrItem, BodyItem, DefsEntry, File, ShapeInst, Stmt, TypeRef, WireDecl};
 use crate::error::Diagnostic;
 
 /// Attrs that are purely visual — appearance only, not what's drawn or where.
-/// Inline use outside `styles {}` emits a warning.
+/// Inline use outside a style def emits a warning.
 const VISUAL_ATTRS: &[&str] = &[
     "fill",
     "stroke",
@@ -30,34 +30,33 @@ fn size_is_visual(ty: &TypeRef) -> bool {
 
 pub fn lint(file: &File) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
-    for block in &file.blocks {
-        match block {
-            Block::Scene(s) => {
-                for inst in &s.body {
-                    lint_inst(inst, &mut diags);
-                }
-            }
-            Block::Wires(w) => {
-                for wire in &w.wires {
-                    lint_wire(wire, &mut diags);
-                }
-            }
-            Block::Shapes(sh) => {
-                // Shape *definitions* set defaults that act like styles —
-                // visual attrs there are fine. But shape *bodies* contain
-                // primitives that should follow scene rules.
-                for shape in &sh.shapes {
-                    if let Some(body) = &shape.body {
-                        for inst in body {
-                            lint_inst(inst, &mut diags);
-                        }
+    for stmt in &file.stmts {
+        match stmt {
+            Stmt::Node(inst) => lint_inst(inst, &mut diags),
+            Stmt::Wire(w) => lint_wire(w, &mut diags),
+        }
+    }
+    // Shape defs in the defs block can contain bodies with primitives that
+    // should follow scene rules.
+    if let Some(defs) = &file.defs {
+        for entry in &defs.entries {
+            if let DefsEntry::ShapeDef(sd) = entry {
+                if let Some(body) = &sd.body {
+                    for item in body {
+                        lint_body_item(item, &mut diags);
                     }
                 }
             }
-            Block::Defaults(_) | Block::Styles(_) => {}
         }
     }
     diags
+}
+
+fn lint_body_item(item: &BodyItem, diags: &mut Vec<Diagnostic>) {
+    match item {
+        BodyItem::Inst(i) => lint_inst(i, diags),
+        BodyItem::Wire(w) => lint_wire(w, diags),
+    }
 }
 
 fn lint_inst(inst: &ShapeInst, diags: &mut Vec<Diagnostic>) {
@@ -67,7 +66,7 @@ fn lint_inst(inst: &ShapeInst, diags: &mut Vec<Diagnostic>) {
                 diags.push(Diagnostic::warn(
                     a.span,
                     format!(
-                        "visual attr '{}' inline; consider moving to styles {{}}",
+                        "visual attr '{}' inline; consider moving to a .style",
                         a.name
                     ),
                 ));
@@ -76,7 +75,7 @@ fn lint_inst(inst: &ShapeInst, diags: &mut Vec<Diagnostic>) {
     }
     if let Some(body) = &inst.body {
         for child in body {
-            lint_inst(child, diags);
+            lint_body_item(child, diags);
         }
     }
 }
@@ -90,7 +89,7 @@ fn lint_wire(wire: &WireDecl, diags: &mut Vec<Diagnostic>) {
                 diags.push(Diagnostic::warn(
                     a.span,
                     format!(
-                        "visual attr '{}' inline; consider moving to styles {{}}",
+                        "visual attr '{}' inline; consider moving to a .style",
                         a.name
                     ),
                 ));

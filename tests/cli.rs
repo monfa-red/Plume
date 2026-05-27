@@ -6,7 +6,7 @@ use plume::{Options, OutputFormat};
 #[test]
 fn html_format_wraps_svg_in_html_doc() {
     let html = plume::compile_str_with(
-        "scene { :rect \"x\" }\n",
+        "|rect| \"x\"\n",
         &Options {
             format: OutputFormat::Html,
             bake_vars: true,
@@ -23,7 +23,7 @@ fn html_format_wraps_svg_in_html_doc() {
 #[test]
 fn no_defaults_omits_style_block_but_keeps_var_refs() {
     let svg = plume::compile_str_with(
-        "scene { :rect \"x\" }\n",
+        "|rect| \"x\"\n",
         &Options {
             no_defaults: true,
             ..Default::default()
@@ -31,14 +31,13 @@ fn no_defaults_omits_style_block_but_keeps_var_refs() {
     )
     .expect("compile");
     assert!(!svg.contains("@layer plume.defaults"));
-    // Live var() refs are still emitted — host page supplies values.
     assert!(svg.contains("var(--plume-fill)"));
 }
 
 #[test]
 fn theme_overrides_visual_var_visible_in_baked_output() {
     let svg = plume::compile_str_with(
-        "scene { :rect \"x\" fill=--accent }\n",
+        "|rect| \"x\" fill:--accent\n",
         &Options {
             theme_css: Some("--plume-accent: hotpink;".to_string()),
             bake_vars: true,
@@ -51,9 +50,7 @@ fn theme_overrides_visual_var_visible_in_baked_output() {
 
 #[test]
 fn theme_layout_var_bakes_into_layout_math() {
-    // gap = 20 default, theme overrides to 60. Two 40×40 rects stacked row-wise
-    // should sit 40 px further apart.
-    let src = "scene layout=row {\n  :rect size=(40, 40)\n  :rect size=(40, 40)\n}\n";
+    let src = "{ |scene| layout:row }\n|rect| size:(40, 40)\n|rect| size:(40, 40)\n";
     let default = plume::compile_str(src).expect("default compile");
     let themed = plume::compile_str_with(
         src,
@@ -63,7 +60,6 @@ fn theme_layout_var_bakes_into_layout_math() {
         },
     )
     .expect("themed compile");
-    // viewBox width grows by 40 (the gap delta) at minimum.
     let default_w = extract_viewbox_w(&default);
     let themed_w = extract_viewbox_w(&themed);
     assert!(
@@ -76,8 +72,7 @@ fn theme_layout_var_bakes_into_layout_math() {
 
 #[test]
 fn theme_visual_var_does_not_change_layout_baking() {
-    // Tweaking a visual var (accent) doesn't change layout.
-    let src = "scene layout=row {\n  :rect w=40 h=40\n  :rect w=40 h=40\n}\n";
+    let src = "{ |scene| layout:row }\n|rect| size:(40, 40)\n|rect| size:(40, 40)\n";
     let default = plume::compile_str(src).expect("default compile");
     let themed = plume::compile_str_with(
         src,
@@ -93,14 +88,18 @@ fn theme_visual_var_does_not_change_layout_baking() {
 #[test]
 fn check_with_succeeds_on_valid_input() {
     let opts = Options::default();
-    assert!(plume::check_with("scene { :rect \"x\" }\n", &opts).is_ok());
+    assert!(plume::check_with("|rect| \"x\"\n", &opts).is_ok());
 }
 
 #[test]
 fn check_with_propagates_resolve_errors() {
     let opts = Options::default();
-    let err = plume::check_with("scene { :nosuch \"x\" }\n", &opts).expect_err("expected error");
-    assert!(err.to_string().contains("unknown type ':nosuch'"));
+    let err = plume::check_with("|nosuch| \"x\"\n", &opts).expect_err("expected error");
+    assert!(
+        err.to_string().contains("unknown type '|nosuch|'"),
+        "got: {}",
+        err
+    );
 }
 
 fn extract_viewbox_w(svg: &str) -> f64 {
