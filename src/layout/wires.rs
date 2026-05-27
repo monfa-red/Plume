@@ -172,26 +172,43 @@ fn place_lanes(bundles: &[Bundle], specs: &[SegmentSpec], lanes: &mut [(f64, f64
         bins.entry(key).or_default().push(bi);
     }
     for bundle_idxs in bins.values() {
-        let total: usize = bundle_idxs
-            .iter()
-            .map(|&bi| bundles[bi].spec_indices.len())
-            .sum();
-        if total <= 1 {
+        if bundle_idxs.len() <= 1 {
             continue;
         }
-        // All wires in a bin share their `gap` — pick any.
-        let gap = specs[bundles[bundle_idxs[0]].spec_indices[0]].gap;
-        // Each bundle occupies a contiguous run of lanes; cursor walks the bin.
-        let mut cursor: usize = 0;
+
+        // Within each bin, group bundles by their parent WireDecl span.
+        // Bundles from the same source decl (e.g. `cat -> dog & bird` produces
+        // two specs sharing a wire span) collapse to a single lane on this
+        // side — fan-out wires emerge from the same point at the source, and
+        // fan-in wires converge on the same point at the target.
+        //
+        // Bundles from *different* WireDecls (e.g. `cat -> dog` and
+        // `cat -> bird` written as two statements) stay on separate lanes —
+        // the user wrote them as independent wires, so we preserve that.
+        let mut group_order: Vec<crate::span::Span> = Vec::new();
+        let mut by_span: HashMap<crate::span::Span, Vec<usize>> = HashMap::new();
         for &bi in bundle_idxs {
-            let size = bundles[bi].spec_indices.len();
-            let centre_lane = cursor as f64 + (size as f64 - 1.0) / 2.0;
-            let offset = (centre_lane - (total as f64 - 1.0) / 2.0) * gap;
-            match side {
-                BinSide::Src => lanes[bi].0 = offset,
-                BinSide::Tgt => lanes[bi].1 = offset,
+            let span = specs[bundles[bi].spec_indices[0]].wire.span;
+            by_span.entry(span).or_insert_with(|| {
+                group_order.push(span);
+                Vec::new()
+            });
+            by_span.get_mut(&span).unwrap().push(bi);
+        }
+        let n_lanes = group_order.len();
+        if n_lanes <= 1 {
+            // All bundles share one wire-group → one lane, all converged.
+            continue;
+        }
+        let gap = specs[bundles[bundle_idxs[0]].spec_indices[0]].gap;
+        for (lane_idx, span) in group_order.iter().enumerate() {
+            let offset = (lane_idx as f64 - (n_lanes as f64 - 1.0) / 2.0) * gap;
+            for &bi in &by_span[span] {
+                match side {
+                    BinSide::Src => lanes[bi].0 = offset,
+                    BinSide::Tgt => lanes[bi].1 = offset,
+                }
             }
-            cursor += size;
         }
     }
 }
@@ -922,6 +939,13 @@ const WIRE_V: Cell = 1 << 2;
 const HALO_H: Cell = 1 << 3;
 const HALO_V: Cell = 1 << 4;
 
+/// Number of cells to extend each wire's claim along its own axis beyond
+/// its drawn endpoints. With `cell_size = gap / 2`, this reserves one full
+/// `gap` of "no other wire's endpoint may sit closer than this" — fixing
+/// the case where two same-axis wires' endpoints would otherwise abut at
+/// `gap / 2` spacing.
+const ENDPOINT_PAD_CELLS: usize = 2;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Axis {
     H,
@@ -988,16 +1012,24 @@ impl CellMap {
     fn mark_horizontal_segment(&mut self, a: (usize, usize), b: (usize, usize)) {
         let r = a.1;
         let (c0, c1) = if a.0 <= b.0 { (a.0, b.0) } else { (b.0, a.0) };
-        for c in c0..=c1 {
+        // Extend the wire's claim by ENDPOINT_PAD_CELLS along its own axis at
+        // each end. Without this, two same-axis wires can end one cell apart
+        // (= gap/2) because the CellMap only blocks cells *covered* by each
+        // wire. Extending the claim forces the next-nearest same-axis wire to
+        // start ≥ ENDPOINT_PAD_CELLS away — one full wire-gap of separation
+        // even at endpoints.
+        let c0e = c0.saturating_sub(ENDPOINT_PAD_CELLS);
+        let c1e = (c1 + ENDPOINT_PAD_CELLS).min(self.cols.saturating_sub(1));
+        for c in c0e..=c1e {
             self.cells[r * self.cols + c] |= WIRE_H;
         }
         if r > 0 {
-            for c in c0..=c1 {
+            for c in c0e..=c1e {
                 self.cells[(r - 1) * self.cols + c] |= HALO_H;
             }
         }
         if r + 1 < self.rows {
-            for c in c0..=c1 {
+            for c in c0e..=c1e {
                 self.cells[(r + 1) * self.cols + c] |= HALO_H;
             }
         }
@@ -1006,16 +1038,18 @@ impl CellMap {
     fn mark_vertical_segment(&mut self, a: (usize, usize), b: (usize, usize)) {
         let c = a.0;
         let (r0, r1) = if a.1 <= b.1 { (a.1, b.1) } else { (b.1, a.1) };
-        for r in r0..=r1 {
+        let r0e = r0.saturating_sub(ENDPOINT_PAD_CELLS);
+        let r1e = (r1 + ENDPOINT_PAD_CELLS).min(self.rows.saturating_sub(1));
+        for r in r0e..=r1e {
             self.cells[r * self.cols + c] |= WIRE_V;
         }
         if c > 0 {
-            for r in r0..=r1 {
+            for r in r0e..=r1e {
                 self.cells[r * self.cols + c - 1] |= HALO_V;
             }
         }
         if c + 1 < self.cols {
-            for r in r0..=r1 {
+            for r in r0e..=r1e {
                 self.cells[r * self.cols + c + 1] |= HALO_V;
             }
         }

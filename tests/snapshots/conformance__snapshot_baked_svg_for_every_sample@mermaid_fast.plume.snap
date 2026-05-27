@@ -77,12 +77,12 @@ input_file: samples/mermaid_fast.plume
       <polygon class="plume-marker plume-marker-arrow" points="-242.375,3.2 -248.375,6.2 -248.375,0.2" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="fox" data-to="mouse">
-      <path d="M -132.275 -24.8 L -132.275 -56.8 L 19.725 -56.8 L 19.725 -28.8" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="19.725,-25.8 16.725,-31.8 22.725,-31.8" fill="#444"/>
+      <path d="M -132.275 -24.8 L -132.275 -56.8 L 27.725 -56.8 L 27.725 -28.8" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="27.725,-25.8 24.725,-31.8 30.725,-31.8" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="owl" data-to="mouse">
-      <path d="M -27.875 3.2 L 15.325 3.2 L 15.325 11.2 L -3.875 11.2" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-6.875,11.2 -0.875,8.2 -0.875,14.2" fill="#444"/>
+      <path d="M -27.875 3.2 L -11.875 3.2" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-8.875,3.2 -14.875,6.2 -14.875,0.2" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="frog" data-to="pond">
       <path d="M 144.475 3.2 L 160.475 3.2" fill="none" stroke="#444" stroke-width="1"/>
