@@ -80,6 +80,28 @@ parallel `bowl -> dog` lines, and `samples/wires_fan.plume`'s
 
 ---
 
+## Bend snapping (DONE)
+
+**File:** `src/layout/wires.rs`. **Status:** shipped.
+
+Compute `SnapLines` from scene shape edges: `xs` = midpoints between
+adjacent vertical shape edges (preferred X positions for V-segments),
+`ys` = midpoints between adjacent horizontal shape edges (preferred Y
+positions for H-segments). In A*, the bend cost drops from 4 → 2 when
+the bend's new segment runs along a snap line. Wires gravitate toward
+bending at the *centre* of each channel, which the eye reads as
+alignment across independent wires.
+
+This is the natural precursor to full channel decomposition — snap lines
+are channel centrelines.
+
+Visible result on `samples/wires_realistic.plume`: cat→bowl and cat→water
+both bend at exactly the same x, and water→dog bends at the same x as
+the bowl→dog parallel pair. Independent wires now share bend positions
+where the geometry naturally aligns them.
+
+---
+
 ## Endpoint runway enforcement (DONE)
 
 **File:** `src/layout/wires.rs`. **Status:** shipped.

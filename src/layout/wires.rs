@@ -421,6 +421,13 @@ fn route_segment_with_lanes(
     // than bending into them at random Y/X positions.
     let corridors = Corridors::from(&walls_only);
 
+    // Snap lines: preferred bend positions — midpoints between adjacent
+    // shape edges along each axis. Bending AT a snap line costs less than
+    // bending elsewhere, which makes wires turn at the geometric "centre"
+    // of channels rather than wherever A* picks. The eye reads
+    // shared snap points as alignment.
+    let snap_lines = SnapLines::from(&shape_obstacles, spec.gap);
+
     // Edge candidates: 3 per side normally. When the endpoint carries an
     // explicit `.side` override, we pin to that single edge.
     let src_edges = match spec.src_forced {
@@ -439,7 +446,9 @@ fn route_segment_with_lanes(
             for &te in &tgt_edges {
                 let start = grid.cell_outside(&spec.src_bbox, se, spec.gap, src_lane);
                 let goal = grid.cell_outside(&spec.tgt_bbox, te, spec.gap, tgt_lane);
-                if let Some((cells, cost)) = a_star(grid, start, goal, se, te, cells, &corridors) {
+                if let Some((cells, cost)) =
+                    a_star(grid, start, goal, se, te, cells, &corridors, &snap_lines)
+                {
                     if best.as_ref().map_or(true, |b| cost < b.0) {
                         best = Some((cost, se, te, cells));
                     }
@@ -1091,6 +1100,53 @@ impl Corridors {
     }
 }
 
+// ─────────────────────────── Snap lines ───────────────────────────
+//
+// Preferred bend X / Y positions: midpoints between adjacent shape edges
+// along each axis. A wire that bends here is bending at the geometric
+// centre of the channel between two shapes — visible alignment across
+// independent wires.
+//
+// In A*, the bend cost is reduced when the bend's perpendicular coordinate
+// (the new segment's X for V bends, Y for H bends) is close to a snap line.
+
+struct SnapLines {
+    xs: Vec<f64>,
+    ys: Vec<f64>,
+    /// World-distance window inside which a coordinate counts as "on" the line.
+    tolerance: f64,
+}
+
+impl SnapLines {
+    fn from(obstacles: &[AbsBbox], gap: f64) -> Self {
+        // Shape edges along X (the left + right boundaries) inform Y-segment
+        // snap positions (because Y segments are vertical, i.e. constant X).
+        // Same idea for Y edges → snap_y.
+        let xs = midpoints_between_edges(obstacles.iter().flat_map(|b| [b.x, b.x + b.w]));
+        let ys = midpoints_between_edges(obstacles.iter().flat_map(|b| [b.y, b.y + b.h]));
+        Self {
+            xs,
+            ys,
+            tolerance: gap * 0.5,
+        }
+    }
+
+    fn near_x(&self, x: f64) -> bool {
+        self.xs.iter().any(|sx| (x - sx).abs() <= self.tolerance)
+    }
+
+    fn near_y(&self, y: f64) -> bool {
+        self.ys.iter().any(|sy| (y - sy).abs() <= self.tolerance)
+    }
+}
+
+fn midpoints_between_edges(iter: impl Iterator<Item = f64>) -> Vec<f64> {
+    let mut edges: Vec<f64> = iter.collect();
+    edges.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    edges.dedup_by(|a, b| (*a - *b).abs() < 1.0);
+    edges.windows(2).map(|w| (w[0] + w[1]) / 2.0).collect()
+}
+
 // ─────────────────────────── A* ───────────────────────────
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -1135,7 +1191,11 @@ type AStarKey = ((usize, usize), Dir);
 ///   off-corridor +1 when travelling along a track that isn't a clean
 ///                channel (a row/col with no shape walls anywhere). This
 ///                makes wires gravitate toward natural gaps between shapes.
-///   bend:        +4 when the direction changes
+///   bend:        +4 normally, +2 when bending AT a snap line. A snap line
+///                is the midpoint between two adjacent shape edges along
+///                the axis the new segment runs on — the geometric centre
+///                of a channel. Discounting bends there makes independent
+///                wires share alignment.
 ///   cross:       +8 when stepping onto a cell occupied by a perpendicular wire
 ///   blocked:     cell is a WALL or would overlap a same-axis wire
 ///
@@ -1144,6 +1204,7 @@ type AStarKey = ((usize, usize), Dir);
 /// cross). Otherwise we'd be tracing along an existing wire instead of
 /// truly crossing it. This is enforced by inspecting the current cell's
 /// `WIRE_H` / `WIRE_V` flags relative to the incoming direction.
+#[allow(clippy::too_many_arguments)]
 fn a_star(
     grid: &Grid,
     start: (usize, usize),
@@ -1152,8 +1213,10 @@ fn a_star(
     tgt_edge: Edge,
     cells: &CellMap,
     corridors: &Corridors,
+    snap_lines: &SnapLines,
 ) -> Option<(Vec<(usize, usize)>, i64)> {
     const BEND: i64 = 4;
+    const BEND_SNAP: i64 = 2;
     const CROSS: i64 = 8;
     const OFF_CORRIDOR: i64 = 1;
 
@@ -1224,7 +1287,17 @@ fn a_star(
 
             let mut step_cost = 1_i64;
             if node.dir != Dir::None && node.dir != d {
-                step_cost += BEND;
+                // Bend AT the current cell — the new segment runs through it
+                // perpendicular to the incoming direction. Snap-line discount
+                // applies when that perpendicular axis lands on a snap line.
+                let bend_at = grid.cell_center(node.cell);
+                let on_snap = match axis_of(d) {
+                    // New segment is horizontal — it's at Y = bend_at.1.
+                    Axis::H => snap_lines.near_y(bend_at.1),
+                    // New segment is vertical — it's at X = bend_at.0.
+                    Axis::V => snap_lines.near_x(bend_at.0),
+                };
+                step_cost += if on_snap { BEND_SNAP } else { BEND };
             }
             step_cost += cross_cost;
             if !is_endpoint && !corridors.on_corridor(next, axis_of(d)) {

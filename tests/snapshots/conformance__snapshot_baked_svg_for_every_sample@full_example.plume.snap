@@ -132,7 +132,7 @@ input_file: samples/full_example.plume
   </g>
   <g class="plume-wires">
     <g class="plume-wire" data-from="cat" data-to="garden.den.carrot">
-      <path d="M -184.6 -67.1 L -114.55 -67.1 L -114.55 -75.1 L -82.55 -75.1" fill="none" stroke="red" stroke-width="2"/>
+      <path d="M -184.6 -67.1 L -152.6 -67.1 L -152.6 -75.1 L -82.55 -75.1" fill="none" stroke="red" stroke-width="2"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="garden.den.carrot">
       <path d="M 37.25 -75.1 L 47.25 -75.1" fill="none" stroke="red" stroke-width="2"/>
