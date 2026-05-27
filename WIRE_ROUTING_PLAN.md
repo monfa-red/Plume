@@ -80,6 +80,27 @@ parallel `bowl -> dog` lines, and `samples/wires_fan.plume`'s
 
 ---
 
+## Endpoint runway enforcement (DONE)
+
+**File:** `src/layout/wires.rs`. **Status:** shipped.
+
+Phase 2's perpendicular-shift stamping can squash a sibling's endpoint
+segment when the canonical's bend lands close to the target — the
+"inward" sibling ends up with a 3 px run before its arrow tip, and the
+arrow visually swallows the bend. Fix: post-process the canonical's path
+after A* + assembly to push the last bend back along its previous-
+perpendicular segment, then shift the bend-before-it by the same amount
+to keep things orthogonal. Same on the source end.
+
+The minimum runway is `2 × gap + max_perpendicular_shift_in_bundle`,
+which guarantees the worst-case sibling still has `2 × gap` of straight
+before its marker.
+
+Visible result: in `samples/wires_realistic.plume` the lower bowl→dog
+sibling went from 3.275 px of last-segment runway to 20 px.
+
+---
+
 ## Phase 3-lite — Channel-aware A* (DONE)
 
 **File:** `src/layout/wires.rs`. **Status:** shipped.

@@ -61,7 +61,7 @@ pub fn route_wires(
     for (bi, bundle) in bundles.iter().enumerate() {
         let (src_lane, tgt_lane) = bundle_lanes[bi];
         let canonical_spec = &specs[bundle.spec_indices[0]];
-        let canonical_path = route_segment_with_lanes(
+        let mut canonical_path = route_segment_with_lanes(
             canonical_spec,
             &scene,
             &grid,
@@ -69,6 +69,19 @@ pub fn route_wires(
             tgt_lane,
             &routed_paths,
         );
+
+        // Endpoint runway: the canonical's first and last segments need to be
+        // long enough that, after sibling perpendicular shifts, the worst
+        // sibling's endpoint segment still has clearance for its marker.
+        //
+        // A bundle of size N has siblings at shifts ±max_shift; that shift
+        // squashes the "inward" sibling's endpoint segment by `max_shift` in
+        // length. Reserving `2 × gap + max_shift` for the canonical means
+        // every sibling ends up with ≥ 2 × gap of straight before its marker.
+        let bundle_size = bundle.spec_indices.len() as f64;
+        let max_shift = ((bundle_size - 1.0) / 2.0) * canonical_spec.gap;
+        let min_runway = 2.0 * canonical_spec.gap + max_shift;
+        canonical_path = enforce_endpoint_runways(canonical_path, min_runway);
 
         // Stamp siblings by perpendicular shift, centred around the canonical.
         let size = bundle.spec_indices.len();
@@ -181,6 +194,65 @@ fn place_lanes(bundles: &[Bundle], specs: &[SegmentSpec], lanes: &mut [(f64, f64
             cursor += size;
         }
     }
+}
+
+// ─────────────────────────── Endpoint runway ───────────────────────────
+
+/// Ensure the path's first and last segments are at least `min_len` long.
+/// When A* picks a bend close to an endpoint, the resulting short segment
+/// disappears under the wire's marker (arrow tip lands on the bend). We
+/// fix this by pushing the last bend back along the *previous* segment —
+/// since adjacent orthogonal segments share an axis, we can shift the
+/// bend along its perpendicular axis without breaking orthogonality, then
+/// shift the corner before it by the same amount to follow.
+fn enforce_endpoint_runways(mut path: Vec<(f64, f64)>, min_len: f64) -> Vec<(f64, f64)> {
+    if path.len() < 4 {
+        return path;
+    }
+    push_tail_bend_back(&mut path, min_len);
+    path.reverse();
+    push_tail_bend_back(&mut path, min_len);
+    path.reverse();
+    path
+}
+
+fn push_tail_bend_back(path: &mut [(f64, f64)], min_len: f64) {
+    let n = path.len();
+    if n < 4 {
+        return;
+    }
+    let end = path[n - 1];
+    let bend = path[n - 2];
+    let prev = path[n - 3];
+    let prev2 = path[n - 4];
+
+    let dx = end.0 - bend.0;
+    let dy = end.1 - bend.1;
+    let last_len = (dx * dx + dy * dy).sqrt();
+    if last_len >= min_len || last_len < 0.01 {
+        return;
+    }
+
+    // Reserve a small buffer so the previous-previous segment doesn't collapse
+    // to zero — A*'s found cells need to remain on free space.
+    let buffer = 4.0;
+    let prev2_len = ((prev.0 - prev2.0).powi(2) + (prev.1 - prev2.1).powi(2)).sqrt();
+    let want_push = min_len - last_len;
+    let push = want_push.min((prev2_len - buffer).max(0.0));
+    if push < 0.5 {
+        return;
+    }
+
+    // Push the bend back along the last segment's axis (away from `end`).
+    let ux = -dx / last_len;
+    let uy = -dy / last_len;
+    let shift_x = ux * push;
+    let shift_y = uy * push;
+    path[n - 2] = (bend.0 + shift_x, bend.1 + shift_y);
+    // To keep `prev → new_bend` perpendicular to `new_bend → end`, the corner
+    // before the bend has to move by the same amount — the previous-previous
+    // segment shortens but stays straight.
+    path[n - 3] = (prev.0 + shift_x, prev.1 + shift_y);
 }
 
 // ─────────────────────────── Polyline perpendicular shift ───────────────────────────

@@ -8,7 +8,8 @@
 //   - a wire that has to detour around an unrelated group
 
 {
-  |scene| layout:row gap:16
+  |scene| layout:row gap:12
+|wire| gap:12
 
   .loud stroke:red thickness:2
   .quiet stroke:blue stroke-style:dashed
@@ -24,7 +25,7 @@ kitchen |group| "Kitchen" layout:column gap:15 padding:30 {
   water |treat| "Water"
 }
 
-garden |group| "Garden" layout:column gap:15 padding:10 {
+garden |group| "Garden" layout:column gap:15 padding:12 {
   dog  |treat| "Dog"
   bird |treat| "Bird"
 }
@@ -32,15 +33,14 @@ garden |group| "Garden" layout:column gap:15 padding:10 {
 roof |treat| "Roof"
 
 // Top-level → group-interior
-cat -> bowl .loud
-cat -> water .loud
+cat -> bowl & water .loud
 
 // Parallel feeds (e.g. two paths to the same target)
 bowl -> dog .loud
 bowl -> dog .loud
 
 // Cross-group with labels
-water <-> dog "shares" .quiet
+water <-o dog "shares" .quiet
 water <-> bird .quiet
 
 // Group-interior → top-level (must exit kitchen and reach roof past garden)
