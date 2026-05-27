@@ -74,10 +74,10 @@ input_file: samples/wires_realistic.plume
       <polygon class="plume-marker plume-marker-arrow" points="39.075,-16.4 29.075,-11.4 29.075,-21.4" fill="red"/>
     </g>
     <g class="plume-wire" data-from="kitchen.water" data-to="garden.dog">
-      <path d="M -14.5 37.6 L 8.8 37.6 L 8.8 7.6 L 16.075 7.6 L 16.075 -10.4 L 36.075 -10.4" fill="none" stroke="blue" stroke-width="1" stroke-dasharray="4,4"/>
+      <path d="M -14.5 37.6 L 8.8 37.6 L 8.8 7.6 L 16.075 7.6 L 16.075 -4.4 L 36.075 -4.4" fill="none" stroke="blue" stroke-width="1" stroke-dasharray="4,4"/>
       <polygon class="plume-marker plume-marker-arrow" points="-17.5,37.6 -11.5,34.6 -11.5,40.6" fill="blue"/>
-      <circle class="plume-marker plume-marker-dot" cx="39.075" cy="-10.4" r="2" fill="blue"/>
-      <text x="8.8" y="11.6125" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">shares</text>
+      <circle class="plume-marker plume-marker-dot" cx="39.075" cy="-4.4" r="2" fill="blue"/>
+      <text x="8.8" y="14.6125" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">shares</text>
     </g>
     <g class="plume-wire" data-from="kitchen.water" data-to="garden.bird">
       <path d="M -14.5 49.6 L 32.5 49.6" fill="none" stroke="blue" stroke-width="1" stroke-dasharray="4,4"/>

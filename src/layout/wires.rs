@@ -172,42 +172,46 @@ fn place_lanes(bundles: &[Bundle], specs: &[SegmentSpec], lanes: &mut [(f64, f64
         bins.entry(key).or_default().push(bi);
     }
     for bundle_idxs in bins.values() {
-        if bundle_idxs.len() <= 1 {
-            continue;
-        }
-
-        // Within each bin, group bundles by their parent WireDecl span.
-        // Bundles from the same source decl (e.g. `cat -> dog & bird` produces
-        // two specs sharing a wire span) collapse to a single lane on this
-        // side — fan-out wires emerge from the same point at the source, and
-        // fan-in wires converge on the same point at the target.
-        //
-        // Bundles from *different* WireDecls (e.g. `cat -> dog` and
-        // `cat -> bird` written as two statements) stay on separate lanes —
-        // the user wrote them as independent wires, so we preserve that.
-        let mut group_order: Vec<crate::span::Span> = Vec::new();
-        let mut by_span: HashMap<crate::span::Span, Vec<usize>> = HashMap::new();
+        // Pass 1 — assign each spec a slot index in this bin. Specs from the
+        // same parent WireDecl (`cat -> dog & bird` makes two specs that
+        // share a span) collapse onto the same slot, so fan-out wires emerge
+        // from one shared point. Specs from different decls each get their
+        // own slot — total slots = number of distinct wire-spans in the bin.
+        let mut span_to_slot: HashMap<crate::span::Span, usize> = HashMap::new();
+        let mut spec_slot: HashMap<usize, usize> = HashMap::new();
+        let mut slot_count = 0;
         for &bi in bundle_idxs {
-            let span = specs[bundles[bi].spec_indices[0]].wire.span;
-            by_span.entry(span).or_insert_with(|| {
-                group_order.push(span);
-                Vec::new()
-            });
-            by_span.get_mut(&span).unwrap().push(bi);
+            for &spec_idx in &bundles[bi].spec_indices {
+                let span = specs[spec_idx].wire.span;
+                let slot = *span_to_slot.entry(span).or_insert_with(|| {
+                    let s = slot_count;
+                    slot_count += 1;
+                    s
+                });
+                spec_slot.insert(spec_idx, slot);
+            }
         }
-        let n_lanes = group_order.len();
-        if n_lanes <= 1 {
-            // All bundles share one wire-group → one lane, all converged.
+        if slot_count <= 1 {
             continue;
         }
         let gap = specs[bundles[bundle_idxs[0]].spec_indices[0]].gap;
-        for (lane_idx, span) in group_order.iter().enumerate() {
-            let offset = (lane_idx as f64 - (n_lanes as f64 - 1.0) / 2.0) * gap;
-            for &bi in &by_span[span] {
-                match side {
-                    BinSide::Src => lanes[bi].0 = offset,
-                    BinSide::Tgt => lanes[bi].1 = offset,
-                }
+
+        // Pass 2 — bundle's lane offset = midpoint of its specs' slot
+        // positions. Bundle stamping (±gap/2 around centre for size-2) lands
+        // each sibling exactly on its assigned slot, which keeps gap spacing
+        // intact between neighbouring bundles.
+        for &bi in bundle_idxs {
+            let bundle_size = bundles[bi].spec_indices.len() as f64;
+            let sum: f64 = bundles[bi]
+                .spec_indices
+                .iter()
+                .map(|&si| spec_slot[&si] as f64)
+                .sum();
+            let mid_slot = sum / bundle_size;
+            let offset = (mid_slot - (slot_count as f64 - 1.0) / 2.0) * gap;
+            match side {
+                BinSide::Src => lanes[bi].0 = offset,
+                BinSide::Tgt => lanes[bi].1 = offset,
             }
         }
     }

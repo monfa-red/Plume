@@ -40,7 +40,7 @@ input_file: samples/wires_bus.plume
       <polygon class="plume-marker plume-marker-arrow" points="-32.3,19.2 -39.8,22.95 -39.8,15.45" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="bird">
-      <path d="M -130.75 -24.8 L -130.75 -56.8 L 133.25 -56.8 L 133.25 -28.8" fill="none" stroke="#444" stroke-width="1.5"/>
+      <path d="M -114.75 -24.8 L -114.75 -56.8 L 133.25 -56.8 L 133.25 -28.8" fill="none" stroke="#444" stroke-width="1.5"/>
       <polygon class="plume-marker plume-marker-arrow" points="133.25,-25.8 129.5,-33.3 137,-33.3" fill="#444"/>
     </g>
   </g>
