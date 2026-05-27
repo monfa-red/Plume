@@ -61,15 +61,6 @@ pub fn route_wires(
     for (bi, bundle) in bundles.iter().enumerate() {
         let (src_lane, tgt_lane) = bundle_lanes[bi];
         let canonical_spec = &specs[bundle.spec_indices[0]];
-        let mut canonical_path = route_segment_with_lanes(
-            canonical_spec,
-            &scene,
-            &grid,
-            src_lane,
-            tgt_lane,
-            &routed_paths,
-        );
-
         // Endpoint runway: the canonical's first and last segments need to be
         // long enough that, after sibling perpendicular shifts, the worst
         // sibling's endpoint segment still has clearance for its marker.
@@ -81,7 +72,15 @@ pub fn route_wires(
         let bundle_size = bundle.spec_indices.len() as f64;
         let max_shift = ((bundle_size - 1.0) / 2.0) * canonical_spec.gap;
         let min_runway = 2.0 * canonical_spec.gap + max_shift;
-        canonical_path = enforce_endpoint_runways(canonical_path, min_runway);
+        let canonical_path = route_segment_with_lanes(
+            canonical_spec,
+            &scene,
+            &grid,
+            src_lane,
+            tgt_lane,
+            min_runway,
+            &routed_paths,
+        );
 
         // Stamp siblings by perpendicular shift, centred around the canonical.
         let size = bundle.spec_indices.len();
@@ -226,18 +225,28 @@ fn place_lanes(bundles: &[Bundle], specs: &[SegmentSpec], lanes: &mut [(f64, f64
 /// since adjacent orthogonal segments share an axis, we can shift the
 /// bend along its perpendicular axis without breaking orthogonality, then
 /// shift the corner before it by the same amount to follow.
-fn enforce_endpoint_runways(mut path: Vec<(f64, f64)>, min_len: f64) -> Vec<(f64, f64)> {
+///
+/// `cells` carries the obstacles A* itself routed against; we cap the
+/// push so the shifted perpendicular segment never enters a cell that's
+/// blocked for its axis — otherwise the runway fix would shove the bend
+/// onto a column/row already claimed by another wire.
+fn enforce_endpoint_runways(
+    mut path: Vec<(f64, f64)>,
+    min_len: f64,
+    cells: &CellMap,
+    grid: &Grid,
+) -> Vec<(f64, f64)> {
     if path.len() < 4 {
         return path;
     }
-    push_tail_bend_back(&mut path, min_len);
+    push_tail_bend_back(&mut path, min_len, cells, grid);
     path.reverse();
-    push_tail_bend_back(&mut path, min_len);
+    push_tail_bend_back(&mut path, min_len, cells, grid);
     path.reverse();
     path
 }
 
-fn push_tail_bend_back(path: &mut [(f64, f64)], min_len: f64) {
+fn push_tail_bend_back(path: &mut [(f64, f64)], min_len: f64, cells: &CellMap, grid: &Grid) {
     let n = path.len();
     if n < 4 {
         return;
@@ -259,14 +268,28 @@ fn push_tail_bend_back(path: &mut [(f64, f64)], min_len: f64) {
     let buffer = 4.0;
     let prev2_len = ((prev.0 - prev2.0).powi(2) + (prev.1 - prev2.1).powi(2)).sqrt();
     let want_push = min_len - last_len;
-    let push = want_push.min((prev2_len - buffer).max(0.0));
+    let max_push = want_push.min((prev2_len - buffer).max(0.0));
+    if max_push < 0.5 {
+        return;
+    }
+
+    // Push back along the last segment's axis (away from `end`).
+    let ux = -dx / last_len;
+    let uy = -dy / last_len;
+
+    // The shifted prev→bend segment runs perpendicular to the last segment.
+    // Pin push to the largest value that keeps every cell along that new
+    // segment passable on its own axis.
+    let axis = if (prev.0 - bend.0).abs() < 0.5 {
+        Axis::V
+    } else {
+        Axis::H
+    };
+    let push = largest_safe_push(prev, bend, ux, uy, max_push, axis, cells, grid);
     if push < 0.5 {
         return;
     }
 
-    // Push the bend back along the last segment's axis (away from `end`).
-    let ux = -dx / last_len;
-    let uy = -dy / last_len;
     let shift_x = ux * push;
     let shift_y = uy * push;
     path[n - 2] = (bend.0 + shift_x, bend.1 + shift_y);
@@ -274,6 +297,70 @@ fn push_tail_bend_back(path: &mut [(f64, f64)], min_len: f64) {
     // before the bend has to move by the same amount — the previous-previous
     // segment shortens but stays straight.
     path[n - 3] = (prev.0 + shift_x, prev.1 + shift_y);
+}
+
+/// Search down from `max_push` for the largest push such that the prev→bend
+/// segment, after being translated by `push` along (ux, uy), passes only
+/// through cells that are `Free` or `Cross` on its own axis. Steps by one
+/// grid cell so we sample every distinct column (or row) the segment could
+/// land on. Returns 0 if no positive shift is safe.
+#[allow(clippy::too_many_arguments)]
+fn largest_safe_push(
+    prev: (f64, f64),
+    bend: (f64, f64),
+    ux: f64,
+    uy: f64,
+    max_push: f64,
+    axis: Axis,
+    cells: &CellMap,
+    grid: &Grid,
+) -> f64 {
+    let step = grid.cell_size.max(1.0);
+    let mut push = max_push;
+    while push > 0.0 {
+        let new_prev = (prev.0 + ux * push, prev.1 + uy * push);
+        let new_bend = (bend.0 + ux * push, bend.1 + uy * push);
+        if !segment_blocked_on_axis(new_prev, new_bend, axis, cells, grid) {
+            return push;
+        }
+        push -= step;
+    }
+    0.0
+}
+
+/// True iff any cell intersected by the orthogonal segment a→b is blocked
+/// for travel along `axis`. Used to validate runway-enforcement shifts:
+/// we don't want to push the bend into a column already owned by another
+/// wire's parallel track or its halo.
+fn segment_blocked_on_axis(
+    a: (f64, f64),
+    b: (f64, f64),
+    axis: Axis,
+    cells: &CellMap,
+    grid: &Grid,
+) -> bool {
+    let ca = grid.world_to_cell(a);
+    let cb = grid.world_to_cell(b);
+    match axis {
+        Axis::V => {
+            let col = ca.0;
+            let (r0, r1) = if ca.1 <= cb.1 {
+                (ca.1, cb.1)
+            } else {
+                (cb.1, ca.1)
+            };
+            (r0..=r1).any(|r| matches!(cells.entry_for((col, r), axis), EntryRule::Blocked))
+        }
+        Axis::H => {
+            let row = ca.1;
+            let (c0, c1) = if ca.0 <= cb.0 {
+                (ca.0, cb.0)
+            } else {
+                (cb.0, ca.0)
+            };
+            (c0..=c1).any(|c| matches!(cells.entry_for((c, row), axis), EntryRule::Blocked))
+        }
+    }
 }
 
 // ─────────────────────────── Polyline perpendicular shift ───────────────────────────
@@ -409,12 +496,14 @@ fn plan_segments<'a>(
     Ok(out)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn route_segment_with_lanes(
     spec: &SegmentSpec,
     scene: &SceneIndex,
     grid: &Grid,
     src_lane: f64,
     tgt_lane: f64,
+    min_runway: f64,
     prior_paths: &[Vec<(f64, f64)>],
 ) -> Vec<(f64, f64)> {
     let shape_obstacles = scene.obstacles_for(&spec.src_id, &spec.tgt_id, spec.gap);
@@ -515,7 +604,8 @@ fn route_segment_with_lanes(
         grid,
     );
 
-    assemble_path(src_pt, src_edge, &cells, tgt_pt, tgt_edge, grid)
+    let path = assemble_path(src_pt, src_edge, &cells, tgt_pt, tgt_edge, grid);
+    enforce_endpoint_runways(path, min_runway, &walls_and_wires, grid)
 }
 
 /// For `self_bbox` connecting to `other_bbox`, return the edges of
