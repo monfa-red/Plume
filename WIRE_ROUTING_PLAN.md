@@ -42,70 +42,41 @@ crossings happen at clean 90° angles; no more "L-bend in random place".
 
 ---
 
-## Phase 2 — Bus routing for parallel pairs
+## Phase 2 — Bus routing for parallel pairs (DONE)
 
-**Goal:** when N wires share `(src, src_edge, tgt, tgt_edge)`, route ONE
-canonical path and emit the siblings as that path offset perpendicularly
-by `lane × wire-gap`. True rails, not "N independent routes that happen
-to be near each other". Also gives one-to-many fan-out for free as long
-as the wires share enough prefix.
+**File:** `src/layout/wires.rs`. **Status:** shipped.
 
-### Where it slots in
+When N wires share `(src, src_edge, tgt, tgt_edge)` they form a *bundle*.
+The bundle's canonical wire is routed once via A*; siblings are stamped
+by perpendicular polyline shift. Result: true rails — siblings are
+guaranteed parallel because they share an A* route.
 
-`route_wires` in `src/layout/wires.rs`. Today it iterates `specs` and
-runs A* per spec. Insert a pre-pass that groups parallel-pair specs into
-**bundles**, route the bundle once, replicate. Same data structures
-(`CellMap`, `SegmentSpec`), just a different orchestration loop.
+Key additions:
 
-### Algorithm
+- `group_bundles(&[SegmentSpec]) -> Vec<Bundle>` — group by the 4-tuple key.
+- `assign_bundle_lanes(&[Bundle], &[SegmentSpec])` — per-bundle lane offsets.
+  Each (shape, edge) bin packs its bundles into contiguous lane ranges;
+  the bundle's lane = the centre of its range.
+- `shift_polyline(&path, delta)` — translate each orthogonal segment
+  perpendicular to its axis; replace each bend with the intersection of
+  the two shifted lines.
+- Replacing the per-spec routing loop with a per-bundle loop in
+  `route_wires`. After routing the canonical, every sibling's path is
+  marked in CellMap so subsequent bundles route around the whole bus.
 
-1. **Group.** Hash by `(src_id, src_edge, tgt_id, tgt_edge)`. Bundles of
-   size 1 are routed as today (no change). Bundles of size ≥ 2 are buses.
-2. **Pick the canonical lane.** Use the bundle's central lane (lane 0 if
-   odd count, else split between the two innermost). Route this one with
-   the existing A*.
-3. **Replicate.** For each sibling, offset the central path
-   perpendicularly. Implementation: walk the polyline segment-by-segment;
-   for each horizontal segment, shift the segment up/down by
-   `lane × wire-gap`; vertical segments shift left/right.
-4. **Endpoint reconciliation.** The shifted polyline's start/end will
-   miss the actual shape edge by the lane offset. Add short connectors
-   at each end so the wire visibly hits the shape edge at the right lane
-   position.
-5. **Register the bundle's footprint with CellMap.** All N wires occupy
-   the bundle's footprint (the central path inflated by N × gap on the
-   shift axis). Mark this in CellMap so later wires route around the
-   whole bundle, not just the central wire.
+**Acceptance:** `samples/wires_bus.plume`, `samples/wires_realistic.plume`'s
+parallel `bowl -> dog` lines, and `samples/wires_fan.plume`'s
+`bowl -> apple & mug & mouse` all render as clean parallel tracks.
 
-### Tricky bits
+### Not yet done in Phase 2 (deferred to a future task)
 
-- **Mid-bundle bends.** When the central path bends, siblings have to
-  bend at offset positions. If you naively shift segments perpendicularly,
-  the inside-of-bend siblings get shorter, outside-of-bend siblings
-  longer — visible as a "stair-step". Solution: at every bend in the
-  central path, insert short connector segments to take siblings around
-  the corner with the correct radius (= sibling's offset).
-- **Markers.** Only the bundle as a whole has logical source/target. Each
-  sibling still carries its own per-wire marker config (resolve already
-  emits per-wire). The first/last marker is drawn at each sibling's
-  actual endpoint.
-- **One-to-many fan-out** (`cat -> dog & bird`): currently treated as
-  two separate wires with the same source. Group them — same `src_id`
-  and `src_edge`. They share source-side prefix; bundle them up to the
-  point where their targets diverge, then split into single-wire routes.
-
-### Estimated effort
-
-~150–200 LOC across `route_wires` (grouping), a new
-`assemble_bundle_paths` function, and updates to the `CellMap` mark step.
-About 1 focused session.
-
-### Acceptance test
-
-`samples/wires_realistic.plume` has two `bowl -> dog` lines. They should
-render as two parallel rails, fully co-routed, with markers on each.
-`samples/wires_fan.plume` has `bowl -> apple & mug & mouse` — the wires
-should share their initial leg out of `bowl` before fanning to targets.
+- **True fan-out collapse** — `cat -> dog & bird` currently emits two
+  independent bundles (one per target) because the bundle key requires
+  same target. If we want the wires to share a single trunk out of the
+  source and split at a branch point, we'd extend the bundle concept:
+  group by `(src_id, src_edge)` alone, route the bundle, then split each
+  sibling at a chosen branch cell. This is a Phase 2½ extension; not
+  blocking.
 
 ---
 

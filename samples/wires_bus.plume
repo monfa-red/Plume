@@ -1,0 +1,20 @@
+// Bus routing: parallel wires sharing the same (src, src-edge, tgt, tgt-edge)
+// become a single canonical route stamped at perpendicular offsets — true
+// rails, not "N independent routes that happen to be near each other".
+
+{
+  |scene| layout:row gap:80
+  |wire|  thickness:1.5
+}
+
+cat  |rect| "Cat"
+dog  |rect| "Dog"
+bird |rect| "Bird"
+
+// Three parallel cat -> dog. Bundle → 3 stamped rails.
+cat -> dog
+cat -> dog
+cat -> dog
+
+// Single wire to bird from a different edge — its own bundle of size 1.
+cat -> bird

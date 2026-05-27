@@ -34,71 +34,207 @@ pub fn route_wires(
 ) -> Result<Vec<RoutedWire>, Error> {
     let scene = SceneIndex::build(scene_nodes);
 
-    // Pre-pass: explode chains into per-segment specs, pre-pick the entry/
-    // exit edge for each end via `nearest_edge`, and count how many segments
-    // share each (shape, edge) so we can fan wires sharing an exit/entry
-    // along that edge. Lanes are computed per endpoint independently — a
-    // wire's source lane comes from the bin (src_id, src_edge); its target
-    // lane from (tgt_id, tgt_edge).
+    // Explode chains into per-segment specs (one A* run = one segment).
     let specs = plan_segments(program, &scene)?;
 
-    let mut bin_total: HashMap<(String, Edge), usize> = HashMap::new();
-    for s in &specs {
-        *bin_total.entry((s.src_id.clone(), s.src_edge)).or_insert(0) += 1;
-        *bin_total.entry((s.tgt_id.clone(), s.tgt_edge)).or_insert(0) += 1;
-    }
-    let mut bin_seen: HashMap<(String, Edge), usize> = HashMap::new();
-    let mut lane_offsets: Vec<(f64, f64)> = Vec::with_capacity(specs.len());
-    for s in &specs {
-        let src = next_lane(&mut bin_seen, &bin_total, &s.src_id, s.src_edge, s.gap);
-        let tgt = next_lane(&mut bin_seen, &bin_total, &s.tgt_id, s.tgt_edge, s.gap);
-        lane_offsets.push((src, tgt));
-    }
+    // Group specs into *bundles*: segments that share the same source and
+    // target shapes AND the same chosen edges on both sides. A bundle of
+    // size N becomes N parallel rails sharing a single A* route, offset
+    // perpendicularly. Bundles of size 1 are routed normally (same as
+    // Phase 1).
+    let bundles = group_bundles(&specs);
 
-    // One shared grid for every wire — sized to the scene's bounds inflated
-    // by the largest gap. Using the same grid across wires lets the CellMap
-    // accumulate routed-wire state correctly.
+    // Assign lane offsets per bundle within each (shape, edge) bin. Bundles
+    // get contiguous lane ranges; the bundle's lane offset is the centre of
+    // its range. This gives us "fanning per bundle" while keeping siblings
+    // adjacent for the perpendicular-shift trick to produce visible rails.
+    let bundle_lanes = assign_bundle_lanes(&bundles, &specs);
+
+    // One shared grid sized to fit all wires comfortably.
     let max_gap = specs.iter().map(|s| s.gap).fold(0.0_f64, f64::max).max(8.0);
     let bounds = scene.bounds(max_gap);
     let grid = Grid::new(bounds, (max_gap / 2.0).max(4.0));
 
-    let mut routed: Vec<RoutedWire> = Vec::with_capacity(specs.len());
+    let mut routed: Vec<Option<RoutedWire>> = (0..specs.len()).map(|_| None).collect();
     let mut routed_paths: Vec<Vec<(f64, f64)>> = Vec::with_capacity(specs.len());
 
-    for (i, spec) in specs.iter().enumerate() {
-        let (src_lane, tgt_lane) = lane_offsets[i];
-        let path = route_segment_with_lanes(spec, &scene, &grid, src_lane, tgt_lane, &routed_paths);
-        routed_paths.push(path.clone());
-        routed.push(build_routed_wire(spec, path));
+    for (bi, bundle) in bundles.iter().enumerate() {
+        let (src_lane, tgt_lane) = bundle_lanes[bi];
+        let canonical_spec = &specs[bundle.spec_indices[0]];
+        let canonical_path = route_segment_with_lanes(
+            canonical_spec,
+            &scene,
+            &grid,
+            src_lane,
+            tgt_lane,
+            &routed_paths,
+        );
+
+        // Stamp siblings by perpendicular shift, centred around the canonical.
+        let size = bundle.spec_indices.len();
+        let centre = (size as f64 - 1.0) / 2.0;
+        for (k, &spec_idx) in bundle.spec_indices.iter().enumerate() {
+            let shift = (k as f64 - centre) * canonical_spec.gap;
+            let path = if shift.abs() < 0.5 {
+                canonical_path.clone()
+            } else {
+                shift_polyline(&canonical_path, shift)
+            };
+            routed_paths.push(path.clone());
+            routed[spec_idx] = Some(build_routed_wire(&specs[spec_idx], path));
+        }
     }
 
-    Ok(routed)
+    Ok(routed.into_iter().map(Option::unwrap).collect())
 }
 
-/// Count the number of segments using each `(shape, edge)` so far, returning
-/// the lane offset for THIS segment. Lanes are centred around 0: for a bin
-/// with `n` segments at indices `0..n`, offsets are `(i − (n−1)/2) * step`.
-///
-/// Step matters: it has to be at least `gap` (= 2 × cell_size) so adjacent
-/// lanes land in different grid rows after `world_to_cell`'s floor — and
-/// so each wire's halo zone doesn't swallow its neighbour's track.
-fn next_lane(
-    seen: &mut HashMap<(String, Edge), usize>,
-    total: &HashMap<(String, Edge), usize>,
-    id: &str,
-    edge: Edge,
-    gap: f64,
-) -> f64 {
-    let key = (id.to_string(), edge);
-    let n = total.get(&key).copied().unwrap_or(1);
-    if n <= 1 {
-        return 0.0;
+// ─────────────────────────── Bundles ───────────────────────────
+
+/// A group of segments sharing the same source shape + source edge AND
+/// the same target shape + target edge. They are routed as a single
+/// "bus" — one canonical A* path, then siblings stamped by perpendicular
+/// shift.
+struct Bundle {
+    src_id: String,
+    src_edge: Edge,
+    tgt_id: String,
+    tgt_edge: Edge,
+    /// Indices into the original `specs` array, in source order.
+    spec_indices: Vec<usize>,
+}
+
+fn group_bundles(specs: &[SegmentSpec]) -> Vec<Bundle> {
+    type Key = (String, Edge, String, Edge);
+    let mut by_key: HashMap<Key, usize> = HashMap::new();
+    let mut bundles: Vec<Bundle> = Vec::new();
+    for (i, spec) in specs.iter().enumerate() {
+        let key = (
+            spec.src_id.clone(),
+            spec.src_edge,
+            spec.tgt_id.clone(),
+            spec.tgt_edge,
+        );
+        let bi = *by_key.entry(key.clone()).or_insert_with(|| {
+            bundles.push(Bundle {
+                src_id: key.0.clone(),
+                src_edge: key.1,
+                tgt_id: key.2.clone(),
+                tgt_edge: key.3,
+                spec_indices: Vec::new(),
+            });
+            bundles.len() - 1
+        });
+        bundles[bi].spec_indices.push(i);
     }
-    let i = seen.entry(key).or_insert(0);
-    let idx = *i;
-    *i += 1;
-    let step = gap;
-    (idx as f64 - (n as f64 - 1.0) / 2.0) * step
+    bundles
+}
+
+/// For each (shape, edge), pack bundles into contiguous lane ranges. Each
+/// bundle's lane offset is the centre of its range — that's the position
+/// the canonical wire occupies; siblings shift symmetrically around it.
+///
+/// Lanes are centred around 0 across the whole bin so total bin width is
+/// `total_lanes × gap`.
+fn assign_bundle_lanes(bundles: &[Bundle], specs: &[SegmentSpec]) -> Vec<(f64, f64)> {
+    let mut lanes = vec![(0.0_f64, 0.0_f64); bundles.len()];
+    place_lanes(bundles, specs, &mut lanes, BinSide::Src);
+    place_lanes(bundles, specs, &mut lanes, BinSide::Tgt);
+    lanes
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BinSide {
+    Src,
+    Tgt,
+}
+
+fn place_lanes(bundles: &[Bundle], specs: &[SegmentSpec], lanes: &mut [(f64, f64)], side: BinSide) {
+    // Group bundles by (shape, edge) bin, preserving creation order.
+    let mut bins: HashMap<(String, Edge), Vec<usize>> = HashMap::new();
+    for (bi, bundle) in bundles.iter().enumerate() {
+        let key = match side {
+            BinSide::Src => (bundle.src_id.clone(), bundle.src_edge),
+            BinSide::Tgt => (bundle.tgt_id.clone(), bundle.tgt_edge),
+        };
+        bins.entry(key).or_default().push(bi);
+    }
+    for bundle_idxs in bins.values() {
+        let total: usize = bundle_idxs
+            .iter()
+            .map(|&bi| bundles[bi].spec_indices.len())
+            .sum();
+        if total <= 1 {
+            continue;
+        }
+        // All wires in a bin share their `gap` — pick any.
+        let gap = specs[bundles[bundle_idxs[0]].spec_indices[0]].gap;
+        // Each bundle occupies a contiguous run of lanes; cursor walks the bin.
+        let mut cursor: usize = 0;
+        for &bi in bundle_idxs {
+            let size = bundles[bi].spec_indices.len();
+            let centre_lane = cursor as f64 + (size as f64 - 1.0) / 2.0;
+            let offset = (centre_lane - (total as f64 - 1.0) / 2.0) * gap;
+            match side {
+                BinSide::Src => lanes[bi].0 = offset,
+                BinSide::Tgt => lanes[bi].1 = offset,
+            }
+            cursor += size;
+        }
+    }
+}
+
+// ─────────────────────────── Polyline perpendicular shift ───────────────────────────
+
+/// Shift an orthogonal polyline by `delta` perpendicular to each segment.
+/// Horizontal segments move on the y axis; vertical segments move on the x
+/// axis. At each bend the corner is replaced by the intersection of the
+/// two shifted lines — so straight bits stay parallel to the original and
+/// corners track the bend topology. Used to stamp bundle siblings.
+fn shift_polyline(path: &[(f64, f64)], delta: f64) -> Vec<(f64, f64)> {
+    if path.len() < 2 {
+        return path.to_vec();
+    }
+    // Translate each segment perpendicular to its axis.
+    let mut shifted: Vec<((f64, f64), (f64, f64))> = Vec::with_capacity(path.len() - 1);
+    for w in path.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let dy = (b.1 - a.1).abs();
+        let dx = (b.0 - a.0).abs();
+        let segment = if dy < 0.5 {
+            // Horizontal — shift y.
+            ((a.0, a.1 + delta), (b.0, b.1 + delta))
+        } else if dx < 0.5 {
+            // Vertical — shift x.
+            ((a.0 + delta, a.1), (b.0 + delta, b.1))
+        } else {
+            // Diagonal — defensive: shouldn't occur for orthogonal routes.
+            (a, b)
+        };
+        shifted.push(segment);
+    }
+
+    let mut out = Vec::with_capacity(shifted.len() + 1);
+    out.push(shifted[0].0);
+    for pair in shifted.windows(2) {
+        let (a1, b1) = pair[0];
+        let (a2, _) = pair[1];
+        out.push(intersect_orthogonal(a1, b1, a2));
+    }
+    out.push(shifted.last().unwrap().1);
+    out
+}
+
+/// Intersection of two perpendicular axis-aligned lines: one passes through
+/// `a1`–`b1`, the other passes through `a2` and is perpendicular to the first.
+fn intersect_orthogonal(a1: (f64, f64), b1: (f64, f64), a2: (f64, f64)) -> (f64, f64) {
+    let horizontal_first = (a1.1 - b1.1).abs() < 0.5;
+    if horizontal_first {
+        // First line: y = a1.1. Second line: x = a2.0 (vertical).
+        (a2.0, a1.1)
+    } else {
+        // First line: x = a1.0 (vertical). Second line: y = a2.1.
+        (a1.0, a2.1)
+    }
 }
 
 // ─────────────────────────── Per-segment orchestration ───────────────────────────
