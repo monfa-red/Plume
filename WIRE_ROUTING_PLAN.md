@@ -80,7 +80,40 @@ parallel `bowl -> dog` lines, and `samples/wires_fan.plume`'s
 
 ---
 
-## Phase 3 — Channel decomposition
+## Phase 3-lite — Channel-aware A* (DONE)
+
+**File:** `src/layout/wires.rs`. **Status:** shipped.
+
+A pragmatic intermediate step between Phase 2 and full channel
+decomposition. Instead of restructuring routing to navigate a channel
+graph, we identify "corridor" rows and columns (entirely wall-free) and
+give A* a small cost surcharge (+1) for travelling along non-corridor
+tracks. Wires gravitate toward natural gaps between shapes.
+
+Key additions:
+
+- `Corridors::from(&CellMap)` — precompute per-row and per-column flags.
+- `corridors.on_corridor(cell, axis)` — query whether `cell` sits on a
+  corridor track for the given travel axis.
+- `a_star` now takes `corridors: &Corridors` and adds `OFF_CORRIDOR` (+1)
+  per non-corridor step.
+
+Cost shape becomes: step 1, off-corridor +1, bend +4, cross +8.
+
+**Visible result:** in `samples/full_example.plume`, the orange dashed
+`owl --> rabbit` wire now routes along the wide corridor at the top of
+the canvas (above all the shapes) instead of weaving between them.
+Across all wires, L-bends land at more geometrically meaningful Y/X
+values — the visible randomness drops.
+
+This isn't full Phase 3 (no channel graph, no two-level routing, no track
+assignment). It's the 80% win for ~50 LOC. Full Phase 3 below is still
+worth doing for diagram-heavy use cases, but most hand-authored Plume
+files won't benefit much beyond this.
+
+---
+
+## Phase 3 — Channel decomposition (deferred)
 
 **Goal:** end the "random L-bend" feel. Bends should happen at
 *channel corners* — geometrically meaningful inflection points (where

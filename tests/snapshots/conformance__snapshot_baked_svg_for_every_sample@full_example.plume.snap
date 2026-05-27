@@ -4,7 +4,7 @@ assertion_line: 26
 expression: svg
 input_file: samples/full_example.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-381.6 -171.1 788 442.95" width="788" height="442.95" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-401.6 -183.1 783.2 454.95" width="783.2" height="454.95" class="plume">
   <defs/>
   <g class="plume-scene" color="#222">
     <g class="plume-node plume-shape-oval" data-id="cat" transform="translate(-273.1,-60.3)">
@@ -159,14 +159,14 @@ input_file: samples/full_example.plume
       <polygon class="plume-marker plume-marker-arrow" points="278.6,12.9 272.6,15.9 272.6,9.9" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="treehouse" data-to="kitchen">
-      <path d="M -225.925 108.9 L -13.6 108.9 L -13.6 23.1" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-228.925,108.9 -222.925,105.9 -222.925,111.9" fill="#444"/>
+      <path d="M -269.6 66.5 L -269.6 52.9 L -13.6 52.9 L -13.6 23.1" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-269.6,69.5 -272.6,63.5 -266.6,63.5" fill="#444"/>
       <polygon class="plume-marker plume-marker-arrow" points="-13.6,20.1 -10.6,26.1 -16.6,26.1" fill="#444"/>
-      <text x="-76.8625" y="108.9" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">watches</text>
+      <text x="-133.5" y="52.9" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">watches</text>
     </g>
     <g class="plume-wire" data-from="treehouse.owl" data-to="garden.den.rabbit">
-      <path d="M -256.6 124.9 L 386.4 124.9 L 386.4 -115.1 L 242.4 -115.1 L 242.4 -58.5" fill="none" stroke="orange" stroke-width="2" stroke-dasharray="8,8"/>
-      <circle class="plume-marker plume-marker-dot" cx="242.4" cy="-55.5" r="3.3333" fill="orange"/>
+      <path d="M -269.6 107.6 L -269.6 84.9 L -381.6 84.9 L -381.6 -163.1 L 194.4 -163.1 L 194.4 -67.1 L 208.025 -67.1" fill="none" stroke="orange" stroke-width="2" stroke-dasharray="8,8"/>
+      <circle class="plume-marker plume-marker-dot" cx="211.025" cy="-67.1" r="3.3333" fill="orange"/>
     </g>
   </g>
 </svg>

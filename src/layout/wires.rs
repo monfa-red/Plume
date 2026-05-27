@@ -343,6 +343,12 @@ fn route_segment_with_lanes(
     };
     let empty = CellMap::new(grid);
 
+    // Corridors: which rows/cols are entirely free of shape walls. Wires
+    // get a small cost discount for travelling along these tracks — that's
+    // what makes them gravitate toward natural gaps between shapes rather
+    // than bending into them at random Y/X positions.
+    let corridors = Corridors::from(&walls_only);
+
     // Edge candidates: 3 per side normally. When the endpoint carries an
     // explicit `.side` override, we pin to that single edge.
     let src_edges = match spec.src_forced {
@@ -361,7 +367,7 @@ fn route_segment_with_lanes(
             for &te in &tgt_edges {
                 let start = grid.cell_outside(&spec.src_bbox, se, spec.gap, src_lane);
                 let goal = grid.cell_outside(&spec.tgt_bbox, te, spec.gap, tgt_lane);
-                if let Some((cells, cost)) = a_star(grid, start, goal, se, te, cells) {
+                if let Some((cells, cost)) = a_star(grid, start, goal, se, te, cells, &corridors) {
                     if best.as_ref().map_or(true, |b| cost < b.0) {
                         best = Some((cost, se, te, cells));
                     }
@@ -972,6 +978,47 @@ enum EntryRule {
     Blocked,
 }
 
+// ─────────────────────────── Corridors ───────────────────────────
+//
+// A grid row is a "horizontal corridor" iff every cell in it is free of
+// shape walls — i.e., the row is a clean horizontal channel. Same idea for
+// columns. Wires that travel along corridors pay one less than wires that
+// travel through non-corridor tracks, which makes them gravitate toward
+// natural gaps between shapes instead of bending at random Y / X values.
+//
+// Built once per segment from the wall-only CellMap and shared across all
+// fallback tiers — wires don't influence corridor membership.
+
+struct Corridors {
+    /// `h[r]` is true iff row `r` is entirely wall-free.
+    h: Vec<bool>,
+    /// `v[c]` is true iff column `c` is entirely wall-free.
+    v: Vec<bool>,
+}
+
+impl Corridors {
+    fn from(cells: &CellMap) -> Self {
+        let mut h = vec![true; cells.rows];
+        let mut v = vec![true; cells.cols];
+        for (i, &cell) in cells.cells.iter().enumerate() {
+            if cell & WALL != 0 {
+                h[i / cells.cols] = false;
+                v[i % cells.cols] = false;
+            }
+        }
+        Self { h, v }
+    }
+
+    /// True iff a wire moving on `axis` through `cell` is travelling along
+    /// a clean channel (no shape walls anywhere in that row/column).
+    fn on_corridor(&self, cell: (usize, usize), axis: Axis) -> bool {
+        match axis {
+            Axis::H => self.h[cell.1],
+            Axis::V => self.v[cell.0],
+        }
+    }
+}
+
 // ─────────────────────────── A* ───────────────────────────
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -1012,10 +1059,13 @@ type AStarKey = ((usize, usize), Dir);
 
 /// A* on the wire-routing grid. Cost shape:
 ///
-///   step:    1 per cell
-///   bend:    +4 when the direction changes
-///   cross:   +8 when stepping onto a cell occupied by a perpendicular wire
-///   blocked: cell is a WALL or would overlap a same-axis wire
+///   step:        1 per cell
+///   off-corridor +1 when travelling along a track that isn't a clean
+///                channel (a row/col with no shape walls anywhere). This
+///                makes wires gravitate toward natural gaps between shapes.
+///   bend:        +4 when the direction changes
+///   cross:       +8 when stepping onto a cell occupied by a perpendicular wire
+///   blocked:     cell is a WALL or would overlap a same-axis wire
 ///
 /// Crossings carry one extra rule: when we step onto a perpendicular-wire
 /// cell we MUST exit in the same direction we entered (no bend at the
@@ -1029,9 +1079,11 @@ fn a_star(
     src_edge: Edge,
     tgt_edge: Edge,
     cells: &CellMap,
+    corridors: &Corridors,
 ) -> Option<(Vec<(usize, usize)>, i64)> {
     const BEND: i64 = 4;
     const CROSS: i64 = 8;
+    const OFF_CORRIDOR: i64 = 1;
 
     let start_dir = preferred_dir(src_edge);
     let goal_dir = opposite(preferred_dir(tgt_edge));
@@ -1103,6 +1155,9 @@ fn a_star(
                 step_cost += BEND;
             }
             step_cost += cross_cost;
+            if !is_endpoint && !corridors.on_corridor(next, axis_of(d)) {
+                step_cost += OFF_CORRIDOR;
+            }
 
             let g = node.g_cost + step_cost;
             let key = (next, d);

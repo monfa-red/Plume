@@ -56,7 +56,7 @@ input_file: samples/wires_fan.plume
       <text x="57.125" y="-112.225" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">hunts</text>
     </g>
     <g class="plume-wire" data-from="bowl" data-to="apple">
-      <path d="M -6.875 64.6 L -6.875 76.2 L 1.125 76.2 L 1.125 90.6" fill="none" stroke="#444" stroke-width="1"/>
+      <path d="M -6.875 64.6 L -6.875 84.2 L 1.125 84.2 L 1.125 90.6" fill="none" stroke="#444" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="1.125,93.6 -1.875,87.6 4.125,87.6" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="bowl" data-to="mug">
