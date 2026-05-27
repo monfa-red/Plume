@@ -46,9 +46,9 @@ input_file: samples/wires_fan.plume
   </g>
   <g class="plume-wires">
     <g class="plume-wire" data-from="fox" data-to="mouse">
-      <path d="M 1.125 -144.2 L 1.125 -155.8 L -6.875 -155.8 L -6.875 -170.2" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-6.875,-173.2 -3.875,-167.2 -9.875,-167.2" fill="#444"/>
-      <text x="-6.275" y="-155.8" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">hunts</text>
+      <path d="M 1.125 -144.2 L 1.125 -163.8 L -14.875 -163.8 L -14.875 -170.2" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-14.875,-173.2 -11.875,-167.2 -17.875,-167.2" fill="#444"/>
+      <text x="-2.275" y="-163.8" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">hunts</text>
     </g>
     <g class="plume-wire" data-from="owl" data-to="mouse">
       <path d="M 27.725 -35.8 L 57.125 -35.8 L 57.125 -195.8 L 38.875 -195.8" fill="none" stroke="#444" stroke-width="1"/>
@@ -64,8 +64,8 @@ input_file: samples/wires_fan.plume
       <polygon class="plume-marker plume-marker-arrow" points="-28.725,196.2 -34.725,199.2 -34.725,193.2" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="bowl" data-to="mouse">
-      <path d="M -31.3 36.2 L -54.875 36.2 L -54.875 -187.8 L -38.875 -187.8" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-35.875,-187.8 -41.875,-184.8 -41.875,-190.8" fill="#444"/>
+      <path d="M -31.3 36.2 L -54.875 36.2 L -54.875 -179.8 L -38.875 -179.8" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-35.875,-179.8 -41.875,-176.8 -41.875,-182.8" fill="#444"/>
     </g>
   </g>
 </svg>

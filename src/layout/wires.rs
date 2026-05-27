@@ -1,21 +1,21 @@
-//! Wire routing — obstacle-aware orthogonal A* (SPEC §9).
+//! Wire routing — obstacle-aware orthogonal A* (SPEC §10).
 //!
 //! For each wire segment we:
 //!   1. Pick entry / exit edges by relative geometry (nearest edge).
 //!   2. Apply a lane offset along the chosen edges. Parallel wires (same
 //!      pair of endpoints) get distinct offsets BEFORE A* runs, so each
 //!      wire computes its own path on its own track instead of stacking
-//!      onto the leader and then being shifted post-hoc (which produced
-//!      crossing paths when the leader and the follower took different
-//!      A* routes).
-//!   3. Build an obstacle map. Each scene node is a hard obstacle UNLESS it
-//!      is an endpoint or a named ancestor of an endpoint — in those cases
-//!      we recurse into its children so the path can enter the group that
-//!      holds its endpoint while still avoiding cousin shapes.
-//!   4. Run A* on a coarse grid (cell size ≈ wire-gap). The cost penalises
+//!      onto the leader and then being shifted post-hoc.
+//!   3. Build a `CellMap`: per-cell state recording shapes (hard walls),
+//!      previously-routed wires (with axis), and wire halos (perpendicular
+//!      gap zones).
+//!   4. Run A* on a coarse grid (cell size ≈ wire-gap / 2). Cost penalises
 //!      bends so paths stay straight when they can.
-//!   5. Fall back through a hierarchy: shapes-and-wires-respected → ignore
-//!      other wires → ignore shapes too → straight line.
+//!   5. Each routed wire becomes a HARD obstacle for subsequent wires,
+//!      with one carve-out: a perpendicular crossing is allowed at a
+//!      moderate cost. This is what enforces PCB-style spacing.
+//!   6. Fall back through a hierarchy: walls+wires → walls only → no
+//!      obstacles → straight line.
 
 use super::ir::{PlacedNode, RoutedText, RoutedWire};
 use super::values::layout_var;
@@ -55,16 +55,20 @@ pub fn route_wires(
         lane_offsets.push((src, tgt));
     }
 
+    // One shared grid for every wire — sized to the scene's bounds inflated
+    // by the largest gap. Using the same grid across wires lets the CellMap
+    // accumulate routed-wire state correctly.
+    let max_gap = specs.iter().map(|s| s.gap).fold(0.0_f64, f64::max).max(8.0);
+    let bounds = scene.bounds(max_gap);
+    let grid = Grid::new(bounds, (max_gap / 2.0).max(4.0));
+
     let mut routed: Vec<RoutedWire> = Vec::with_capacity(specs.len());
-    let mut soft_blocked: Vec<Vec<(usize, usize)>> = Vec::new();
+    let mut routed_paths: Vec<Vec<(f64, f64)>> = Vec::with_capacity(specs.len());
 
     for (i, spec) in specs.iter().enumerate() {
-        let bounds = scene.bounds(spec.gap);
-        let grid = Grid::new(bounds, (spec.gap.max(8.0) / 2.0).max(4.0));
-
         let (src_lane, tgt_lane) = lane_offsets[i];
-        let path = route_segment_with_lanes(spec, &scene, &grid, src_lane, tgt_lane, &soft_blocked);
-        soft_blocked.push(grid.cells_along(&path));
+        let path = route_segment_with_lanes(spec, &scene, &grid, src_lane, tgt_lane, &routed_paths);
+        routed_paths.push(path.clone());
         routed.push(build_routed_wire(spec, path));
     }
 
@@ -74,6 +78,10 @@ pub fn route_wires(
 /// Count the number of segments using each `(shape, edge)` so far, returning
 /// the lane offset for THIS segment. Lanes are centred around 0: for a bin
 /// with `n` segments at indices `0..n`, offsets are `(i − (n−1)/2) * step`.
+///
+/// Step matters: it has to be at least `gap` (= 2 × cell_size) so adjacent
+/// lanes land in different grid rows after `world_to_cell`'s floor — and
+/// so each wire's halo zone doesn't swallow its neighbour's track.
 fn next_lane(
     seen: &mut HashMap<(String, Edge), usize>,
     total: &HashMap<(String, Edge), usize>,
@@ -89,7 +97,7 @@ fn next_lane(
     let i = seen.entry(key).or_insert(0);
     let idx = *i;
     *i += 1;
-    let step = gap / 2.0;
+    let step = gap;
     (idx as f64 - (n as f64 - 1.0) / 2.0) * step
 }
 
@@ -178,17 +186,29 @@ fn route_segment_with_lanes(
     grid: &Grid,
     src_lane: f64,
     tgt_lane: f64,
-    soft_blocked: &[Vec<(usize, usize)>],
+    prior_paths: &[Vec<(f64, f64)>],
 ) -> Vec<(f64, f64)> {
     let shape_obstacles = scene.obstacles_for(&spec.src_id, &spec.tgt_id, spec.gap);
-    let blocked_by_shapes = grid.block_cells(&shape_obstacles);
-    let blocked_by_wires = grid.flatten_soft(soft_blocked);
+
+    // Build three cell-map tiers up front. Each one represents a relaxation
+    // of constraints — A* tries them in order until one finds a path.
+    let walls_and_wires = {
+        let mut m = CellMap::new(grid);
+        m.mark_walls(grid, &shape_obstacles);
+        for p in prior_paths {
+            m.mark_wire_path(grid, p);
+        }
+        m
+    };
+    let walls_only = {
+        let mut m = CellMap::new(grid);
+        m.mark_walls(grid, &shape_obstacles);
+        m
+    };
+    let empty = CellMap::new(grid);
 
     // Edge candidates: 3 per side normally. When the endpoint carries an
-    // explicit `.side` override, we pin to that single edge — the user has
-    // told us which side to use. Otherwise we drop the edge that strictly
-    // faces AWAY from the other shape (the path would loop all the way
-    // around the source to reach it).
+    // explicit `.side` override, we pin to that single edge.
     let src_edges = match spec.src_forced {
         Some(e) => vec![e],
         None => candidate_edges(&spec.src_bbox, &spec.tgt_bbox),
@@ -200,19 +220,12 @@ fn route_segment_with_lanes(
     type Candidate = (i64, Edge, Edge, Vec<(usize, usize)>);
     let mut best: Option<Candidate> = None;
 
-    for tier in 0..3 {
-        let (use_shapes, use_wires) = match tier {
-            0 => (&blocked_by_shapes[..], &blocked_by_wires[..]),
-            1 => (&blocked_by_shapes[..], &[][..]),
-            _ => (&[][..], &[][..]),
-        };
+    for cells in [&walls_and_wires, &walls_only, &empty] {
         for &se in &src_edges {
             for &te in &tgt_edges {
                 let start = grid.cell_outside(&spec.src_bbox, se, spec.gap, src_lane);
                 let goal = grid.cell_outside(&spec.tgt_bbox, te, spec.gap, tgt_lane);
-                if let Some((cells, cost)) =
-                    a_star(grid, start, goal, se, te, use_shapes, use_wires)
-                {
+                if let Some((cells, cost)) = a_star(grid, start, goal, se, te, cells) {
                     if best.as_ref().map_or(true, |b| cost < b.0) {
                         best = Some((cost, se, te, cells));
                     }
@@ -659,68 +672,168 @@ impl Grid {
         };
         self.world_to_cell(p)
     }
+}
 
-    /// Mark every cell whose centre lies inside any obstacle bbox.
-    fn block_cells(&self, obstacles: &[AbsBbox]) -> Vec<bool> {
-        let mut blocked = vec![false; self.cols * self.rows];
+// ─────────────────────────── CellMap ───────────────────────────
+//
+// Per-cell routing state, recorded as a packed bitfield. Each cell can carry
+// any combination of:
+//
+//   WALL    — hard obstacle (shape bbox or shape halo). Nothing routes here.
+//   WIRE_H  — a previously-routed wire passes through this cell horizontally.
+//   WIRE_V  — same, vertically. WIRE_H+WIRE_V together = a wire bend cell.
+//   HALO_H  — perpendicular gap of a horizontal wire (the row above/below
+//             the wire's track). Blocks parallel horizontal approach;
+//             vertical traversal passes through freely.
+//   HALO_V  — same idea, for vertical wires.
+//
+// The combination gives us PCB-style spacing: a wire's track is impassable
+// to anyone going the same direction (overlap), passable perpendicularly
+// at cost (crossing), and surrounded by halo zones that block parallel-too-
+// close approaches but allow perpendicular pass-through.
+
+type Cell = u8;
+const WALL: Cell = 1 << 0;
+const WIRE_H: Cell = 1 << 1;
+const WIRE_V: Cell = 1 << 2;
+const HALO_H: Cell = 1 << 3;
+const HALO_V: Cell = 1 << 4;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Axis {
+    H,
+    V,
+}
+
+struct CellMap {
+    cols: usize,
+    rows: usize,
+    cells: Vec<Cell>,
+}
+
+impl CellMap {
+    fn new(grid: &Grid) -> Self {
+        Self {
+            cols: grid.cols,
+            rows: grid.rows,
+            cells: vec![0; grid.cols * grid.rows],
+        }
+    }
+
+    fn at(&self, cell: (usize, usize)) -> Cell {
+        self.cells[cell.1 * self.cols + cell.0]
+    }
+
+    /// Mark every cell whose centre lies inside any obstacle bbox as WALL.
+    /// Shapes are passed already inflated by `wire-gap`, so this also
+    /// produces the shape's halo for free.
+    fn mark_walls(&mut self, grid: &Grid, obstacles: &[AbsBbox]) {
         for ob in obstacles {
-            let min_c = ((ob.x - self.bounds.x) / self.cell_size).floor().max(0.0) as usize;
-            let min_r = ((ob.y - self.bounds.y) / self.cell_size).floor().max(0.0) as usize;
+            let min_c = ((ob.x - grid.bounds.x) / grid.cell_size).floor().max(0.0) as usize;
+            let min_r = ((ob.y - grid.bounds.y) / grid.cell_size).floor().max(0.0) as usize;
             let max_c =
-                (((ob.x + ob.w - self.bounds.x) / self.cell_size).ceil() as usize).min(self.cols);
+                (((ob.x + ob.w - grid.bounds.x) / grid.cell_size).ceil() as usize).min(self.cols);
             let max_r =
-                (((ob.y + ob.h - self.bounds.y) / self.cell_size).ceil() as usize).min(self.rows);
+                (((ob.y + ob.h - grid.bounds.y) / grid.cell_size).ceil() as usize).min(self.rows);
             for r in min_r..max_r {
                 for c in min_c..max_c {
-                    blocked[r * self.cols + c] = true;
+                    self.cells[r * self.cols + c] |= WALL;
                 }
             }
         }
-        blocked
     }
 
-    fn cells_along(&self, path: &[(f64, f64)]) -> Vec<(usize, usize)> {
-        let mut out = Vec::new();
-        for w in path.windows(2) {
-            let a = self.world_to_cell(w[0]);
-            let b = self.world_to_cell(w[1]);
-            line_cells(a, b, &mut out);
+    /// Walk a routed wire's polyline and mark its track (`WIRE_H` / `WIRE_V`)
+    /// plus the parallel halo cells (`HALO_H` / `HALO_V`).
+    fn mark_wire_path(&mut self, grid: &Grid, path: &[(f64, f64)]) {
+        for window in path.windows(2) {
+            let a = grid.world_to_cell(window[0]);
+            let b = grid.world_to_cell(window[1]);
+            if a == b {
+                continue;
+            }
+            if a.1 == b.1 {
+                self.mark_horizontal_segment(a, b);
+            } else if a.0 == b.0 {
+                self.mark_vertical_segment(a, b);
+            }
+            // Diagonal/empty segments shouldn't occur for orthogonal routes;
+            // ignore them defensively.
         }
-        out.sort();
-        out.dedup();
-        out
     }
 
-    fn flatten_soft(&self, soft: &[Vec<(usize, usize)>]) -> Vec<bool> {
-        let mut soft_blocked = vec![false; self.cols * self.rows];
-        for cells in soft {
-            for &(c, r) in cells {
-                if c < self.cols && r < self.rows {
-                    soft_blocked[r * self.cols + c] = true;
-                }
+    fn mark_horizontal_segment(&mut self, a: (usize, usize), b: (usize, usize)) {
+        let r = a.1;
+        let (c0, c1) = if a.0 <= b.0 { (a.0, b.0) } else { (b.0, a.0) };
+        for c in c0..=c1 {
+            self.cells[r * self.cols + c] |= WIRE_H;
+        }
+        if r > 0 {
+            for c in c0..=c1 {
+                self.cells[(r - 1) * self.cols + c] |= HALO_H;
             }
         }
-        soft_blocked
+        if r + 1 < self.rows {
+            for c in c0..=c1 {
+                self.cells[(r + 1) * self.cols + c] |= HALO_H;
+            }
+        }
+    }
+
+    fn mark_vertical_segment(&mut self, a: (usize, usize), b: (usize, usize)) {
+        let c = a.0;
+        let (r0, r1) = if a.1 <= b.1 { (a.1, b.1) } else { (b.1, a.1) };
+        for r in r0..=r1 {
+            self.cells[r * self.cols + c] |= WIRE_V;
+        }
+        if c > 0 {
+            for r in r0..=r1 {
+                self.cells[r * self.cols + c - 1] |= HALO_V;
+            }
+        }
+        if c + 1 < self.cols {
+            for r in r0..=r1 {
+                self.cells[r * self.cols + c + 1] |= HALO_V;
+            }
+        }
+    }
+
+    /// Decide whether a wire moving along `axis` can step into this cell.
+    /// Returns the entry cost adjustment, or `None` if blocked.
+    ///
+    /// The rule, in plain English:
+    ///   - WALL: never enter.
+    ///   - Cell has a wire on MY axis: would overlap → never enter.
+    ///   - Cell has a wire on the OTHER axis: crossing — allowed at cost.
+    ///   - Cell is a halo of a wire on MY axis: parallel-too-close → never.
+    ///   - Cell is a halo of a wire on the OTHER axis: perpendicular pass
+    ///     through the gap zone is fine — no cost penalty.
+    ///   - Otherwise: free.
+    fn entry_for(&self, cell: (usize, usize), axis: Axis) -> EntryRule {
+        let s = self.cells[cell.1 * self.cols + cell.0];
+        if s & WALL != 0 {
+            return EntryRule::Blocked;
+        }
+        let (my_wire, my_halo, cross_wire) = match axis {
+            Axis::H => (WIRE_H, HALO_H, WIRE_V),
+            Axis::V => (WIRE_V, HALO_V, WIRE_H),
+        };
+        if s & my_wire != 0 || s & my_halo != 0 {
+            return EntryRule::Blocked;
+        }
+        if s & cross_wire != 0 {
+            return EntryRule::Cross;
+        }
+        EntryRule::Free
     }
 }
 
-/// Rasterise an orthogonal line between two grid cells (paths are already
-/// axis-aligned by the time we record them).
-fn line_cells(a: (usize, usize), b: (usize, usize), out: &mut Vec<(usize, usize)>) {
-    if a.0 == b.0 {
-        let (r0, r1) = if a.1 <= b.1 { (a.1, b.1) } else { (b.1, a.1) };
-        for r in r0..=r1 {
-            out.push((a.0, r));
-        }
-    } else if a.1 == b.1 {
-        let (c0, c1) = if a.0 <= b.0 { (a.0, b.0) } else { (b.0, a.0) };
-        for c in c0..=c1 {
-            out.push((c, a.1));
-        }
-    } else {
-        out.push(a);
-        out.push(b);
-    }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum EntryRule {
+    Free,
+    /// Crossing a perpendicular wire — allowed at moderate cost.
+    Cross,
+    Blocked,
 }
 
 // ─────────────────────────── A* ───────────────────────────
@@ -761,15 +874,29 @@ impl PartialOrd for Node {
 
 type AStarKey = ((usize, usize), Dir);
 
+/// A* on the wire-routing grid. Cost shape:
+///
+///   step:    1 per cell
+///   bend:    +4 when the direction changes
+///   cross:   +8 when stepping onto a cell occupied by a perpendicular wire
+///   blocked: cell is a WALL or would overlap a same-axis wire
+///
+/// Crossings carry one extra rule: when we step onto a perpendicular-wire
+/// cell we MUST exit in the same direction we entered (no bend at the
+/// cross). Otherwise we'd be tracing along an existing wire instead of
+/// truly crossing it. This is enforced by inspecting the current cell's
+/// `WIRE_H` / `WIRE_V` flags relative to the incoming direction.
 fn a_star(
     grid: &Grid,
     start: (usize, usize),
     goal: (usize, usize),
     src_edge: Edge,
     tgt_edge: Edge,
-    blocked: &[bool],
-    soft: &[bool],
+    cells: &CellMap,
 ) -> Option<(Vec<(usize, usize)>, i64)> {
+    const BEND: i64 = 4;
+    const CROSS: i64 = 8;
+
     let start_dir = preferred_dir(src_edge);
     let goal_dir = opposite(preferred_dir(tgt_edge));
 
@@ -785,12 +912,8 @@ fn a_star(
     });
     best_g.insert((start, start_dir), 0);
 
-    const BEND: i64 = 4; // discourage turns
-    const SOFT: i64 = 4; // mild preference against crossing other wires
-
     while let Some(node) = open.pop() {
         if node.cell == goal {
-            // Reconstruct.
             let mut path = vec![node.cell];
             let mut key = (node.cell, node.dir);
             while let Some(prev) = came_from.get(&key) {
@@ -801,8 +924,8 @@ fn a_star(
                 }
             }
             path.reverse();
-            // Add an extra step in `goal_dir` direction beyond the goal so
-            // the entry-axis snap in `simplify` lines up with the target edge.
+            // One extra step in `goal_dir` so the entry-axis snap in
+            // `simplify` lines up with the target edge.
             if let Some(extra) = step(node.cell, goal_dir, grid) {
                 if extra != node.cell {
                     path.push(extra);
@@ -811,25 +934,39 @@ fn a_star(
             return Some((path, node.g_cost));
         }
 
+        // If we just entered this cell by crossing a perpendicular wire, the
+        // only legal next step is to continue straight. Otherwise we'd bend
+        // ONTO the wire we just crossed, which is the same as overlap.
+        let must_continue = perpendicular_cross_here(cells, node.cell, node.dir);
+
         for &d in &[Dir::Right, Dir::Left, Dir::Up, Dir::Down] {
+            if must_continue && d != node.dir {
+                continue;
+            }
             let next = match step(node.cell, d, grid) {
                 Some(c) => c,
                 None => continue,
             };
-            let i = next.1 * grid.cols + next.0;
-            // `blocked` is empty on the final no-obstacles fallback tier — the
-            // bounds guard mirrors the one on `soft` below.
-            if i < blocked.len() && blocked[i] && next != goal && next != start {
-                continue;
-            }
+
+            // Source/target cells are always reachable — they're our anchors,
+            // not obstacles to ourselves.
+            let is_endpoint = next == goal || next == start;
+            let entry = if is_endpoint {
+                EntryRule::Free
+            } else {
+                cells.entry_for(next, axis_of(d))
+            };
+            let cross_cost = match entry {
+                EntryRule::Blocked => continue,
+                EntryRule::Free => 0,
+                EntryRule::Cross => CROSS,
+            };
 
             let mut step_cost = 1_i64;
             if node.dir != Dir::None && node.dir != d {
                 step_cost += BEND;
             }
-            if i < soft.len() && soft[i] {
-                step_cost += SOFT;
-            }
+            step_cost += cross_cost;
 
             let g = node.g_cost + step_cost;
             let key = (next, d);
@@ -850,6 +987,26 @@ fn a_star(
         }
     }
     None
+}
+
+fn axis_of(d: Dir) -> Axis {
+    match d {
+        Dir::Right | Dir::Left => Axis::H,
+        Dir::Up | Dir::Down | Dir::None => Axis::V,
+    }
+}
+
+/// True iff arriving at `cell` going `dir` placed us *on top of* a
+/// perpendicular wire. In that case we must continue straight to leave.
+fn perpendicular_cross_here(cells: &CellMap, cell: (usize, usize), dir: Dir) -> bool {
+    if matches!(dir, Dir::None) {
+        return false;
+    }
+    let s = cells.at(cell);
+    match axis_of(dir) {
+        Axis::H => s & WIRE_V != 0,
+        Axis::V => s & WIRE_H != 0,
+    }
 }
 
 fn step(c: (usize, usize), d: Dir, grid: &Grid) -> Option<(usize, usize)> {

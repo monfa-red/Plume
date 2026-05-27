@@ -19,13 +19,13 @@ input_file: samples/wires_realistic.plume
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Kitchen</text>
       </g>
       <g class="plume-node plume-shape-treat plume-shape-rect" data-id="bowl" transform="translate(0,-16.5)">
-        <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="4" ry="4" fill="#f6f6f6" stroke="#444" stroke-width="1"/>
+        <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Bowl</text>
         </g>
       </g>
       <g class="plume-node plume-shape-treat plume-shape-rect" data-id="water" transform="translate(0,48.1)">
-        <rect x="-34.375" y="-24.3" width="68.75" height="48.6" rx="4" ry="4" fill="#f6f6f6" stroke="#444" stroke-width="1"/>
+        <rect x="-34.375" y="-24.3" width="68.75" height="48.6" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Water</text>
         </g>
@@ -37,20 +37,20 @@ input_file: samples/wires_realistic.plume
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Garden</text>
       </g>
       <g class="plume-node plume-shape-treat plume-shape-rect" data-id="dog" transform="translate(0,-16.5)">
-        <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="4" ry="4" fill="#f6f6f6" stroke="#444" stroke-width="1"/>
+        <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Dog</text>
         </g>
       </g>
       <g class="plume-node plume-shape-treat plume-shape-rect" data-id="bird" transform="translate(0,48.1)">
-        <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="4" ry="4" fill="#f6f6f6" stroke="#444" stroke-width="1"/>
+        <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Bird</text>
         </g>
       </g>
     </g>
     <g class="plume-node plume-shape-treat plume-shape-rect" data-id="roof" transform="translate(158.9,0)">
-      <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="4" ry="4" fill="#f6f6f6" stroke="#444" stroke-width="1"/>
+      <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Roof</text>
       </g>
@@ -58,34 +58,34 @@ input_file: samples/wires_realistic.plume
   </g>
   <g class="plume-wires">
     <g class="plume-wire" data-from="cat" data-to="kitchen.bowl">
-      <path d="M -134.75 -8.4 L -105.2 -8.4 L -105.2 -18.4 L -88.675 -18.4" fill="none" stroke="red" stroke-width="2"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-85.675,-18.4 -95.675,-13.4 -95.675,-23.4" fill="red"/>
+      <path d="M -134.75 -11.4 L -106.2 -11.4 L -106.2 -19.4 L -88.675 -19.4" fill="none" stroke="red" stroke-width="2"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-85.675,-19.4 -95.675,-14.4 -95.675,-24.4" fill="red"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="kitchen.water">
-      <path d="M -155.2 24.8 L -155.2 51.6 L -92.25 51.6" fill="none" stroke="red" stroke-width="2"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-89.25,51.6 -99.25,56.6 -99.25,46.6" fill="red"/>
+      <path d="M -134.75 4.6 L -106.2 4.6 L -106.2 44.6 L -92.25 44.6" fill="none" stroke="red" stroke-width="2"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-89.25,44.6 -99.25,49.6 -99.25,39.6" fill="red"/>
     </g>
     <g class="plume-wire" data-from="kitchen.bowl" data-to="garden.dog">
-      <path d="M -22.075 -18.4 L 14.8 -18.4 L 14.8 -28.4 L 38.075 -28.4" fill="none" stroke="red" stroke-width="2"/>
-      <polygon class="plume-marker plume-marker-arrow" points="41.075,-28.4 31.075,-23.4 31.075,-33.4" fill="red"/>
+      <path d="M -22.075 -27.4 L 21.8 -27.4 L 21.8 -35.4 L 38.075 -35.4" fill="none" stroke="red" stroke-width="2"/>
+      <polygon class="plume-marker plume-marker-arrow" points="41.075,-35.4 31.075,-30.4 31.075,-40.4" fill="red"/>
     </g>
     <g class="plume-wire" data-from="kitchen.bowl" data-to="garden.dog">
-      <path d="M -22.075 -8.4 L 14.8 -8.4 L 14.8 -18.4 L 38.075 -18.4" fill="none" stroke="red" stroke-width="2"/>
-      <polygon class="plume-marker plume-marker-arrow" points="41.075,-18.4 31.075,-13.4 31.075,-23.4" fill="red"/>
+      <path d="M -22.075 -11.4 L 21.8 -11.4 L 21.8 -19.4 L 38.075 -19.4" fill="none" stroke="red" stroke-width="2"/>
+      <polygon class="plume-marker plume-marker-arrow" points="41.075,-19.4 31.075,-14.4 31.075,-24.4" fill="red"/>
     </g>
     <g class="plume-wire" data-from="kitchen.water" data-to="garden.dog">
-      <path d="M -14.5 41.6 L 4.8 41.6 L 4.8 -8.4 L 38.075 -8.4" fill="none" stroke="blue" stroke-width="1" stroke-dasharray="4,4"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-17.5,41.6 -11.5,38.6 -11.5,44.6" fill="blue"/>
-      <polygon class="plume-marker plume-marker-arrow" points="41.075,-8.4 35.075,-5.4 35.075,-11.4" fill="blue"/>
-      <text x="4.8" y="9.6125" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">shares</text>
+      <path d="M -14.5 28.6 L 13.8 28.6 L 13.8 -3.4 L 38.075 -3.4" fill="none" stroke="blue" stroke-width="1" stroke-dasharray="4,4"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-17.5,28.6 -11.5,25.6 -11.5,31.6" fill="blue"/>
+      <polygon class="plume-marker plume-marker-arrow" points="41.075,-3.4 35.075,-0.4 35.075,-6.4" fill="blue"/>
+      <text x="13.8" y="14.6125" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">shares</text>
     </g>
     <g class="plume-wire" data-from="kitchen.water" data-to="garden.bird">
-      <path d="M -14.5 51.6 L 34.5 51.6" fill="none" stroke="blue" stroke-width="1" stroke-dasharray="4,4"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-17.5,51.6 -11.5,48.6 -11.5,54.6" fill="blue"/>
-      <polygon class="plume-marker plume-marker-arrow" points="37.5,51.6 31.5,54.6 31.5,48.6" fill="blue"/>
+      <path d="M -14.5 44.6 L 34.5 44.6" fill="none" stroke="blue" stroke-width="1" stroke-dasharray="4,4"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-17.5,44.6 -11.5,41.6 -11.5,47.6" fill="blue"/>
+      <polygon class="plume-marker plume-marker-arrow" points="37.5,44.6 31.5,47.6 31.5,41.6" fill="blue"/>
     </g>
     <g class="plume-wire" data-from="kitchen.water" data-to="roof">
-      <path d="M -18.5 52.6 L 5.8 52.6 L 5.8 108.6 L 157.8 108.6 L 157.8 28.8" fill="none" stroke="green" stroke-width="1"/>
+      <path d="M -18.5 60.6 L 5.8 60.6 L 5.8 108.6 L 157.8 108.6 L 157.8 28.8" fill="none" stroke="green" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="157.8,25.8 160.8,31.8 154.8,31.8" fill="green"/>
     </g>
   </g>
