@@ -36,10 +36,23 @@ pub enum BendAxis {
     Horizontal,
 }
 
-/// Natural bend information for one Z-shape bundle. Non-Z bundles
-/// (perpendicular or same-direction edges) produce `None`.
+/// Whether the bundle ends up routing as a single-trunk Z or as a
+/// 5-segment detour. The redistribute step uses the same channel-spacing
+/// math for both, but routing dispatches the chosen `BundleLane.bend` to
+/// different parameters: Z bundles use it as the trunk position; detour
+/// bundles use it as the near-tgt approach column (`b2`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum BendKind {
+    ZTrunk,
+    DetourB2,
+}
+
+/// Natural bend information for one bundle. `None` only when the bundle
+/// has no single bend the channel allocator can move (same-direction
+/// `U`, perpendicular `L`, straight 0-bend wires).
 pub struct BundleBend {
     pub axis: BendAxis,
+    pub kind: BendKind,
     /// Natural bend coordinate: x for `Vertical` bends, y for `Horizontal`.
     pub natural: f64,
     /// The clear interval along the bend axis — the x range a `Vertical`
@@ -61,9 +74,11 @@ pub struct BundleBend {
 /// Result of one bundle's lane-allocation decision.
 #[derive(Clone, Copy)]
 pub struct BundleLane {
-    /// Final bend coordinate after redistribution. The router uses this
-    /// in place of the natural midpoint when picking the canonical's bend.
+    /// Final bend coordinate after redistribution. Router uses this as
+    /// `z_shape`'s trunk for `ZTrunk` bends, or as `detour_facing`'s
+    /// near-tgt approach column for `DetourB2` bends.
     pub bend: f64,
+    pub kind: BendKind,
 }
 
 /// Compute the natural bend for each bundle. Returns `None` for bundles
@@ -103,76 +118,94 @@ pub fn compute_bundle_bends(
                 &canonical_spec.tgt_id,
                 canonical_spec.gap,
             );
+            let size = bundle.size();
+            let stamping_gap = bundle_endpoint_spacing(bundle, endpoints, canonical_spec.gap);
+            let sibling_radius = (size as f64 - 1.0) / 2.0 * stamping_gap;
+            let src_halo = canonical_spec.src_bbox.inflate(canonical_spec.gap);
+            let tgt_halo = canonical_spec.tgt_bbox.inflate(canonical_spec.gap);
+            let horizontal_exit = bundle.src_edge.is_horizontal_exit();
             // If an obstacle straddles both endpoint axes and sits
             // between src and tgt, no Z-shape can clear it — the router
-            // will produce a 5-segment detour instead. Such bundles
-            // don't compete for the channel's Z-trunk space, so leave
-            // them out of redistribution.
-            if z_shape_blocked(
+            // will produce a 5-segment detour instead. The bundle's
+            // representative bend then becomes its *near-tgt approach
+            // column* (the detour's `b2`), which has to be packed
+            // alongside any Z trunk that lands in the same strip.
+            let is_detour = z_shape_blocked(
                 canonical_src_x,
                 canonical_src_y,
                 canonical_tgt_x,
                 canonical_tgt_y,
-                bundle.src_edge.is_horizontal_exit(),
+                horizontal_exit,
                 &obstacles,
-            ) {
-                return None;
-            }
-            let size = bundle.size();
-            let stamping_gap = bundle_endpoint_spacing(bundle, endpoints, canonical_spec.gap);
+            );
             // Stamping puts each sibling at `canonical ± k·stamping_gap`,
             // so the canonical's clear range must shrink by
             // `(size-1)/2 · stamping_gap` on each side — otherwise the
             // outermost siblings would overflow into a shape obstacle.
-            let sibling_radius = (size as f64 - 1.0) / 2.0 * stamping_gap;
-            // The trunk also has to sit clear of the src and tgt shapes'
-            // own halos. Without this the router rejects the Z (its
-            // strict-clearance check forbids middle segments running
-            // parallel close to either endpoint shape) and falls back to
-            // a 5-segment detour, which adds two unnecessary bends.
-            let src_halo = canonical_spec.src_bbox.inflate(canonical_spec.gap);
-            let tgt_halo = canonical_spec.tgt_bbox.inflate(canonical_spec.gap);
-            let (axis, natural, clear) = if bundle.src_edge.is_horizontal_exit() {
-                let y_lo = canonical_src_y.min(canonical_tgt_y);
-                let y_hi = canonical_src_y.max(canonical_tgt_y);
-                let x_lo = canonical_src_x.min(canonical_tgt_x);
-                let x_hi = canonical_src_x.max(canonical_tgt_x);
-                let xs = clear_x_intervals(y_lo, y_hi, &obstacles, x_lo, x_hi);
-                let natural_x = (canonical_src_x + canonical_tgt_x) / 2.0;
-                let raw = pick_widest_interval(&xs, natural_x).unwrap_or((x_lo, x_hi));
-                let (halo_lo, halo_hi) =
-                    trunk_halo_bounds_horizontal(bundle.src_edge, &src_halo, &tgt_halo);
-                let trunk_lo = raw.0.max(halo_lo);
-                let trunk_hi = raw.1.min(halo_hi);
-                let raw = if trunk_lo + sibling_radius < trunk_hi - sibling_radius {
-                    (trunk_lo, trunk_hi)
+            let (axis, natural, clear) = if horizontal_exit {
+                let axis = BendAxis::Vertical;
+                let (natural, clear) = if is_detour {
+                    detour_b2_bounds_horizontal(
+                        bundle.tgt_edge,
+                        canonical_src_x,
+                        canonical_src_y,
+                        canonical_tgt_x,
+                        canonical_tgt_y,
+                        &obstacles,
+                        &tgt_halo,
+                        canonical_spec.gap,
+                        sibling_radius,
+                    )
                 } else {
-                    raw
+                    z_trunk_bounds_horizontal(
+                        bundle.src_edge,
+                        canonical_src_x,
+                        canonical_src_y,
+                        canonical_tgt_x,
+                        canonical_tgt_y,
+                        &obstacles,
+                        &src_halo,
+                        &tgt_halo,
+                        sibling_radius,
+                    )
                 };
-                let clear = (raw.0 + sibling_radius, raw.1 - sibling_radius);
-                (BendAxis::Vertical, natural_x, clear)
+                (axis, natural, clear)
             } else {
-                let x_lo = canonical_src_x.min(canonical_tgt_x);
-                let x_hi = canonical_src_x.max(canonical_tgt_x);
-                let y_lo = canonical_src_y.min(canonical_tgt_y);
-                let y_hi = canonical_src_y.max(canonical_tgt_y);
-                let ys = clear_y_intervals(x_lo, x_hi, &obstacles, y_lo, y_hi);
-                let natural_y = (canonical_src_y + canonical_tgt_y) / 2.0;
-                let raw = pick_widest_interval(&ys, natural_y).unwrap_or((y_lo, y_hi));
-                let (halo_lo, halo_hi) =
-                    trunk_halo_bounds_vertical(bundle.src_edge, &src_halo, &tgt_halo);
-                let trunk_lo = raw.0.max(halo_lo);
-                let trunk_hi = raw.1.min(halo_hi);
-                let raw = if trunk_lo + sibling_radius < trunk_hi - sibling_radius {
-                    (trunk_lo, trunk_hi)
+                let axis = BendAxis::Horizontal;
+                let (natural, clear) = if is_detour {
+                    detour_b2_bounds_vertical(
+                        bundle.tgt_edge,
+                        canonical_src_x,
+                        canonical_src_y,
+                        canonical_tgt_x,
+                        canonical_tgt_y,
+                        &obstacles,
+                        &tgt_halo,
+                        canonical_spec.gap,
+                        sibling_radius,
+                    )
                 } else {
-                    raw
+                    z_trunk_bounds_vertical(
+                        bundle.src_edge,
+                        canonical_src_x,
+                        canonical_src_y,
+                        canonical_tgt_x,
+                        canonical_tgt_y,
+                        &obstacles,
+                        &src_halo,
+                        &tgt_halo,
+                        sibling_radius,
+                    )
                 };
-                let clear = (raw.0 + sibling_radius, raw.1 - sibling_radius);
-                (BendAxis::Horizontal, natural_y, clear)
+                (axis, natural, clear)
             };
             Some(BundleBend {
                 axis,
+                kind: if is_detour {
+                    BendKind::DetourB2
+                } else {
+                    BendKind::ZTrunk
+                },
                 natural,
                 clear,
                 size,
@@ -181,6 +214,177 @@ pub fn compute_bundle_bends(
             })
         })
         .collect()
+}
+
+/// Natural Z-trunk x and the clear range it can occupy without crossing
+/// any obstacle or endpoint halo.
+#[allow(clippy::too_many_arguments)]
+fn z_trunk_bounds_horizontal(
+    src_edge: Edge,
+    src_x: f64,
+    src_y: f64,
+    tgt_x: f64,
+    tgt_y: f64,
+    obstacles: &[AbsBbox],
+    src_halo: &AbsBbox,
+    tgt_halo: &AbsBbox,
+    sibling_radius: f64,
+) -> (f64, (f64, f64)) {
+    let y_lo = src_y.min(tgt_y);
+    let y_hi = src_y.max(tgt_y);
+    let x_lo = src_x.min(tgt_x);
+    let x_hi = src_x.max(tgt_x);
+    let xs = clear_x_intervals(y_lo, y_hi, obstacles, x_lo, x_hi);
+    let natural = (src_x + tgt_x) / 2.0;
+    let raw = pick_widest_interval(&xs, natural).unwrap_or((x_lo, x_hi));
+    let (halo_lo, halo_hi) = trunk_halo_bounds_horizontal(src_edge, src_halo, tgt_halo);
+    let trunk_lo = raw.0.max(halo_lo);
+    let trunk_hi = raw.1.min(halo_hi);
+    let raw = if trunk_lo + sibling_radius < trunk_hi - sibling_radius {
+        (trunk_lo, trunk_hi)
+    } else {
+        raw
+    };
+    (natural, (raw.0 + sibling_radius, raw.1 - sibling_radius))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn z_trunk_bounds_vertical(
+    src_edge: Edge,
+    src_x: f64,
+    src_y: f64,
+    tgt_x: f64,
+    tgt_y: f64,
+    obstacles: &[AbsBbox],
+    src_halo: &AbsBbox,
+    tgt_halo: &AbsBbox,
+    sibling_radius: f64,
+) -> (f64, (f64, f64)) {
+    let x_lo = src_x.min(tgt_x);
+    let x_hi = src_x.max(tgt_x);
+    let y_lo = src_y.min(tgt_y);
+    let y_hi = src_y.max(tgt_y);
+    let ys = clear_y_intervals(x_lo, x_hi, obstacles, y_lo, y_hi);
+    let natural = (src_y + tgt_y) / 2.0;
+    let raw = pick_widest_interval(&ys, natural).unwrap_or((y_lo, y_hi));
+    let (halo_lo, halo_hi) = trunk_halo_bounds_vertical(src_edge, src_halo, tgt_halo);
+    let trunk_lo = raw.0.max(halo_lo);
+    let trunk_hi = raw.1.min(halo_hi);
+    let raw = if trunk_lo + sibling_radius < trunk_hi - sibling_radius {
+        (trunk_lo, trunk_hi)
+    } else {
+        raw
+    };
+    (natural, (raw.0 + sibling_radius, raw.1 - sibling_radius))
+}
+
+/// For a detour wrap-around, the near-tgt approach column (`b2` in
+/// `detour_facing_horizontal`) is a vertical that hugs the tgt edge.
+/// The bundle's representative bend is that column — bundles whose `b2`
+/// columns crowd the same tgt-side strip need redistributing.
+#[allow(clippy::too_many_arguments)]
+fn detour_b2_bounds_horizontal(
+    tgt_edge: Edge,
+    src_x: f64,
+    src_y: f64,
+    tgt_x: f64,
+    tgt_y: f64,
+    obstacles: &[AbsBbox],
+    tgt_halo: &AbsBbox,
+    gap: f64,
+    sibling_radius: f64,
+) -> (f64, (f64, f64)) {
+    // Detour b2 lives in the strip just outside `tgt_halo` on the side
+    // the wire enters from. The y-range that matters is the path from
+    // the trunk back down to tgt.y — but we don't know trunk_y yet, so
+    // approximate with the full src→tgt y-span (a strict superset, so
+    // the resulting clear is conservative-tight).
+    let y_lo = src_y.min(tgt_y);
+    let y_hi = src_y.max(tgt_y);
+    let x_lo = src_x.min(tgt_x);
+    let x_hi = src_x.max(tgt_x);
+    let xs = clear_x_intervals(y_lo, y_hi, obstacles, x_lo, x_hi);
+    let (natural, halo_lo, halo_hi) = match tgt_edge {
+        Edge::Left => (tgt_halo.x - gap / 2.0, tgt_halo.right(), tgt_halo.x),
+        Edge::Right => (tgt_halo.right() + gap / 2.0, tgt_halo.right(), tgt_halo.x),
+        _ => ((src_x + tgt_x) / 2.0, f64::NEG_INFINITY, f64::INFINITY),
+    };
+    let raw = pick_widest_interval(&xs, natural).unwrap_or((x_lo, x_hi));
+    // For Left tgt, b2 sits *west* of the tgt shape — the wire's vertical
+    // can run anywhere in the tgt halo (it's still outside the shape
+    // proper), as long as it stays clear of the shape edge itself.
+    // Bounding by `tgt_halo.x` was too tight: it left no room for the
+    // sibling spread of a 2+ wire bundle and any neighbouring Z bundle's
+    // trunk would crowd the strip. `tgt_bbox.x - 1` keeps the vertical
+    // a hair outside the shape frame.
+    let tgt_outer_x = match tgt_edge {
+        Edge::Left => tgt_halo.x + gap - 1.0, // = tgt_bbox.x - 1
+        Edge::Right => tgt_halo.right() - gap + 1.0,
+        _ => 0.0,
+    };
+    let bounds = match tgt_edge {
+        Edge::Left => (raw.0, raw.1.min(tgt_outer_x)),
+        Edge::Right => (raw.0.max(tgt_outer_x), raw.1),
+        _ => raw,
+    };
+    let _ = (halo_lo, halo_hi);
+    let lo = bounds.0;
+    let hi = bounds.1;
+    let clear = if lo + sibling_radius <= hi - sibling_radius {
+        (lo + sibling_radius, hi - sibling_radius)
+    } else {
+        // No room for full sibling spread; centre canonical and accept
+        // that outer stamps will encroach into the obstacle/halo. Still
+        // better than the old fall-back to `raw` (which silently allowed
+        // stamps INSIDE the tgt shape).
+        let mid = (lo + hi) / 2.0;
+        (mid, mid)
+    };
+    (natural, clear)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn detour_b2_bounds_vertical(
+    tgt_edge: Edge,
+    src_x: f64,
+    src_y: f64,
+    tgt_x: f64,
+    tgt_y: f64,
+    obstacles: &[AbsBbox],
+    tgt_halo: &AbsBbox,
+    gap: f64,
+    sibling_radius: f64,
+) -> (f64, (f64, f64)) {
+    let x_lo = src_x.min(tgt_x);
+    let x_hi = src_x.max(tgt_x);
+    let y_lo = src_y.min(tgt_y);
+    let y_hi = src_y.max(tgt_y);
+    let ys = clear_y_intervals(x_lo, x_hi, obstacles, y_lo, y_hi);
+    let (natural, _) = match tgt_edge {
+        Edge::Top => (tgt_halo.y - gap / 2.0, ()),
+        Edge::Bottom => (tgt_halo.bottom() + gap / 2.0, ()),
+        _ => ((src_y + tgt_y) / 2.0, ()),
+    };
+    let raw = pick_widest_interval(&ys, natural).unwrap_or((y_lo, y_hi));
+    let tgt_outer_y = match tgt_edge {
+        Edge::Top => tgt_halo.y + gap - 1.0,
+        Edge::Bottom => tgt_halo.bottom() - gap + 1.0,
+        _ => 0.0,
+    };
+    let bounds = match tgt_edge {
+        Edge::Top => (raw.0, raw.1.min(tgt_outer_y)),
+        Edge::Bottom => (raw.0.max(tgt_outer_y), raw.1),
+        _ => raw,
+    };
+    let lo = bounds.0;
+    let hi = bounds.1;
+    let clear = if lo + sibling_radius <= hi - sibling_radius {
+        (lo + sibling_radius, hi - sibling_radius)
+    } else {
+        let mid = (lo + hi) / 2.0;
+        (mid, mid)
+    };
+    (natural, clear)
 }
 
 /// True when an obstacle straddles both endpoints' bend axes AND sits
@@ -361,12 +565,19 @@ pub fn group_by_channel(bends: &[Option<BundleBend>], gap: f64) -> Vec<Vec<usize
             if (bi.natural - bj.natural).abs() >= natural_threshold {
                 continue;
             }
-            // Their clear intervals must overlap by at least `gap` — if
-            // there's no common reachable space, redistributing them
-            // together just pushes one outside its own interval.
-            let lo = bi.clear.0.max(bj.clear.0);
-            let hi = bi.clear.1.min(bj.clear.1);
-            if hi - lo < gap {
+            // Each bundle's stamps span `(size - 1) * stamping_gap` around
+            // its canonical, which can sit anywhere in `clear` — so the
+            // *reachable* sibling range is `clear` widened by half-span on
+            // each side. If those ranges overlap, the bundles' bends and
+            // stamps will land in the same strip without redistribution.
+            let i_half = (bi.size as f64 - 1.0) / 2.0 * bi.stamping_gap;
+            let j_half = (bj.size as f64 - 1.0) / 2.0 * bj.stamping_gap;
+            let i_lo = bi.clear.0 - i_half;
+            let i_hi = bi.clear.1 + i_half;
+            let j_lo = bj.clear.0 - j_half;
+            let j_hi = bj.clear.1 + j_half;
+            let overlap = i_hi.min(j_hi) - i_lo.max(j_lo);
+            if overlap <= 0.0 {
                 continue;
             }
             union(&mut parent, i, j);
@@ -461,7 +672,10 @@ pub fn redistribute_channels(
             // outermost sibling never overflows into a shape obstacle.
             let b = bends[bi].as_ref().unwrap();
             let centre = centre_raw.clamp(b.clear.0, b.clear.1);
-            out[bi] = Some(BundleLane { bend: centre });
+            out[bi] = Some(BundleLane {
+                bend: centre,
+                kind: b.kind,
+            });
             cursor += 2.0 * half_spans[idx];
             if idx + 1 < n {
                 cursor += buffer;

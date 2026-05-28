@@ -47,7 +47,8 @@ pub fn route(
     world: AbsBbox,
     _prior_paths: &[Polyline],
     gap: f64,
-    preferred_bend: Option<f64>,
+    preferred_trunk: Option<f64>,
+    preferred_b2: Option<f64>,
     src_bbox: AbsBbox,
     tgt_bbox: AbsBbox,
 ) -> Polyline {
@@ -59,7 +60,8 @@ pub fn route(
         obstacles,
         world,
         gap,
-        preferred_bend,
+        preferred_trunk,
+        preferred_b2,
     );
 
     // For the *middle* segments of each candidate, treat src and tgt as
@@ -90,7 +92,8 @@ fn generate_candidates(
     obstacles: &[AbsBbox],
     world: AbsBbox,
     gap: f64,
-    preferred_bend: Option<f64>,
+    preferred_trunk: Option<f64>,
+    preferred_b2: Option<f64>,
 ) -> Vec<Polyline> {
     let mut out = Vec::with_capacity(4);
 
@@ -99,11 +102,18 @@ fn generate_candidates(
         if let Some(p) = straight(src, tgt, src_edge) {
             out.push(p);
         }
-        if let Some(p) = z_shape(src, tgt, src_edge, obstacles, preferred_bend) {
+        if let Some(p) = z_shape(src, tgt, src_edge, obstacles, preferred_trunk) {
             out.push(p);
         }
         out.push(detour_facing(
-            src, tgt, src_edge, tgt_edge, obstacles, world, gap,
+            src,
+            tgt,
+            src_edge,
+            tgt_edge,
+            obstacles,
+            world,
+            gap,
+            preferred_b2,
         ));
     } else if src_edge.is_horizontal_exit() != tgt_edge.is_horizontal_exit() {
         // Perpendicular — L-shape.
@@ -317,11 +327,30 @@ fn detour_facing(
     obstacles: &[AbsBbox],
     world: AbsBbox,
     gap: f64,
+    preferred_b2: Option<f64>,
 ) -> Polyline {
     if src_edge.is_horizontal_exit() {
-        detour_facing_horizontal(src, tgt, src_edge, tgt_edge, obstacles, world, gap)
+        detour_facing_horizontal(
+            src,
+            tgt,
+            src_edge,
+            tgt_edge,
+            obstacles,
+            world,
+            gap,
+            preferred_b2,
+        )
     } else {
-        detour_facing_vertical(src, tgt, src_edge, tgt_edge, obstacles, world, gap)
+        detour_facing_vertical(
+            src,
+            tgt,
+            src_edge,
+            tgt_edge,
+            obstacles,
+            world,
+            gap,
+            preferred_b2,
+        )
     }
 }
 
@@ -334,6 +363,7 @@ fn detour_facing_horizontal(
     obstacles: &[AbsBbox],
     world: AbsBbox,
     gap: f64,
+    preferred_b2: Option<f64>,
 ) -> Polyline {
     // Pick a horizontal trunk clear across the full x-span between src
     // and tgt. The trunk is the row the wire travels along between the
@@ -349,7 +379,8 @@ fn detour_facing_horizontal(
     let (sy_lo, sy_hi) = order(src.1, trunk_y);
     let (ty_lo, ty_hi) = order(trunk_y, tgt.1);
     let b1 = bend_column_for(src.0, src_edge, sy_lo, sy_hi, obstacles, world, gap);
-    let b2 = bend_column_for(tgt.0, tgt_edge, ty_lo, ty_hi, obstacles, world, gap);
+    let b2 = preferred_b2
+        .unwrap_or_else(|| bend_column_for(tgt.0, tgt_edge, ty_lo, ty_hi, obstacles, world, gap));
 
     collapse_collinear(vec![
         src,
@@ -370,6 +401,7 @@ fn detour_facing_vertical(
     obstacles: &[AbsBbox],
     world: AbsBbox,
     gap: f64,
+    preferred_b2: Option<f64>,
 ) -> Polyline {
     // For same-row Bottom↔Top wires the trunk has to live OUTSIDE both
     // shapes' y range. Pick `b1` and `b2` based on the exit/entry edge so
@@ -383,7 +415,8 @@ fn detour_facing_vertical(
     let (sx_lo, sx_hi) = order(src.0, trunk_x);
     let (tx_lo, tx_hi) = order(trunk_x, tgt.0);
     let b1 = bend_row_for(src.1, src_edge, sx_lo, sx_hi, obstacles, world, gap);
-    let b2 = bend_row_for(tgt.1, tgt_edge, tx_lo, tx_hi, obstacles, world, gap);
+    let b2 = preferred_b2
+        .unwrap_or_else(|| bend_row_for(tgt.1, tgt_edge, tx_lo, tx_hi, obstacles, world, gap));
 
     collapse_collinear(vec![
         src,

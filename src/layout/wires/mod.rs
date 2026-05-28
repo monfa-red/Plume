@@ -154,10 +154,18 @@ fn route_bundle_canonical(
         // Use the channel-assigned bend only if the routing keeps the
         // bundle's natural edges — alternative edge combos have a
         // different bend axis, so the redistributed value doesn't apply.
-        let preferred_bend = if se == bundle.src_edge && te == bundle.tgt_edge {
-            lane.map(|l| l.bend)
+        // The bend is dispatched to z_shape (for Z bundles) or
+        // detour_facing's near-tgt approach column (for detour bundles).
+        let (preferred_trunk, preferred_b2) = if se == bundle.src_edge && te == bundle.tgt_edge {
+            match lane {
+                Some(l) => match l.kind {
+                    lanes::BendKind::ZTrunk => (Some(l.bend), None),
+                    lanes::BendKind::DetourB2 => (None, Some(l.bend)),
+                },
+                None => (None, None),
+            }
         } else {
-            None
+            (None, None)
         };
         let path = route::route(
             src_pt,
@@ -168,7 +176,8 @@ fn route_bundle_canonical(
             world,
             prior_paths,
             canonical_spec.gap,
-            preferred_bend,
+            preferred_trunk,
+            preferred_b2,
             canonical_spec.src_bbox,
             canonical_spec.tgt_bbox,
         );
