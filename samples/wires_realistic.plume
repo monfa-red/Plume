@@ -9,10 +9,11 @@
 
 {
   |scene| layout:row gap:12
-|wire| gap:12
+  |wire| gap:12
+  |group| stroke:#aaa
 
   .loud stroke:red thickness:2
-  .quiet stroke:blue stroke-style:dashed
+  .quiet stroke:blue
   .happy stroke:green
 
   |treat:rect| radius:4 fill:#eee
@@ -40,7 +41,7 @@ bowl -> dog .loud
 bowl -> dog .loud
 
 // Cross-group with labels
-water <-o dog "shares" .quiet
+water <- dog "shares" .quiet
 water <-> bird .quiet
 
 // Group-interior → top-level (must exit kitchen and reach roof past garden)

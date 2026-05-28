@@ -4,7 +4,7 @@ assertion_line: 26
 expression: svg
 input_file: samples/mermaid_fast.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-412.275 -76.8 824.55 121.6" width="824.55" height="121.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-412.275 -68.8 824.55 113.6" width="824.55" height="113.6" class="plume">
   <defs/>
   <g class="plume-scene" color="#222">
     <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-364.55,0)">
@@ -70,27 +70,27 @@ input_file: samples/mermaid_fast.plume
   </g>
   <g class="plume-wires">
     <g class="plume-wire" data-from="cat" data-to="bird">
-      <path d="M -336.825 3.2 L -316.825 3.2" fill="none" stroke="#444" stroke-width="1"/>
+      <path d="M -336.825 0 L -316.825 0" fill="none" stroke="#444" stroke-width="1"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="bird">
-      <path d="M -261.375 3.2 L -245.375 3.2" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-242.375,3.2 -248.375,6.2 -248.375,0.2" fill="#444"/>
+      <path d="M -261.375 0 L -245.375 0" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-242.375,0 -248.375,3 -248.375,-3" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="fox" data-to="mouse">
-      <path d="M -132.275 -24.8 L -132.275 -56.8 L 27.725 -56.8 L 27.725 -28.8" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="27.725,-25.8 24.725,-31.8 30.725,-31.8" fill="#444"/>
+      <path d="M -103.325 0 L -101.325 0 L -101.325 -48.8 L 27 -48.8 L 27 0 L -3.875 0" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-6.875,0 -0.875,-3 -0.875,3" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="owl" data-to="mouse">
-      <path d="M -27.875 3.2 L -11.875 3.2" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-8.875,3.2 -14.875,6.2 -14.875,0.2" fill="#444"/>
+      <path d="M -27.875 0 L -11.875 0" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-8.875,0 -14.875,3 -14.875,-3" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="frog" data-to="pond">
-      <path d="M 144.475 3.2 L 160.475 3.2" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="163.475,3.2 157.475,6.2 157.475,0.2" fill="#444"/>
+      <path d="M 144.475 0 L 160.475 0" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="163.475,0 157.475,3 157.475,-3" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="fish" data-to="bowl">
-      <path d="M 309.675 3.2 L 325.675 3.2" fill="none" stroke="#444" stroke-width="1"/>
-      <circle class="plume-marker plume-marker-dot" cx="328.675" cy="3.2" r="2" fill="#444"/>
+      <path d="M 309.675 0 L 325.675 0" fill="none" stroke="#444" stroke-width="1"/>
+      <circle class="plume-marker plume-marker-dot" cx="328.675" cy="0" r="2" fill="#444"/>
     </g>
   </g>
 </svg>
