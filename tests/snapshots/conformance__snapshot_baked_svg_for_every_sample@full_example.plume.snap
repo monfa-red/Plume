@@ -152,7 +152,7 @@ input_file: samples/full_example.plume
       <polygon class="plume-marker plume-marker-arrow" points="21.225,-6.7 15.225,-3.7 15.225,-9.7" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="kitchen.counter.water" data-to="garden.pond.fish">
-      <path d="M 117 -69.3 L 132.7563 -69.3 L 132.7563 9 L 203.6 9" fill="none" stroke="#444" stroke-width="1"/>
+      <path d="M 117 -69.3 L 137.5375 -69.3 L 137.5375 9 L 203.6 9" fill="none" stroke="#444" stroke-width="1"/>
     </g>
     <g class="plume-wire" data-from="kitchen.counter.water" data-to="garden.pond.fish">
       <path d="M 264.6 9 L 275.6 9" fill="none" stroke="#444" stroke-width="1"/>

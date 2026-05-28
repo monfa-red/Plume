@@ -44,32 +44,12 @@ pub fn route(
     tgt_edge: Edge,
     obstacles: &[AbsBbox],
     world: AbsBbox,
-    prior_paths: &[Polyline],
-    gap: f64,
+    _prior_paths: &[Polyline],
 ) -> Polyline {
-    // Per-wire lane awareness: extract every prior wire's bend columns
-    // and rows so the new wire can prefer a bend that's at least `gap`
-    // from any of them. This is the mid-channel lane-allocation pass.
-    let prior_columns = prior_bend_columns(prior_paths);
-    let prior_rows = prior_bend_rows(prior_paths);
+    let candidates = generate_candidates(src, tgt, src_edge, tgt_edge, obstacles, world);
 
-    let candidates = generate_candidates(
-        src,
-        tgt,
-        src_edge,
-        tgt_edge,
-        obstacles,
-        world,
-        &prior_columns,
-        &prior_rows,
-        gap,
-    );
-
-    // Pick the first candidate that clears every shape obstacle. Wire-
-    // wire spacing is enforced *during* candidate generation (via
-    // `prior_columns` / `prior_rows`) rather than as a rejection here —
-    // that way fan-out siblings still share their trunk segment even
-    // though they technically overlap.
+    // Pick the first candidate that clears every shape obstacle. Falls
+    // back to the last attempt if nothing fully clears.
     let mut fallback: Option<Polyline> = None;
     for cand in candidates {
         if segments_clear(&cand, obstacles) {
@@ -80,46 +60,8 @@ pub fn route(
     fallback.unwrap_or_else(|| vec![src, tgt])
 }
 
-/// Extract x-coordinates of every vertical bend column in `prior_paths`.
-/// These are the columns the new wire's vertical bend should sit at least
-/// `gap` away from.
-fn prior_bend_columns(prior_paths: &[Polyline]) -> Vec<f64> {
-    let mut out = Vec::new();
-    for path in prior_paths {
-        for w in path.windows(2) {
-            let (a, b) = (w[0], w[1]);
-            let is_vertical = (a.0 - b.0).abs() < 0.5 && (a.1 - b.1).abs() >= 0.5;
-            if is_vertical {
-                out.push(a.0);
-            }
-        }
-    }
-    out.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    out.dedup_by(|a, b| (*a - *b).abs() < 0.5);
-    out
-}
-
-/// Same for horizontal bend rows — y-coordinates of every horizontal
-/// segment in `prior_paths`.
-fn prior_bend_rows(prior_paths: &[Polyline]) -> Vec<f64> {
-    let mut out = Vec::new();
-    for path in prior_paths {
-        for w in path.windows(2) {
-            let (a, b) = (w[0], w[1]);
-            let is_horizontal = (a.1 - b.1).abs() < 0.5 && (a.0 - b.0).abs() >= 0.5;
-            if is_horizontal {
-                out.push(a.1);
-            }
-        }
-    }
-    out.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    out.dedup_by(|a, b| (*a - *b).abs() < 0.5);
-    out
-}
-
 /// Build the ordered candidate list for an edge pair, cheapest topology
 /// first. Each candidate is a complete polyline — caller validates.
-#[allow(clippy::too_many_arguments)]
 fn generate_candidates(
     src: (f64, f64),
     tgt: (f64, f64),
@@ -127,9 +69,6 @@ fn generate_candidates(
     tgt_edge: Edge,
     obstacles: &[AbsBbox],
     world: AbsBbox,
-    prior_columns: &[f64],
-    prior_rows: &[f64],
-    gap: f64,
 ) -> Vec<Polyline> {
     let mut out = Vec::with_capacity(4);
 
@@ -138,15 +77,7 @@ fn generate_candidates(
         if let Some(p) = straight(src, tgt, src_edge) {
             out.push(p);
         }
-        if let Some(p) = z_shape(
-            src,
-            tgt,
-            src_edge,
-            obstacles,
-            prior_columns,
-            prior_rows,
-            gap,
-        ) {
+        if let Some(p) = z_shape(src, tgt, src_edge, obstacles) {
             out.push(p);
         }
         out.push(detour_facing(src, tgt, src_edge, obstacles, world));
@@ -184,47 +115,24 @@ fn straight(src: (f64, f64), tgt: (f64, f64), src_edge: Edge) -> Option<Polyline
 // ─────────────────────────── 2-bend Z-shape ───────────────────────────
 
 /// Natural Z-shape for facing edges. Picks the bend coordinate at the
-/// midline of the channel between the two shapes — preferring a column
-/// (or row) that's at least `gap` from any prior wire's bend so parallel
-/// wires sharing the channel stay visually separated. Falls back to the
-/// natural midpoint when no `gap`-clear lane exists.
-#[allow(clippy::too_many_arguments)]
+/// midline of the channel between the two shapes — the natural midpoint
+/// when it lies in a clear strip, otherwise the nearest clear strip's
+/// midline. Returns `None` if even that strip can't be found.
 fn z_shape(
     src: (f64, f64),
     tgt: (f64, f64),
     src_edge: Edge,
     obstacles: &[AbsBbox],
-    prior_columns: &[f64],
-    prior_rows: &[f64],
-    gap: f64,
 ) -> Option<Polyline> {
     if src_edge.is_horizontal_exit() {
         let (x_lo, x_hi) = order(src.0, tgt.0);
         let (y_lo, y_hi) = order(src.1, tgt.1);
-        let mid_x = pick_lane_column(
-            (src.0 + tgt.0) / 2.0,
-            x_lo,
-            x_hi,
-            y_lo,
-            y_hi,
-            obstacles,
-            prior_columns,
-            gap,
-        )?;
+        let mid_x = pick_clear_column((src.0 + tgt.0) / 2.0, x_lo, x_hi, y_lo, y_hi, obstacles)?;
         Some(vec![src, (mid_x, src.1), (mid_x, tgt.1), tgt])
     } else {
         let (x_lo, x_hi) = order(src.0, tgt.0);
         let (y_lo, y_hi) = order(src.1, tgt.1);
-        let mid_y = pick_lane_row(
-            (src.1 + tgt.1) / 2.0,
-            y_lo,
-            y_hi,
-            x_lo,
-            x_hi,
-            obstacles,
-            prior_rows,
-            gap,
-        )?;
+        let mid_y = pick_clear_row((src.1 + tgt.1) / 2.0, y_lo, y_hi, x_lo, x_hi, obstacles)?;
         Some(vec![src, (src.0, mid_y), (tgt.0, mid_y), tgt])
     }
 }
@@ -429,31 +337,18 @@ fn detour_perpendicular(
 
 // ─────────────────────────── Channel pickers ───────────────────────────
 
-/// Like the obstacle-only "clear column" pick, but additionally excludes a `±gap` band
-/// around every column in `prior_columns`. If carving out these bands
-/// leaves no clear strip, fall back to the obstacle-clear pick — i.e.,
-/// accept the closeness rather than fail the route.
-#[allow(clippy::too_many_arguments)]
-fn pick_lane_column(
+/// Midline of the clear-x strip closest to `desired` for a vertical
+/// segment spanning `[y_lo, y_hi]`. If `desired` falls inside a clear
+/// strip, that exact x is returned; otherwise the strip's midpoint.
+fn pick_clear_column(
     desired: f64,
     x_lo: f64,
     x_hi: f64,
     y_lo: f64,
     y_hi: f64,
     obstacles: &[AbsBbox],
-    prior_columns: &[f64],
-    gap: f64,
 ) -> Option<f64> {
     let xs = clear_x_intervals(y_lo, y_hi, obstacles, x_lo, x_hi);
-    let lane_xs = carve_out_bands(&xs, prior_columns, gap);
-    if let Some(iv) = nearest_interval(&lane_xs, desired) {
-        return Some(if iv.contains(desired) {
-            desired
-        } else {
-            iv.mid()
-        });
-    }
-    // No gap-clear lane — fall back to obstacle-clear.
     nearest_interval(&xs, desired).map(|iv| {
         if iv.contains(desired) {
             desired
@@ -463,26 +358,17 @@ fn pick_lane_column(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
-fn pick_lane_row(
+/// Mirror of `pick_clear_column` for a horizontal segment spanning
+/// `[x_lo, x_hi]`.
+fn pick_clear_row(
     desired: f64,
     y_lo: f64,
     y_hi: f64,
     x_lo: f64,
     x_hi: f64,
     obstacles: &[AbsBbox],
-    prior_rows: &[f64],
-    gap: f64,
 ) -> Option<f64> {
     let ys = clear_y_intervals(x_lo, x_hi, obstacles, y_lo, y_hi);
-    let lane_ys = carve_out_bands(&ys, prior_rows, gap);
-    if let Some(iv) = nearest_interval(&lane_ys, desired) {
-        return Some(if iv.contains(desired) {
-            desired
-        } else {
-            iv.mid()
-        });
-    }
     nearest_interval(&ys, desired).map(|iv| {
         if iv.contains(desired) {
             desired
@@ -490,54 +376,6 @@ fn pick_lane_row(
             iv.mid()
         }
     })
-}
-
-/// Shrink each clear interval by removing a `±gap` window around every
-/// value in `centres`. Used to reserve lane spacing around already-placed
-/// wires.
-fn carve_out_bands(
-    intervals: &[super::channels::Interval],
-    centres: &[f64],
-    gap: f64,
-) -> Vec<super::channels::Interval> {
-    if centres.is_empty() {
-        return intervals.to_vec();
-    }
-    let mut sorted = centres.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-    let mut out: Vec<super::channels::Interval> = Vec::new();
-    for iv in intervals {
-        let mut start = iv.min;
-        let end = iv.max;
-        for &c in &sorted {
-            let lo = c - gap;
-            let hi = c + gap;
-            if hi <= start {
-                continue;
-            }
-            if lo >= end {
-                break;
-            }
-            if lo > start {
-                out.push(super::channels::Interval {
-                    min: start,
-                    max: lo,
-                });
-            }
-            start = start.max(hi);
-            if start >= end {
-                break;
-            }
-        }
-        if start < end {
-            out.push(super::channels::Interval {
-                min: start,
-                max: end,
-            });
-        }
-    }
-    out
 }
 
 /// Midline of the interval closest to `target`. Used to choose the trunk
