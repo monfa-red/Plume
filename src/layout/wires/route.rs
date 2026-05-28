@@ -47,6 +47,7 @@ pub fn route(
     world: AbsBbox,
     _prior_paths: &[Polyline],
     gap: f64,
+    sibling_radius: f64,
     preferred_trunk: Option<f64>,
     preferred_b2: Option<f64>,
     src_bbox: AbsBbox,
@@ -60,6 +61,7 @@ pub fn route(
         obstacles,
         world,
         gap,
+        sibling_radius,
         preferred_trunk,
         preferred_b2,
     );
@@ -92,6 +94,7 @@ fn generate_candidates(
     obstacles: &[AbsBbox],
     world: AbsBbox,
     gap: f64,
+    sibling_radius: f64,
     preferred_trunk: Option<f64>,
     preferred_b2: Option<f64>,
 ) -> Vec<Polyline> {
@@ -125,7 +128,15 @@ fn generate_candidates(
         ));
     } else {
         // Same-direction — U-shape.
-        out.push(u_shape(src, tgt, src_edge, obstacles, world, gap));
+        out.push(u_shape(
+            src,
+            tgt,
+            src_edge,
+            obstacles,
+            world,
+            gap,
+            sibling_radius,
+        ));
     }
 
     out
@@ -261,79 +272,59 @@ fn u_shape(
     obstacles: &[AbsBbox],
     world: AbsBbox,
     gap: f64,
+    sibling_radius: f64,
 ) -> Polyline {
-    // Loop size: a reasonable target distance past src/tgt. When no
-    // obstacle forces a deeper loop, this keeps the trunk a fixed
-    // breathing-room amount past the edge — enough that perpendicular-
-    // shifted siblings still have headroom and don't degenerate.
-    let breathing = gap.max(16.0) * 2.0;
+    // Trunk lands JUST past the nearest blocking obstacle's halo —
+    // `iv.min` for southbound/eastbound, `iv.max` for north/west — so
+    // the loop only extends as far as the geometry forces. The
+    // `sibling_radius` push keeps the inner-most sibling of a >1-spec
+    // bundle from landing inside that halo after perpendicular shift.
+    // When nothing blocks (no obstacle in the strip), fall back to a
+    // small `gap`-sized loop so the canonical doesn't degenerate.
+    // Canonical needs `gap` past src/tgt to be visible at all, plus
+    // `sibling_radius` so the inner-most stamped sibling stays past
+    // src/tgt by `gap`. Otherwise the inner sib collapses to the
+    // src edge and renders as a zero-height degenerate U.
+    let nudge = gap + sibling_radius;
     match src_edge {
         Edge::Right => {
             let y_lo = src.1.min(tgt.1);
             let y_hi = src.1.max(tgt.1);
             let beyond = src.0.max(tgt.0);
-            let target = beyond + breathing;
             let xs = clear_x_intervals(y_lo, y_hi, obstacles, beyond, world.right());
-            let mid_x = nearest_interval(&xs, target)
-                .map(|iv| {
-                    if iv.contains(target) {
-                        target
-                    } else {
-                        iv.min.max(target)
-                    }
-                })
-                .unwrap_or(target);
+            let mid_x = nearest_interval(&xs, beyond)
+                .map(|iv| iv.min + nudge)
+                .unwrap_or(beyond + nudge);
             vec![src, (mid_x, src.1), (mid_x, tgt.1), tgt]
         }
         Edge::Left => {
             let y_lo = src.1.min(tgt.1);
             let y_hi = src.1.max(tgt.1);
             let beyond = src.0.min(tgt.0);
-            let target = beyond - breathing;
             let xs = clear_x_intervals(y_lo, y_hi, obstacles, world.x, beyond);
-            let mid_x = nearest_interval(&xs, target)
-                .map(|iv| {
-                    if iv.contains(target) {
-                        target
-                    } else {
-                        iv.max.min(target)
-                    }
-                })
-                .unwrap_or(target);
+            let mid_x = nearest_interval(&xs, beyond)
+                .map(|iv| iv.max - nudge)
+                .unwrap_or(beyond - nudge);
             vec![src, (mid_x, src.1), (mid_x, tgt.1), tgt]
         }
         Edge::Top => {
             let x_lo = src.0.min(tgt.0);
             let x_hi = src.0.max(tgt.0);
             let beyond = src.1.min(tgt.1);
-            let target = beyond - breathing;
             let ys = clear_y_intervals(x_lo, x_hi, obstacles, world.y, beyond);
-            let mid_y = nearest_interval(&ys, target)
-                .map(|iv| {
-                    if iv.contains(target) {
-                        target
-                    } else {
-                        iv.max.min(target)
-                    }
-                })
-                .unwrap_or(target);
+            let mid_y = nearest_interval(&ys, beyond)
+                .map(|iv| iv.max - nudge)
+                .unwrap_or(beyond - nudge);
             vec![src, (src.0, mid_y), (tgt.0, mid_y), tgt]
         }
         Edge::Bottom => {
             let x_lo = src.0.min(tgt.0);
             let x_hi = src.0.max(tgt.0);
             let beyond = src.1.max(tgt.1);
-            let target = beyond + breathing;
             let ys = clear_y_intervals(x_lo, x_hi, obstacles, beyond, world.bottom());
-            let mid_y = nearest_interval(&ys, target)
-                .map(|iv| {
-                    if iv.contains(target) {
-                        target
-                    } else {
-                        iv.min.max(target)
-                    }
-                })
-                .unwrap_or(target);
+            let mid_y = nearest_interval(&ys, beyond)
+                .map(|iv| iv.min + nudge)
+                .unwrap_or(beyond + nudge);
             vec![src, (src.0, mid_y), (tgt.0, mid_y), tgt]
         }
     }

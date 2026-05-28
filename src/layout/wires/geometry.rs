@@ -7,7 +7,7 @@
 
 use crate::ast::Side;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub enum Edge {
     Right,
     Bottom,

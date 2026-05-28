@@ -181,6 +181,8 @@ fn route_bundle_canonical(
         } else {
             (None, None)
         };
+        let sibling_radius =
+            (bundle.size() as f64 - 1.0) / 2.0 * bundle_stamping_gap(bundle, endpoints, specs);
         let path = route::route(
             src_pt,
             tgt_pt,
@@ -190,6 +192,7 @@ fn route_bundle_canonical(
             world,
             prior_paths,
             canonical_spec.gap,
+            sibling_radius,
             preferred_trunk,
             preferred_b2,
             canonical_spec.src_bbox,
@@ -216,9 +219,9 @@ fn route_bundle_canonical(
 /// explicit `.side` override (`spec.src_forced` / `spec.tgt_forced`) is
 /// left alone on that side; the user already chose for us.
 fn resolve_edges(specs: &mut [SegmentSpec], scene: &SceneIndex, world: AbsBbox) {
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
     type Key = (String, Edge, String, Edge);
-    let mut groups: HashMap<Key, Vec<usize>> = HashMap::new();
+    let mut groups: BTreeMap<Key, Vec<usize>> = BTreeMap::new();
     for (i, spec) in specs.iter().enumerate() {
         let initial_src = spec.src_forced.unwrap_or(spec.src_default_edge);
         let initial_tgt = spec.tgt_forced.unwrap_or(spec.tgt_default_edge);
@@ -269,16 +272,16 @@ fn relieve_overloaded_bins(specs: &mut [SegmentSpec], scene: &SceneIndex, world:
 }
 
 fn try_one_relief(specs: &mut [SegmentSpec], scene: &SceneIndex, world: AbsBbox) -> bool {
-    use std::collections::{HashMap, HashSet};
+    use std::collections::{BTreeMap, HashSet};
     type Key = (String, Edge, String, Edge);
-    let mut bundle_specs: HashMap<Key, Vec<usize>> = HashMap::new();
+    let mut bundle_specs: BTreeMap<Key, Vec<usize>> = BTreeMap::new();
     for (i, spec) in specs.iter().enumerate() {
         let se = spec.src_forced.unwrap_or(spec.src_default_edge);
         let te = spec.tgt_forced.unwrap_or(spec.tgt_default_edge);
         let key = (spec.src_id.clone(), se, spec.tgt_id.clone(), te);
         bundle_specs.entry(key).or_default().push(i);
     }
-    let mut load: HashMap<(String, Edge), usize> = HashMap::new();
+    let mut load: BTreeMap<(String, Edge), usize> = BTreeMap::new();
     for (key, indices) in &bundle_specs {
         let src_spans: HashSet<_> = indices.iter().map(|&i| specs[i].wire.span).collect();
         let tgt_spans: HashSet<_> = indices.iter().map(|&i| specs[i].wire.span).collect();
@@ -293,7 +296,7 @@ fn try_one_relief(specs: &mut [SegmentSpec], scene: &SceneIndex, world: AbsBbox)
     // a problem — endpoint lanes compress fine. It's two bundles
     // forced to interleave their trunks in too narrow a channel that
     // breaks the visual.
-    let mut bins: HashMap<(String, Edge), Vec<Key>> = HashMap::new();
+    let mut bins: BTreeMap<(String, Edge), Vec<Key>> = BTreeMap::new();
     for k in bundle_specs.keys() {
         bins.entry((k.0.clone(), k.1)).or_default().push(k.clone());
         bins.entry((k.2.clone(), k.3)).or_default().push(k.clone());
@@ -560,6 +563,7 @@ fn simulate_path_score(
         world,
         &[],
         spec.gap,
+        0.0,
         None,
         None,
         spec.src_bbox,
