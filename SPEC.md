@@ -588,9 +588,9 @@ IDs inside the body are local. On instantiation, internal wires materialize with
 
 ### Routing
 
-Wires route orthogonally on a coarse grid using A* with bend penalty. The router picks entry / exit edges by relative geometry unless overridden by an explicit side.
+Wires route orthogonally: every segment is axis-aligned and every bend is 90°. The router picks entry / exit edges by relative geometry unless overridden by an explicit `.side`. (The routing algorithm is an implementation detail — see `docs/superpowers/specs/2026-05-28-wire-routing-rules-design.md`.)
 
-**Obstacle rules.** Routes clear other shapes by at least the wire's `gap` (default 16, settable on `|wire|`, on a style, or per-wire). Wires also try to stay that distance from other wires.
+**Obstacle rules.** A route clears every other shape by at least that shape's **clearance** — the `gap` of its parent container (the scene's gap for a top-level shape), settable wherever `gap` is set. Wires stay at least their own `gap` (default 16, settable on `|wire|`, on a style, or per-wire) from other wires.
 
 | Shape | Treated as |
 |---|---|
@@ -601,7 +601,7 @@ Wires route orthogonally on a coarse grid using A* with bend penalty. The router
 **Fallback hierarchy.** The router tries each tier and stops at the first that succeeds:
 
 1. Path that respects gap from all shapes and wires.
-2. Path that crosses other wires.
+2. Path that crosses other wires (perpendicularly only).
 3. Path that crosses shapes (when fully surrounded).
 4. Straight line from edge to edge.
 
