@@ -4,16 +4,21 @@
 //!
 //! 1. **Plan** the resolved wires into one `SegmentSpec` per routed link
 //!    (chains explode, fan-out specs share a `wire.span`).
-//! 2. **Allocate endpoints**: for each (shape, edge) bin, distribute the
+//! 2. **Resolve edges** per geometric bundle: pick the `(src_edge,
+//!    tgt_edge)` pair that yields the simplest topology (fewest bends).
+//!    This runs *before* endpoint allocation so bins reflect the
+//!    actually-used edges; bird → roof doesn't reserve four lanes on
+//!    `roof.left` if water → roof is going to enter via `roof.bottom`.
+//! 3. **Allocate endpoints**: for each (shape, edge) bin, distribute the
 //!    wires using that endpoint into evenly-spaced lanes around the edge
 //!    midpoint. Fan-out specs collapse onto a single shared lane.
-//! 3. **Group** specs into bundles by (src, src_edge, tgt, tgt_edge). A
+//! 4. **Group** specs into bundles by (src, src_edge, tgt, tgt_edge). A
 //!    bundle of N parallel wires routes once and is stamped N times by
 //!    perpendicular shift, so siblings stay exactly `gap` apart.
-//! 4. **Route** each bundle's canonical through the channel router. The
+//! 5. **Route** each bundle's canonical through the channel router. The
 //!    router picks the minimum-bend topology (0 / 1 / 2 bends typically)
 //!    that clears every obstacle, placing bends at channel midlines.
-//! 5. **Stamp** siblings from the canonical via perpendicular shift.
+//! 6. **Stamp** siblings from the canonical via perpendicular shift.
 //!
 //! No grid, no A\*. Endpoints are pixel-perfect by construction; bends
 //! are deterministic — same layout always produces the same routing.
@@ -45,14 +50,23 @@ pub fn route_wires(
     scene_nodes: &[PlacedNode],
 ) -> Result<Vec<RoutedWire>, Error> {
     let scene = SceneIndex::build(scene_nodes);
-    let specs = plan_segments(program, &scene)?;
-    let endpoints = allocate_endpoints(&specs);
-    let bundles = group_bundles(&specs);
+    let mut specs = plan_segments(program, &scene)?;
 
     // Pad the world bounds by the largest gap so perimeter detours have
     // room outside every shape.
     let max_gap = specs.iter().map(|s| s.gap).fold(0.0_f64, f64::max).max(8.0);
     let world = scene.bounds(max_gap);
+
+    // Pick each bundle's actually-best `(src_edge, tgt_edge)` based on
+    // simulated topology length, *before* allocating endpoint lanes. If
+    // we wait until routing, the bin allocator wastes lanes on edges that
+    // never carry a wire (visible as bird → roof landing off-centre on
+    // roof.left because two lanes were reserved for water → roof, which
+    // ended up exiting via roof.bottom).
+    resolve_edges(&mut specs, &scene, world);
+
+    let endpoints = allocate_endpoints(&specs);
+    let bundles = group_bundles(&specs);
 
     // Bundle-aware lane allocation: where Z-shape bundles would otherwise
     // crowd the same channel, redistribute their canonical bends evenly so
@@ -192,6 +206,117 @@ fn route_bundle_canonical(
         }
     }
     fallback.unwrap_or_else(|| vec![canonical_src, canonical_tgt])
+}
+
+/// Per geometric bundle, pick the `(src_edge, tgt_edge)` that yields the
+/// simplest topology — usually fewest bends, then geometric default as a
+/// tiebreaker. This runs once before endpoint allocation so the bin sizes
+/// reflect the edges that wires actually use, not what `plan_segments`
+/// initially guessed from raw geometry. Any spec whose endpoint has an
+/// explicit `.side` override (`spec.src_forced` / `spec.tgt_forced`) is
+/// left alone on that side; the user already chose for us.
+fn resolve_edges(specs: &mut [SegmentSpec], scene: &SceneIndex, world: AbsBbox) {
+    use std::collections::HashMap;
+    type Key = (String, Edge, String, Edge);
+    let mut groups: HashMap<Key, Vec<usize>> = HashMap::new();
+    for (i, spec) in specs.iter().enumerate() {
+        let initial_src = spec.src_forced.unwrap_or(spec.src_default_edge);
+        let initial_tgt = spec.tgt_forced.unwrap_or(spec.tgt_default_edge);
+        let key = (
+            spec.src_id.clone(),
+            initial_src,
+            spec.tgt_id.clone(),
+            initial_tgt,
+        );
+        groups.entry(key).or_default().push(i);
+    }
+    for indices in groups.values() {
+        let sample = &specs[indices[0]];
+        if sample.src_forced.is_some() && sample.tgt_forced.is_some() {
+            continue;
+        }
+        let obstacles = scene.obstacles_for(&sample.src_id, &sample.tgt_id, sample.gap);
+        let (best_src, best_tgt) = pick_best_edges(sample, &obstacles, world);
+        for &i in indices {
+            if specs[i].src_forced.is_none() {
+                specs[i].src_default_edge = best_src;
+            }
+            if specs[i].tgt_forced.is_none() {
+                specs[i].tgt_default_edge = best_tgt;
+            }
+        }
+    }
+}
+
+/// If the geometric default produces a clean Z (≤ 4 vertices = ≤ 3
+/// bends), keep it — that's the topology the diagram author meant. Only
+/// when the default would force a 5-bend detour do we go shopping for an
+/// alternative `(src_edge, tgt_edge)` that yields a simpler shape.
+///
+/// Cleanness threshold: ≤ 4 vertices covers straight (2), L (3), and Z
+/// (4); 6 vertices is the facing-detour, 5 the perpendicular detour.
+/// Switching away from `(Right, Left)` to L just because L is shorter
+/// would re-route `cat → bowl` to enter from the top — visually wrong.
+fn pick_best_edges(spec: &SegmentSpec, obstacles: &[AbsBbox], world: AbsBbox) -> (Edge, Edge) {
+    let default_src = spec.src_forced.unwrap_or(spec.src_default_edge);
+    let default_tgt = spec.tgt_forced.unwrap_or(spec.tgt_default_edge);
+
+    let default_len = simulate_path_len(spec, obstacles, world, default_src, default_tgt);
+    if default_len <= 4 {
+        return (default_src, default_tgt);
+    }
+
+    // Default would detour. Try alternatives and pick the simplest.
+    // Default still comes first in `edge_fallback_order`, so it wins on
+    // ties (e.g., another combo also detours).
+    let combos = edge_fallback_order(default_src, default_tgt, &spec.src_bbox, &spec.tgt_bbox);
+    let mut best = (default_src, default_tgt);
+    let mut best_score = (default_len as i64) * 100;
+    for (rank, &(se, te)) in combos.iter().enumerate() {
+        if let Some(forced) = spec.src_forced {
+            if se != forced {
+                continue;
+            }
+        }
+        if let Some(forced) = spec.tgt_forced {
+            if te != forced {
+                continue;
+            }
+        }
+        let len = simulate_path_len(spec, obstacles, world, se, te);
+        let score = (len as i64) * 100 + rank as i64;
+        if score < best_score {
+            best_score = score;
+            best = (se, te);
+        }
+    }
+    best
+}
+
+fn simulate_path_len(
+    spec: &SegmentSpec,
+    obstacles: &[AbsBbox],
+    world: AbsBbox,
+    se: Edge,
+    te: Edge,
+) -> usize {
+    let src_pt = edge_midpoint(&spec.src_bbox, se);
+    let tgt_pt = edge_midpoint(&spec.tgt_bbox, te);
+    let path = route::route(
+        src_pt,
+        tgt_pt,
+        se,
+        te,
+        obstacles,
+        world,
+        &[],
+        spec.gap,
+        None,
+        None,
+        spec.src_bbox,
+        spec.tgt_bbox,
+    );
+    path.len()
 }
 
 /// Build the priority-ordered list of (src_edge, tgt_edge) pairs to try.

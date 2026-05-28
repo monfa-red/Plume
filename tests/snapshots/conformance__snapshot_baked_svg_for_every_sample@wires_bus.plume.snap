@@ -28,20 +28,20 @@ input_file: samples/wires_bus.plume
   </g>
   <g class="plume-wires">
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -111.3 -20.8 L -85.1667 -20.8 L -85.1667 -13.8667 L -35.3 -13.8667" fill="none" stroke="#444" stroke-width="1.5"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-32.3,-13.8667 -39.8,-10.1167 -39.8,-17.6167" fill="#444"/>
+      <path d="M -111.3 -16 L -35.3 -16" fill="none" stroke="#444" stroke-width="1.5"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-32.3,-16 -39.8,-12.25 -39.8,-19.75" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -111.3 -6.9333 L -71.3 -6.9333 L -71.3 0 L -35.3 0" fill="none" stroke="#444" stroke-width="1.5"/>
+      <path d="M -111.3 0 L -35.3 0" fill="none" stroke="#444" stroke-width="1.5"/>
       <polygon class="plume-marker plume-marker-arrow" points="-32.3,0 -39.8,3.75 -39.8,-3.75" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -111.3 6.9333 L -57.4333 6.9333 L -57.4333 13.8667 L -35.3 13.8667" fill="none" stroke="#444" stroke-width="1.5"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-32.3,13.8667 -39.8,17.6167 -39.8,10.1167" fill="#444"/>
+      <path d="M -111.3 16 L -35.3 16" fill="none" stroke="#444" stroke-width="1.5"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-32.3,16 -39.8,19.75 -39.8,12.25" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="bird">
-      <path d="M -111.3 20.8 L -95.3 20.8 L -95.3 48.8 L 88.15 48.8 L 88.15 0 L 100.15 0" fill="none" stroke="#444" stroke-width="1.5"/>
-      <polygon class="plume-marker plume-marker-arrow" points="103.15,0 95.65,3.75 95.65,-3.75" fill="#444"/>
+      <path d="M -139.025 24.8 L -139.025 48.8 L 135.45 48.8 L 135.45 28.8" fill="none" stroke="#444" stroke-width="1.5"/>
+      <polygon class="plume-marker plume-marker-arrow" points="135.45,25.8 139.2,33.3 131.7,33.3" fill="#444"/>
     </g>
   </g>
 </svg>
