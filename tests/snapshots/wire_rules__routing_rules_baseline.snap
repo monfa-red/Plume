@@ -1,0 +1,58 @@
+---
+source: tests/wire_rules.rs
+assertion_line: 46
+expression: report
+---
+full_example.plume:
+  [R2/Error] kitchen.counter.water->garden.pond.frog: segment (117.0, -69.3)->(393.5, -69.3) within 40 of shape 'garden.den'
+  [R2/Error] kitchen.counter.water->garden.pond.frog: segment (393.5, 9.0)->(264.6, 9.0) within 15 of shape 'garden.pond.fish'
+  [R2/Error] treehouse->kitchen: segment (134.0, 110.8)->(134.0, -60.3) within 20 of shape 'kitchen.counter'
+  [R2/Error] treehouse->kitchen: segment (134.0, 110.8)->(134.0, -60.3) within 40 of shape 'garden'
+  [R2/Error] treehouse->kitchen: segment (134.0, -60.3)->(118.0, -60.3) within 20 of shape 'kitchen.counter'
+  [R2/Error] treehouse->kitchen: segment (134.0, -60.3)->(118.0, -60.3) within 40 of shape 'garden'
+  [R2/Error] treehouse.owl->garden.den.rabbit: segment (-256.6, 124.1)->(409.1, 124.1) within 40 of shape 'diagram1'
+  [R2/Error] treehouse.owl->garden.den.rabbit: segment (409.1, -73.0)->(249.0, -73.0) within 15 of shape 'garden.den.carrot'
+  [R3/Warning] garden.den.rabbit->garden.den.carrot vs kitchen.counter.water->garden.pond.frog: R3 (sep 16)
+  [R4/Invariant] garden.den.rabbit->garden.den.carrot vs treehouse.owl->garden.den.rabbit: R4 (sep 16)
+  [R3/Warning] kitchen.counter.water->garden.pond.frog vs treehouse->kitchen: R3 (sep 16)
+  [R3/Warning] kitchen.counter.water->garden.pond.frog vs treehouse.owl->garden.den.rabbit: R3 (sep 16)
+  [R3/Warning] treehouse->kitchen vs treehouse.owl->garden.den.rabbit: R3 (sep 16)
+
+wires_bus.plume:
+  [R2/Error] cat->bird: segment (-111.3, 0.0)->(104.1, 0.0) within 80 of shape 'dog'
+
+wires_chain.plume:
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+
+wires_fan.plume:
+  [R4/Invariant] owl->mouse vs bowl->mouse: R4 (sep 16)
+
+wires_labels.plume:
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+  [R3/Warning] cat->dog vs cat->dog: R3 (sep 16)
+
+wires_realistic.plume:
+  [R1/Invariant] kitchen.water->garden.dog: non-orthogonal or zero-length segment (45.8, 8.3)->(45.8, 8.3)
+  [R5/Invariant] kitchen.water->garden.dog: target end (45.8, 8.3) not on a perpendicular edge of 'garden.dog'
+  [R2/Error] kitchen.water->garden.dog: segment (-59.4, 28.3)->(-59.4, 8.3) within 8 of shape 'kitchen.bowl'
+  [R2/Error] kitchen.water->garden.dog: segment (-59.4, 8.3)->(45.8, 8.3) within 8 of shape 'kitchen.bowl'
+  [R1/Invariant] kitchen.water->garden.dog: non-orthogonal or zero-length segment (-39.4, 28.3)->(-39.4, 28.3)
+  [R5/Invariant] kitchen.water->garden.dog: source end (-39.4, 28.3) not on a perpendicular edge of 'kitchen.water'
+  [R2/Error] kitchen.water->garden.dog: segment (-39.4, 28.3)->(65.8, 28.3) within 8 of shape 'garden.bird'
+  [R2/Error] kitchen.water->garden.dog: segment (65.8, 28.3)->(65.8, 8.3) within 8 of shape 'garden.bird'

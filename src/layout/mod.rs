@@ -8,6 +8,7 @@ mod values;
 mod wires;
 
 pub use ir::*;
+pub use wires::{Rule, Severity, Violation};
 
 use crate::error::Error;
 use crate::resolve::{Program, ResolvedInst, ResolvedValue, ShapeKind, VarTable};
@@ -60,6 +61,12 @@ pub fn layout(program: &Program) -> Result<LaidOut, Error> {
         wires: routed_wires,
         vars: program.vars.clone(),
     })
+}
+
+/// Run the routing validator over a laid-out scene. See
+/// `docs/superpowers/specs/2026-05-28-wire-routing-rules-design.md`.
+pub fn validate_routing(laid: &LaidOut) -> Vec<Violation> {
+    wires::validate_routing(&laid.nodes, &laid.scene_attrs, &laid.wires, &laid.vars)
 }
 
 /// Recursively lay out a single instance into a PlacedNode.

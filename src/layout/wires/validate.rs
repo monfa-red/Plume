@@ -66,6 +66,12 @@ fn approx(a: f64, b: f64) -> bool {
     (a - b).abs() < EPS
 }
 
+/// Round a point for report messages — kills sub-pixel float noise so the
+/// baseline snapshot stays stable against trivial geometry jitter.
+fn fmt_pt(p: (f64, f64)) -> String {
+    format!("({:.1}, {:.1})", p.0, p.1)
+}
+
 /// Axis of an axis-aligned segment: `Some(true)` horizontal, `Some(false)`
 /// vertical, `None` if degenerate (zero length) or diagonal.
 fn axis(a: (f64, f64), b: (f64, f64)) -> Option<bool> {
@@ -141,22 +147,29 @@ fn check_orthogonal(w: &RoutedWire, out: &mut Vec<Violation>) {
             out.push(Violation {
                 rule: Rule::Orthogonality,
                 detail: format!(
-                    "{}->{}: non-orthogonal or zero-length segment {:?}->{:?}",
-                    w.seg_from, w.seg_to, win[0], win[1]
+                    "{}->{}: non-orthogonal or zero-length segment {}->{}",
+                    w.seg_from,
+                    w.seg_to,
+                    fmt_pt(win[0]),
+                    fmt_pt(win[1])
                 ),
             });
         }
     }
     // Interior vertices must be 90° turns (axis flips), never collinear.
     for i in 1..n - 1 {
-        if let (Some(ax), Some(bx)) = (axis(w.path[i - 1], w.path[i]), axis(w.path[i], w.path[i + 1]))
-        {
+        if let (Some(ax), Some(bx)) = (
+            axis(w.path[i - 1], w.path[i]),
+            axis(w.path[i], w.path[i + 1]),
+        ) {
             if ax == bx {
                 out.push(Violation {
                     rule: Rule::Orthogonality,
                     detail: format!(
-                        "{}->{}: collinear/redundant vertex at {:?}",
-                        w.seg_from, w.seg_to, w.path[i]
+                        "{}->{}: collinear/redundant vertex at {}",
+                        w.seg_from,
+                        w.seg_to,
+                        fmt_pt(w.path[i])
                     ),
                 });
             }
@@ -174,8 +187,11 @@ fn check_attachment(w: &RoutedWire, scene: &SceneIndex, out: &mut Vec<Violation>
             out.push(Violation {
                 rule: Rule::Attachment,
                 detail: format!(
-                    "{}->{}: source end {:?} not on a perpendicular edge of '{}'",
-                    w.seg_from, w.seg_to, w.path[0], w.seg_from
+                    "{}->{}: source end {} not on a perpendicular edge of '{}'",
+                    w.seg_from,
+                    w.seg_to,
+                    fmt_pt(w.path[0]),
+                    w.seg_from
                 ),
             });
         }
@@ -185,8 +201,11 @@ fn check_attachment(w: &RoutedWire, scene: &SceneIndex, out: &mut Vec<Violation>
             out.push(Violation {
                 rule: Rule::Attachment,
                 detail: format!(
-                    "{}->{}: target end {:?} not on a perpendicular edge of '{}'",
-                    w.seg_from, w.seg_to, w.path[n - 1], w.seg_to
+                    "{}->{}: target end {} not on a perpendicular edge of '{}'",
+                    w.seg_from,
+                    w.seg_to,
+                    fmt_pt(w.path[n - 1]),
+                    w.seg_to
                 ),
             });
         }
@@ -199,9 +218,8 @@ fn check_attachment(w: &RoutedWire, scene: &SceneIndex, out: &mut Vec<Violation>
 fn end_on_edge_perp(p: (f64, f64), next: (f64, f64), b: &AbsBbox) -> bool {
     let on_v_edge =
         (approx(p.0, b.x) || approx(p.0, b.right())) && p.1 >= b.y - EPS && p.1 <= b.bottom() + EPS;
-    let on_h_edge = (approx(p.1, b.y) || approx(p.1, b.bottom()))
-        && p.0 >= b.x - EPS
-        && p.0 <= b.right() + EPS;
+    let on_h_edge =
+        (approx(p.1, b.y) || approx(p.1, b.bottom())) && p.0 >= b.x - EPS && p.0 <= b.right() + EPS;
     match axis(p, next) {
         Some(true) => on_v_edge,  // horizontal segment ⟂ a vertical edge
         Some(false) => on_h_edge, // vertical segment ⟂ a horizontal edge
@@ -221,8 +239,13 @@ fn check_shape_clearance(w: &RoutedWire, scene: &SceneIndex, out: &mut Vec<Viola
                 out.push(Violation {
                     rule: Rule::ShapeClearance,
                     detail: format!(
-                        "{}->{}: segment {:?}->{:?} within {} of shape '{}'",
-                        w.seg_from, w.seg_to, win[0], win[1], c, path
+                        "{}->{}: segment {}->{} within {} of shape '{}'",
+                        w.seg_from,
+                        w.seg_to,
+                        fmt_pt(win[0]),
+                        fmt_pt(win[1]),
+                        c,
+                        path
                     ),
                 });
             }
