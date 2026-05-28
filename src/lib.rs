@@ -110,6 +110,36 @@ pub fn validate_str(src: &str) -> Result<Vec<Violation>, Error> {
     Ok(layout::validate_routing(&laid_out))
 }
 
+/// One routed wire's polyline and its segment endpoint ids — the raw material
+/// for routing-quality analysis and tests.
+pub struct WirePath {
+    pub from: String,
+    pub to: String,
+    pub points: Vec<(f64, f64)>,
+    /// Absolute centres of the source and target shapes (edge-choice
+    /// independent), for scoring a route against the straight shape distance.
+    pub from_center: (f64, f64),
+    pub to_center: (f64, f64),
+}
+
+/// Route `src` and return every wire's polyline (in scene coordinates). For
+/// quality analysis beyond the legality contract (detours, crossings, bends).
+pub fn route_str(src: &str) -> Result<Vec<WirePath>, Error> {
+    let program = resolve_pipeline(src, &Options::default())?;
+    let laid_out = layout::layout(&program)?;
+    Ok(laid_out
+        .wires
+        .iter()
+        .map(|w| WirePath {
+            from: w.seg_from.clone(),
+            to: w.seg_to.clone(),
+            points: w.path.clone(),
+            from_center: w.from_center,
+            to_center: w.to_center,
+        })
+        .collect())
+}
+
 fn resolve_pipeline(src: &str, opts: &Options) -> Result<resolve::Program, Error> {
     let tokens = lexer::lex(src)?;
     let file = parser::parse(&tokens)?;

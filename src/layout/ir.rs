@@ -37,6 +37,11 @@ pub struct RoutedWire {
     /// `a -> b & c` fan-out) and are exempt from wire-spacing checks where
     /// they coincide.
     pub decl_span: Span,
+    /// Absolute centres of this segment's source and target shapes. Used by the
+    /// routing-quality analysis to score a route against the straight
+    /// shape-to-shape distance (edge choice independent).
+    pub from_center: (f64, f64),
+    pub to_center: (f64, f64),
 }
 
 #[derive(Clone)]

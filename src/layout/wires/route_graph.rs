@@ -22,6 +22,33 @@ const MIN_STUB: f64 = 8.0;
 
 const ALL_EDGES: [Edge; 4] = [Edge::Right, Edge::Bottom, Edge::Left, Edge::Top];
 
+/// Per-bend cost when comparing candidate routes (matches A*'s internal `BEND`,
+/// so edge choice and in-search choice rank routes the same way).
+const BEND_COST: f64 = 20.0;
+
+/// Penalty for leaving from a non-geometry-preferred edge, so a wire keeps its
+/// natural edge unless an alternate is clearly shorter (e.g. the near edge is
+/// sealed). Less than one bend — a tiebreak, not an override.
+const EDGE_BIAS: f64 = 12.0;
+
+/// A preferred-edge route this much longer than the straight shape-to-shape
+/// distance triggers the full edge search (it might reach the target from a
+/// better side). Below it, the preferred route is good enough — skip the search.
+const DETOUR_OK: f64 = 1.6;
+
+/// Routed length over the straight (Manhattan) shape-centre distance — the same
+/// edge-choice-independent detour measure the quality gate uses.
+fn detour(path: &[(f64, f64)], spec: &SegmentSpec) -> f64 {
+    let c0 = (spec.src_bbox.cx(), spec.src_bbox.cy());
+    let c1 = (spec.tgt_bbox.cx(), spec.tgt_bbox.cy());
+    let ideal = ((c0.0 - c1.0).abs() + (c0.1 - c1.1).abs()).max(1.0);
+    let len: f64 = path
+        .windows(2)
+        .map(|w| (w[0].0 - w[1].0).abs() + (w[0].1 - w[1].1).abs())
+        .sum();
+    len / ideal
+}
+
 /// Route every spec to an orthogonal polyline.
 ///
 /// Each wire leaves its source edge and enters its target edge along a
@@ -37,10 +64,10 @@ pub fn route_all(
 ) -> Vec<Vec<(f64, f64)>> {
     let endpoints = allocate_endpoints(specs);
 
-    // Global lattice: every shape's clearance-inflated edges + the world frame
-    // + every candidate attachment and stub coordinate (so each is a grid node).
-    // Both the lane-allocated points and every edge midpoint are seeded, so an
-    // alternate-edge retry always has nodes to land on.
+    // Base lattice: every shape's clearance-inflated edges + the world frame +
+    // each wire's preferred attachment and stub. Lean on purpose — alternate
+    // edges are only seeded for the few wires that actually need them (below),
+    // so the common case routes on a small grid.
     let inflated: Vec<AbsBbox> = scene
         .all_boxes()
         .into_iter()
@@ -48,30 +75,15 @@ pub fn route_all(
         .collect();
     let mut xs = Vec::new();
     let mut ys = Vec::new();
-    let seed = |p: (f64, f64), xs: &mut Vec<f64>, ys: &mut Vec<f64>| {
-        xs.push(p.0);
-        ys.push(p.1);
-    };
-    for (i, spec) in specs.iter().enumerate() {
-        seed(endpoints.src[i], &mut xs, &mut ys);
-        seed(
+    for i in 0..specs.len() {
+        for p in [
+            endpoints.src[i],
             step_out(endpoints.src[i], endpoints.src_edge[i], MIN_STUB),
-            &mut xs,
-            &mut ys,
-        );
-        seed(endpoints.tgt[i], &mut xs, &mut ys);
-        seed(
+            endpoints.tgt[i],
             step_out(endpoints.tgt[i], endpoints.tgt_edge[i], MIN_STUB),
-            &mut xs,
-            &mut ys,
-        );
-        for e in ALL_EDGES {
-            let sp = edge_midpoint(&spec.src_bbox, e);
-            seed(sp, &mut xs, &mut ys);
-            seed(step_out(sp, e, MIN_STUB), &mut xs, &mut ys);
-            let tp = edge_midpoint(&spec.tgt_bbox, e);
-            seed(tp, &mut xs, &mut ys);
-            seed(step_out(tp, e, MIN_STUB), &mut xs, &mut ys);
+        ] {
+            xs.push(p.0);
+            ys.push(p.1);
         }
     }
     let grid = Grid::build(&inflated, world, &xs, &ys);
@@ -88,14 +100,51 @@ pub fn route_all(
         })
         .collect();
 
+    // Pass 1 — route each wire from its preferred edges (one A* on the lean
+    // grid). A wire is "hard" if that fails or detours badly; only those pay for
+    // the full edge search.
     let mut paths = Vec::with_capacity(specs.len());
-    let mut src_edges = Vec::with_capacity(specs.len());
-    let mut tgt_edges = Vec::with_capacity(specs.len());
+    let mut src_edges: Vec<Edge> = endpoints.src_edge.clone();
+    let mut tgt_edges: Vec<Edge> = endpoints.tgt_edge.clone();
+    let mut hard = Vec::new();
     for (i, spec) in specs.iter().enumerate() {
-        let (path, se, te) = route_wire(spec, &endpoints, i, &grid, &obstacles[i]);
-        paths.push(path);
-        src_edges.push(se);
-        tgt_edges.push(te);
+        let direct = try_route(
+            &grid,
+            endpoints.src[i],
+            src_edges[i],
+            endpoints.tgt[i],
+            tgt_edges[i],
+            &obstacles[i],
+        );
+        match direct {
+            Some(p) if detour(&p, spec) <= DETOUR_OK => paths.push(p),
+            _ => {
+                hard.push(i);
+                paths.push(Vec::new()); // placeholder, filled in pass 2
+            }
+        }
+    }
+
+    // Pass 2 — full edge search for the hard wires, on a grid augmented with
+    // their (and only their) alternate-edge attachment nodes.
+    if !hard.is_empty() {
+        for &i in &hard {
+            for e in ALL_EDGES {
+                for b in [&specs[i].src_bbox, &specs[i].tgt_bbox] {
+                    let m = edge_midpoint(b, e);
+                    let s = step_out(m, e, MIN_STUB);
+                    xs.extend([m.0, s.0]);
+                    ys.extend([m.1, s.1]);
+                }
+            }
+        }
+        let grid2 = Grid::build(&inflated, world, &xs, &ys);
+        for &i in &hard {
+            let (path, se, te) = route_wire(&specs[i], &endpoints, i, &grid2, &obstacles[i]);
+            paths[i] = path;
+            src_edges[i] = se;
+            tgt_edges[i] = te;
+        }
     }
 
     // Step 2.5: fan parallel wires onto separated, shape-clear tracks.
@@ -113,8 +162,21 @@ pub fn route_all(
     paths
 }
 
-/// Route one wire, retrying alternate (unforced) edges when the preferred edge
-/// is unroutable. Returns the assembled polyline and the edges actually used.
+/// A scored candidate route during the edge search.
+struct Candidate {
+    cost: f64,
+    path: Vec<(f64, f64)>,
+    src_edge: Edge,
+    tgt_edge: Edge,
+}
+
+/// Route one wire, choosing the **best** edge pair rather than the first that
+/// works. The geometry-preferred edges are tried, plus every other unforced
+/// edge; among all routable candidates the cheapest (fewest bends, then
+/// shortest) wins, with a bias toward the preferred edges so a wire only leaves
+/// from elsewhere when that is genuinely shorter (e.g. its near edge is sealed
+/// by a neighbour's clearance). This is what keeps a wire from wrapping the
+/// canvas to enter a shape from its far side.
 fn route_wire(
     spec: &SegmentSpec,
     endpoints: &super::endpoints::Endpoints,
@@ -124,37 +186,15 @@ fn route_wire(
 ) -> (Vec<(f64, f64)>, Edge, Edge) {
     let (src0, se0) = (endpoints.src[i], endpoints.src_edge[i]);
     let (tgt0, te0) = (endpoints.tgt[i], endpoints.tgt_edge[i]);
-
-    // Candidate edges per endpoint: the chosen one first, then the rest unless
-    // a `.side` override forces it.
     let src_choices = edge_choices(se0, spec.src_forced.is_some());
     let tgt_choices = edge_choices(te0, spec.tgt_forced.is_some());
 
-    // Sweep target edges first (the common sealed case), then source, then both.
-    // The lane-allocated points are kept while their edge is unchanged; an
-    // alternate edge attaches at its midpoint and track assignment respreads.
-    for &te in &tgt_choices {
-        let tgt = if te == te0 {
-            tgt0
-        } else {
-            edge_midpoint(&spec.tgt_bbox, te)
-        };
-        if let Some(p) = try_route(grid, src0, se0, tgt, te, obstacles) {
-            return (p, se0, te);
-        }
-    }
-    for &se in &src_choices {
-        let src = if se == se0 {
-            src0
-        } else {
-            edge_midpoint(&spec.src_bbox, se)
-        };
-        if let Some(p) = try_route(grid, src, se, tgt0, te0, obstacles) {
-            return (p, se, te0);
-        }
-    }
+    let mut best: Option<Candidate> = None;
     for &se in &src_choices {
         for &te in &tgt_choices {
+            // Keep the lane-allocated attachment while the edge is unchanged; an
+            // alternate edge attaches at its midpoint (track assignment will
+            // respread it).
             let src = if se == se0 {
                 src0
             } else {
@@ -165,10 +205,23 @@ fn route_wire(
             } else {
                 edge_midpoint(&spec.tgt_bbox, te)
             };
-            if let Some(p) = try_route(grid, src, se, tgt, te, obstacles) {
-                return (p, se, te);
+            let Some(path) = try_route(grid, src, se, tgt, te, obstacles) else {
+                continue;
+            };
+            let switched = (se != se0) as u32 + (te != te0) as u32;
+            let cost = route_cost(&path) + f64::from(switched) * EDGE_BIAS;
+            if best.as_ref().map_or(true, |b| cost < b.cost) {
+                best = Some(Candidate {
+                    cost,
+                    path,
+                    src_edge: se,
+                    tgt_edge: te,
+                });
             }
         }
+    }
+    if let Some(b) = best {
+        return (b.path, b.src_edge, b.tgt_edge);
     }
 
     // Nothing routes (the endpoint is genuinely boxed in) — emit the orthogonal
@@ -178,8 +231,27 @@ fn route_wire(
     (assemble(src0, ss, ts, tgt0, None), se0, te0)
 }
 
-/// The edges to try for an endpoint: the preferred one, then the others (unless
-/// a `.side` override pins it).
+/// Cost of a candidate route: length plus a per-bend penalty (spec §6 ranks
+/// fewer bends above raw length, so each bend is worth a generous slice of
+/// pixels). Mirrors the A* objective so edge choice and in-search choice agree.
+fn route_cost(p: &[(f64, f64)]) -> f64 {
+    let len: f64 = p
+        .windows(2)
+        .map(|w| (w[0].0 - w[1].0).abs() + (w[0].1 - w[1].1).abs())
+        .sum();
+    let bends = p
+        .windows(3)
+        .filter(|w| {
+            let a = (w[0].1 - w[1].1).abs() < 0.5;
+            let b = (w[1].1 - w[2].1).abs() < 0.5;
+            a != b
+        })
+        .count();
+    len + bends as f64 * BEND_COST
+}
+
+/// The edges to try for an endpoint: the preferred one and the others (unless a
+/// `.side` override pins it).
 fn edge_choices(preferred: Edge, forced: bool) -> Vec<Edge> {
     if forced {
         return vec![preferred];

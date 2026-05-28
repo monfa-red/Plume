@@ -84,6 +84,8 @@ fn build_routed_wire(spec: &SegmentSpec, path: Vec<(f64, f64)>) -> RoutedWire {
         seg_from: spec.src_id.clone(),
         seg_to: spec.tgt_id.clone(),
         decl_span: spec.wire.span,
+        from_center: (spec.src_bbox.cx(), spec.src_bbox.cy()),
+        to_center: (spec.tgt_bbox.cx(), spec.tgt_bbox.cy()),
         path,
     }
 }

@@ -3,7 +3,7 @@ source: tests/conformance.rs
 expression: svg
 input_file: samples/wires_realistic.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-188.2 -118.4 384.4 244.8" width="384.4" height="244.8" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-188.2 -118.4 376.4 244.8" width="376.4" height="244.8" class="plume">
   <defs/>
   <g class="plume-scene" color="#222">
     <g class="plume-node plume-shape-oval" data-id="cat" transform="translate(-140.475,0)">
@@ -98,12 +98,12 @@ input_file: samples/wires_realistic.plume
       <polygon class="plume-marker plume-marker-arrow" points="23.5,63.26 17.5,66.26 17.5,60.26" fill="blue"/>
     </g>
     <g class="plume-wire" data-from="kitchen.water" data-to="roof">
-      <path d="M -14.5 73.58 L -6.5 73.58 L -6.5 106.4 L 176.2 106.4 L 176.2 0 L 172.2 0" fill="none" stroke="green" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="169.2,0 175.2,-3 175.2,3" fill="green"/>
+      <path d="M -14.5 73.58 L -6.5 73.58 L -6.5 106.4 L 136.9 106.4 L 136.9 28.8" fill="none" stroke="green" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="136.9,25.8 139.9,31.8 133.9,31.8" fill="green"/>
     </g>
     <g class="plume-wire" data-from="kitchen.water" data-to="roof">
-      <path d="M -14.5 73.9 L -16.5 73.9 L -16.5 96.4 L 166.2 96.4 L 166.2 0 L 168.2 0" fill="none" stroke="green" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="167.2,0 161.2,3 161.2,-3" fill="green"/>
+      <path d="M -14.5 73.9 L -16.5 73.9 L -16.5 96.4 L 126.9 96.4 L 126.9 28.8" fill="none" stroke="green" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="126.9,25.8 129.9,31.8 123.9,31.8" fill="green"/>
     </g>
   </g>
 </svg>
