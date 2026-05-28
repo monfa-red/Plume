@@ -248,10 +248,17 @@ fn resolve_edges(specs: &mut [SegmentSpec], scene: &SceneIndex, world: AbsBbox) 
     }
 }
 
-/// If the geometric default produces a clean Z (≤ 4 vertices = ≤ 3
-/// bends), keep it — that's the topology the diagram author meant. Only
-/// when the default would force a 5-bend detour do we go shopping for an
-/// alternative `(src_edge, tgt_edge)` that yields a simpler shape.
+/// If the geometric default produces a clean valid Z (≤ 4 vertices and
+/// every segment clear of obstacles + halos), keep it — that's the
+/// topology the diagram author meant. Only when the default would force
+/// a 5-bend detour OR cross an obstacle do we go shopping for an
+/// alternative `(src_edge, tgt_edge)` that yields a simpler valid shape.
+///
+/// "Valid" matters even for short paths: `u_shape` with `(Top, Top)` can
+/// return a 4-vertex path that ploughs straight through a sibling shape
+/// sitting in the same column above src. Counting vertices alone would
+/// prefer that invalid 4-pt path over a valid 6-pt detour; the validity
+/// gate forces detour wins.
 ///
 /// Cleanness threshold: ≤ 4 vertices covers straight (2), L (3), and Z
 /// (4); 6 vertices is the facing-detour, 5 the perpendicular detour.
@@ -261,17 +268,18 @@ fn pick_best_edges(spec: &SegmentSpec, obstacles: &[AbsBbox], world: AbsBbox) ->
     let default_src = spec.src_forced.unwrap_or(spec.src_default_edge);
     let default_tgt = spec.tgt_forced.unwrap_or(spec.tgt_default_edge);
 
-    let default_len = simulate_path_len(spec, obstacles, world, default_src, default_tgt);
-    if default_len <= 4 {
+    let default_score = simulate_path_score(spec, obstacles, world, default_src, default_tgt);
+    if default_score.is_clean() {
         return (default_src, default_tgt);
     }
 
-    // Default would detour. Try alternatives and pick the simplest.
-    // Default still comes first in `edge_fallback_order`, so it wins on
-    // ties (e.g., another combo also detours).
+    // Default would detour or crash an obstacle. Try alternatives and
+    // pick the simplest valid one. The default's rank-0 score acts as
+    // tiebreaker — an alternative wins only if it strictly beats the
+    // default on validity or vertex count.
     let combos = edge_fallback_order(default_src, default_tgt, &spec.src_bbox, &spec.tgt_bbox);
     let mut best = (default_src, default_tgt);
-    let mut best_score = (default_len as i64) * 100;
+    let mut best_key = default_score.sort_key(0);
     for (rank, &(se, te)) in combos.iter().enumerate() {
         if let Some(forced) = spec.src_forced {
             if se != forced {
@@ -283,23 +291,49 @@ fn pick_best_edges(spec: &SegmentSpec, obstacles: &[AbsBbox], world: AbsBbox) ->
                 continue;
             }
         }
-        let len = simulate_path_len(spec, obstacles, world, se, te);
-        let score = (len as i64) * 100 + rank as i64;
-        if score < best_score {
-            best_score = score;
+        let score = simulate_path_score(spec, obstacles, world, se, te);
+        let key = score.sort_key(rank as i64);
+        if key < best_key {
+            best_key = key;
             best = (se, te);
         }
     }
     best
 }
 
-fn simulate_path_len(
+/// Topology-quality summary for one candidate `(src_edge, tgt_edge)`.
+#[derive(Clone, Copy)]
+struct PathScore {
+    /// Path vertex count — proxy for bends.
+    len: usize,
+    /// True if every segment cleared every obstacle and stayed out of
+    /// the src/tgt halos along middle segments. Strict-check failure
+    /// here means the actual router will also reject it and fall back.
+    valid: bool,
+}
+
+impl PathScore {
+    fn is_clean(self) -> bool {
+        self.valid && self.len <= 4
+    }
+    /// Lower is better. Invalid paths get a giant penalty so they only
+    /// win if *every* candidate is invalid (rare, signifies a layout
+    /// the router can't help). Among valid paths, vertex count wins;
+    /// `rank` (from `edge_fallback_order`) breaks ties so the geometric
+    /// default beats an equally-good alternative.
+    fn sort_key(self, rank: i64) -> i64 {
+        let invalid_pen = if self.valid { 0 } else { 1_000_000 };
+        invalid_pen + (self.len as i64) * 100 + rank
+    }
+}
+
+fn simulate_path_score(
     spec: &SegmentSpec,
     obstacles: &[AbsBbox],
     world: AbsBbox,
     se: Edge,
     te: Edge,
-) -> usize {
+) -> PathScore {
     let src_pt = edge_midpoint(&spec.src_bbox, se);
     let tgt_pt = edge_midpoint(&spec.tgt_bbox, te);
     let path = route::route(
@@ -316,7 +350,13 @@ fn simulate_path_len(
         spec.src_bbox,
         spec.tgt_bbox,
     );
-    path.len()
+    let src_halo = spec.src_bbox.inflate(spec.gap);
+    let tgt_halo = spec.tgt_bbox.inflate(spec.gap);
+    let valid = route::path_is_clear(&path, obstacles, &src_halo, &tgt_halo);
+    PathScore {
+        len: path.len(),
+        valid,
+    }
 }
 
 /// Build the priority-ordered list of (src_edge, tgt_edge) pairs to try.
@@ -362,24 +402,16 @@ fn edge_fallback_order(
     out
 }
 
-/// Edges of `my` worth trying when routing toward `other` — every edge
-/// except the one strictly facing AWAY from `other`. The default edge is
-/// listed first.
-fn candidate_edges(my: &AbsBbox, other: &AbsBbox, default: Edge) -> Vec<Edge> {
-    let dx = other.cx() - my.cx();
-    let dy = other.cy() - my.cy();
+/// Edges of `my` worth trying when routing toward `other`. We list every
+/// edge — even ones that face away from the partner — because tight
+/// layouts sometimes need the "wrong" direction: water → roof can route
+/// cleanly via `water.Bottom` even though Bottom points south while roof
+/// is north, since the wraparound is the only obstacle-free path. The
+/// default edge is listed first so it wins ties in `pick_best_edges`.
+fn candidate_edges(_my: &AbsBbox, _other: &AbsBbox, default: Edge) -> Vec<Edge> {
     let mut out = vec![default];
     for e in [Edge::Right, Edge::Bottom, Edge::Left, Edge::Top] {
-        if e == default {
-            continue;
-        }
-        let strictly_away = match e {
-            Edge::Right => dx < -0.5,
-            Edge::Left => dx > 0.5,
-            Edge::Bottom => dy < -0.5,
-            Edge::Top => dy > 0.5,
-        };
-        if !strictly_away {
+        if e != default {
             out.push(e);
         }
     }
