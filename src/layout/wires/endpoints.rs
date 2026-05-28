@@ -141,9 +141,8 @@ fn allocate_lanes(specs: &[SegmentSpec], edges: &[Edge], side: Side) -> Vec<f64>
     lanes
 }
 
-/// A bundle is identified by `(src_id, src_edge, tgt_id, tgt_edge)` — same
-/// key `group_bundles` uses. Two specs share a bundle iff their endpoints
-/// land on the same pair of edges.
+/// A bundle is identified by `(src_id, src_edge, tgt_id, tgt_edge)`. Two specs
+/// share a bundle iff their endpoints land on the same pair of edges.
 type BundleKey = (String, Edge, String, Edge);
 
 /// Pass 2: for each bundle, if one endpoint bin is "free" (contains only
@@ -255,10 +254,9 @@ fn try_uniform_shift(
         })
         .collect();
 
-    // Shift must be uniform across the bundle — otherwise stamping (which
-    // assumes uniform spacing between siblings) would desync. Pass 1
-    // assigns each bundle consecutive slots in the same source order on
-    // both sides, so deltas should already match.
+    // Shift must be uniform across the bundle so siblings keep their relative
+    // spacing. Pass 1 assigns each bundle consecutive slots in the same source
+    // order on both sides, so deltas should already match.
     let delta = desired[0] - current[0];
     for k in 1..indices.len() {
         if ((desired[k] - current[k]) - delta).abs() > 0.5 {

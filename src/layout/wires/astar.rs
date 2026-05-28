@@ -2,9 +2,9 @@
 //!
 //! The search state is `(x-index, y-index, arrival-direction)`: tracking the
 //! direction lets us charge `BEND` whenever the path turns, so routes prefer
-//! fewer corners (spec §6 ranks fewer bends above raw length). A caller-
-//! supplied `surcharge` adds a per-segment cost — used in Step 2.5 to push
-//! wires off each other; pass `&|_, _| 0.0` for plain shortest-path.
+//! fewer corners (spec §6 ranks fewer bends above raw length). Wire–wire
+//! separation is *not* handled here — it is a separate track-assignment pass
+//! (`tracks`) over the routed polylines.
 
 use super::geometry::AbsBbox;
 use super::grid::{edge_clear, Grid};
@@ -67,7 +67,6 @@ pub fn route(
     src: (f64, f64),
     tgt: (f64, f64),
     obstacles: &[AbsBbox],
-    surcharge: &dyn Fn((f64, f64), (f64, f64)) -> f64,
 ) -> Option<Vec<(f64, f64)>> {
     let (si, sj) = (index_of(&grid.xs, src.0)?, index_of(&grid.ys, src.1)?);
     let (gi, gj) = (index_of(&grid.xs, tgt.0)?, index_of(&grid.ys, tgt.1)?);
@@ -107,7 +106,7 @@ pub fn route(
             } else {
                 0.0
             };
-            let ng = g + manhattan(here, there) + bend + surcharge(here, there);
+            let ng = g + manhattan(here, there) + bend;
             let key = (ni, nj, ndir.code());
             if ng + EPS < dist.get(&key).copied().unwrap_or(f64::INFINITY) {
                 dist.insert(key, ng);
@@ -185,10 +184,6 @@ mod tests {
         AbsBbox { x, y, w, h }
     }
 
-    fn no_surcharge() -> impl Fn((f64, f64), (f64, f64)) -> f64 {
-        |_, _| 0.0
-    }
-
     fn orthogonal(path: &[(f64, f64)]) -> bool {
         path.windows(2)
             .all(|w| (w[0].0 - w[1].0).abs() < EPS || (w[0].1 - w[1].1).abs() < EPS)
@@ -199,7 +194,7 @@ mod tests {
         let world = bx(-100.0, -100.0, 200.0, 200.0);
         let grid = Grid::build(&[], world, &[], &[]);
         // y = 0 is the world midline; x = ±100 are world edges.
-        let path = route(&grid, (-100.0, 0.0), (100.0, 0.0), &[], &no_surcharge()).unwrap();
+        let path = route(&grid, (-100.0, 0.0), (100.0, 0.0), &[]).unwrap();
         assert_eq!(path, vec![(-100.0, 0.0), (100.0, 0.0)]);
     }
 
@@ -208,7 +203,7 @@ mod tests {
         let world = bx(-100.0, -100.0, 200.0, 200.0);
         let obs = [bx(-10.0, -10.0, 20.0, 20.0)]; // blocks the y=0 straight shot
         let grid = Grid::build(&obs, world, &[], &[]);
-        let path = route(&grid, (-100.0, 0.0), (100.0, 0.0), &obs, &no_surcharge()).unwrap();
+        let path = route(&grid, (-100.0, 0.0), (100.0, 0.0), &obs).unwrap();
         assert_eq!(path.first(), Some(&(-100.0, 0.0)));
         assert_eq!(path.last(), Some(&(100.0, 0.0)));
         assert!(orthogonal(&path), "not orthogonal: {path:?}");
@@ -226,7 +221,7 @@ mod tests {
         let world = bx(-100.0, -100.0, 200.0, 200.0);
         let grid = Grid::build(&[], world, &[], &[]);
         // x = 37 is not a grid line and no extra coord was supplied.
-        assert!(route(&grid, (37.0, 0.0), (100.0, 0.0), &[], &no_surcharge()).is_none());
+        assert!(route(&grid, (37.0, 0.0), (100.0, 0.0), &[]).is_none());
     }
 
     #[test]
@@ -235,7 +230,7 @@ mod tests {
         // single vertical segment, no bends.
         let world = bx(-100.0, -100.0, 200.0, 200.0);
         let grid = Grid::build(&[], world, &[], &[]);
-        let path = route(&grid, (0.0, -100.0), (0.0, 100.0), &[], &no_surcharge()).unwrap();
+        let path = route(&grid, (0.0, -100.0), (0.0, 100.0), &[]).unwrap();
         assert_eq!(path, vec![(0.0, -100.0), (0.0, 100.0)]);
     }
 }

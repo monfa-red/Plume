@@ -1,6 +1,31 @@
 # Wire Routing — Step 2: Visibility-Grid + A* Router — Implementation Plan
 
- > ## ▶▶ RESUME HERE — self-contained brief (portable; works after a fresh `git clone` on any machine)
+ > ## ✅ STEP 2.5 DONE (2026-05-28) — wire–wire separation shipped
+> Implemented as a **global track-assignment** post-pass (`src/layout/wires/tracks.rs`)
+> plus **alternate-edge retry** in `route_graph.rs`. Final validator state:
+> **R1=R2=R4=R5=0**; R3 only in `wires_chain` (9 wires) and `wires_labels`
+> (5 wires) — genuine bundle-overflow (need 128px/64px on a ~40px edge), so
+> physically unseparable (the "inherent / no-room" class). Baseline was
+> R2=17, R3=34, R4=5.
+>
+> **How it works:**
+> 1. A\* routes each wire against shapes only (Step 2.4). If the geometry-preferred
+>    edge is sealed (stub lands inside a neighbour's clearance — e.g. roof one
+>    sub-clearance gap from garden), `route_wire` retries the endpoint's other
+>    unforced edges, so the wire detours *around* the obstacle instead of falling
+>    back to a piercing elbow. This alone cleared every R2.
+> 2. `tracks::assign` then slides every segment onto a separated, shape-clear
+>    track. Key insight: **attachment segments are not pinned** — an endpoint
+>    slides freely *along its edge* (still perpendicular, R5-safe), merely clamped
+>    to the edge span. So endpoint lane-spreading and trunk separation are one
+>    decision. Segments are interval-coloured (nearest free track, max-margin
+>    fallback so overflow degrades to R3, never collinear R4). Sliding only
+>    changes a segment's constant coord, so joins stay exact — no bend drift.
+> 3. The dead A\* `surcharge` hook (the abandoned first idea) was removed.
+>
+> Everything below is the original brief, kept for history.
+>
+> ## ▶▶ RESUME HERE — self-contained brief (portable; works after a fresh `git clone` on any machine)
 > *This block is the whole handoff. You do NOT need any prior chat or local memory — everything is in this repo.*
 >
 > **The job:** finish the wire router. Tasks 2.1–2.4 are DONE and on `main`

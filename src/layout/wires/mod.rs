@@ -9,7 +9,10 @@
 //! 3. **Build** one orthogonal visibility grid from every shape's clearance
 //!    edges, the world frame, and every endpoint coordinate.
 //! 4. **Route** each wire with A\* (fewest bends, shape-clearance hard),
-//!    then assemble a `RoutedWire` (markers, texts, provenance).
+//!    retrying alternate edges if the preferred one is sealed off.
+//! 5. **Assign tracks**: fan parallel wires onto separated, shape-clear lanes
+//!    (wire–wire separation, Step 2.5), then assemble each `RoutedWire`
+//!    (markers, texts, provenance).
 //!
 //! The contract these paths must satisfy lives in `validate.rs` (rules R1–R6);
 //! see `docs/superpowers/specs/2026-05-28-wire-routing-rules-design.md`.
@@ -23,6 +26,7 @@ mod planning;
 mod route_graph;
 mod scene;
 mod text;
+mod tracks;
 mod validate;
 
 use crate::error::Error;

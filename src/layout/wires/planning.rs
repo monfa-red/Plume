@@ -3,8 +3,8 @@
 //! A chain `a -> b -> c` becomes two specs (a→b, b→c). A fan-out
 //! `a -> b & c` becomes two specs that share a `wire.span` (so endpoint
 //! allocation can recognise them as siblings of one decl). A bundle of
-//! parallel wires between the same pair is still N separate specs — they
-//! get unified later by `stamping::group_bundles`.
+//! parallel wires between the same pair stays N separate specs; the
+//! track-assignment pass (`tracks`) fans them onto separated lanes.
 
 use super::geometry::{nearest_edge, side_to_edge, AbsBbox, Edge};
 use super::scene::SceneIndex;

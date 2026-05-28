@@ -1,10 +1,9 @@
 ---
 source: tests/conformance.rs
-assertion_line: 26
 expression: svg
 input_file: samples/wires_bus.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-186.75 -44.8 373.5 89.6" width="373.5" height="89.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-186.75 -44.8 381.5 169.6" width="381.5" height="169.6" class="plume">
   <defs/>
   <g class="plume-scene" color="#222">
     <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-139.025,0)">
@@ -32,16 +31,16 @@ input_file: samples/wires_bus.plume
       <polygon class="plume-marker plume-marker-arrow" points="-32.3,-16 -39.8,-12.25 -39.8,-19.75" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -111.3 -6.9333 L -103.3 -6.9333 L -103.3 0 L -35.3 0" fill="none" stroke="#444" stroke-width="1.5"/>
+      <path d="M -111.3 -4.9333 L -103.3 -4.9333 L -103.3 0 L -35.3 0" fill="none" stroke="#444" stroke-width="1.5"/>
       <polygon class="plume-marker plume-marker-arrow" points="-32.3,0 -39.8,3.75 -39.8,-3.75" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -111.3 6.9333 L -103.3 6.9333 L -103.3 16 L -35.3 16" fill="none" stroke="#444" stroke-width="1.5"/>
+      <path d="M -111.3 10.9333 L -103.3 10.9333 L -103.3 16 L -35.3 16" fill="none" stroke="#444" stroke-width="1.5"/>
       <polygon class="plume-marker plume-marker-arrow" points="-32.3,16 -39.8,19.75 -39.8,12.25" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="bird">
-      <path d="M -111.3 20.8 L 96.15 20.8 L 96.15 0 L 100.15 0" fill="none" stroke="#444" stroke-width="1.5"/>
-      <polygon class="plume-marker plume-marker-arrow" points="103.15,0 95.65,3.75 95.65,-3.75" fill="#444"/>
+      <path d="M -139.025 24.8 L -139.025 104.8 L 174.75 104.8 L 174.75 0 L 170.75 0" fill="none" stroke="#444" stroke-width="1.5"/>
+      <polygon class="plume-marker plume-marker-arrow" points="167.75,0 175.25,-3.75 175.25,3.75" fill="#444"/>
     </g>
   </g>
 </svg>
