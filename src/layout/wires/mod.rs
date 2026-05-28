@@ -21,6 +21,7 @@
 mod channels;
 mod endpoints;
 mod geometry;
+mod lanes;
 mod planning;
 mod route;
 mod scene;
@@ -33,6 +34,7 @@ use crate::resolve::{MarkerKind, Markers, Program};
 
 use endpoints::allocate_endpoints;
 use geometry::{edge_midpoint, AbsBbox, Edge};
+use lanes::{compute_bundle_bends, group_by_channel, redistribute_channels, BundleLane};
 use planning::{plan_segments, SegmentSpec};
 use scene::SceneIndex;
 use stamping::{group_bundles, stamp_sibling, Bundle};
@@ -52,12 +54,34 @@ pub fn route_wires(
     let max_gap = specs.iter().map(|s| s.gap).fold(0.0_f64, f64::max).max(8.0);
     let world = scene.bounds(max_gap);
 
+    // Bundle-aware lane allocation: where Z-shape bundles would otherwise
+    // crowd the same channel, redistribute their canonical bends evenly so
+    // every unrelated wire ends up `gap` apart. Fan-out bundles (same
+    // wire span) are exempted — their shared trunks are by design.
+    let bends = compute_bundle_bends(&bundles, &specs, &endpoints);
+    let channel_groups = group_by_channel(
+        &bends,
+        specs.iter().map(|s| s.gap).fold(0.0_f64, f64::max).max(8.0),
+    );
+    let lane_assignments = redistribute_channels(
+        &bends,
+        &channel_groups,
+        specs.iter().map(|s| s.gap).fold(0.0_f64, f64::max).max(8.0),
+    );
+
     let mut routed: Vec<Option<RoutedWire>> = (0..specs.len()).map(|_| None).collect();
     let mut prior_paths: Vec<Vec<(f64, f64)>> = Vec::with_capacity(specs.len());
 
-    for bundle in &bundles {
-        let canonical_path =
-            route_bundle_canonical(bundle, &specs, &endpoints, &scene, world, &prior_paths);
+    for (bi, bundle) in bundles.iter().enumerate() {
+        let canonical_path = route_bundle_canonical(
+            bundle,
+            &specs,
+            &endpoints,
+            &scene,
+            world,
+            &prior_paths,
+            lane_assignments[bi],
+        );
 
         let size = bundle.size();
         let gap = specs[bundle.spec_indices[0]].gap;
@@ -79,6 +103,7 @@ pub fn route_wires(
 /// If the natural-edge route can't clear every obstacle, try alternative
 /// edge pairs (perpendicular to the default) and keep the first that
 /// validates — falling back to the original if none do.
+#[allow(clippy::too_many_arguments)]
 fn route_bundle_canonical(
     bundle: &Bundle,
     specs: &[SegmentSpec],
@@ -86,6 +111,7 @@ fn route_bundle_canonical(
     scene: &SceneIndex,
     world: AbsBbox,
     prior_paths: &[Vec<(f64, f64)>],
+    lane: Option<BundleLane>,
 ) -> Vec<(f64, f64)> {
     let canonical_spec = &specs[bundle.spec_indices[0]];
     let obstacles = scene.obstacles_for(
@@ -117,6 +143,14 @@ fn route_bundle_canonical(
         } else {
             edge_midpoint(&canonical_spec.tgt_bbox, te)
         };
+        // Use the channel-assigned bend only if the routing keeps the
+        // bundle's natural edges — alternative edge combos have a
+        // different bend axis, so the redistributed value doesn't apply.
+        let preferred_bend = if se == bundle.src_edge && te == bundle.tgt_edge {
+            lane.map(|l| l.bend)
+        } else {
+            None
+        };
         let path = route::route(
             src_pt,
             tgt_pt,
@@ -126,6 +160,7 @@ fn route_bundle_canonical(
             world,
             prior_paths,
             canonical_spec.gap,
+            preferred_bend,
         );
         if route::path_is_clear(&path, &obstacles) {
             return path;

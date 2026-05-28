@@ -37,6 +37,7 @@ pub type Polyline = Vec<(f64, f64)>;
 /// detour if obstacles block, and finally a best-effort fallback if even
 /// the detour can't clear. Returns whatever it could build — the caller
 /// can switch to alternative edges if the result still isn't valid.
+#[allow(clippy::too_many_arguments)]
 pub fn route(
     src: (f64, f64),
     tgt: (f64, f64),
@@ -46,8 +47,18 @@ pub fn route(
     world: AbsBbox,
     _prior_paths: &[Polyline],
     gap: f64,
+    preferred_bend: Option<f64>,
 ) -> Polyline {
-    let candidates = generate_candidates(src, tgt, src_edge, tgt_edge, obstacles, world, gap);
+    let candidates = generate_candidates(
+        src,
+        tgt,
+        src_edge,
+        tgt_edge,
+        obstacles,
+        world,
+        gap,
+        preferred_bend,
+    );
 
     // Pick the first candidate that clears every shape obstacle. Falls
     // back to the last attempt if nothing fully clears.
@@ -72,6 +83,7 @@ fn generate_candidates(
     obstacles: &[AbsBbox],
     world: AbsBbox,
     gap: f64,
+    preferred_bend: Option<f64>,
 ) -> Vec<Polyline> {
     let mut out = Vec::with_capacity(4);
 
@@ -80,7 +92,7 @@ fn generate_candidates(
         if let Some(p) = straight(src, tgt, src_edge) {
             out.push(p);
         }
-        if let Some(p) = z_shape(src, tgt, src_edge, obstacles) {
+        if let Some(p) = z_shape(src, tgt, src_edge, obstacles, preferred_bend) {
             out.push(p);
         }
         out.push(detour_facing(
@@ -135,12 +147,14 @@ fn z_shape(
     tgt: (f64, f64),
     src_edge: Edge,
     obstacles: &[AbsBbox],
+    preferred_bend: Option<f64>,
 ) -> Option<Polyline> {
     let tgt_edge = src_edge.opposite();
     if src_edge.is_horizontal_exit() {
         let (x_lo, x_hi) = order(src.0, tgt.0);
         let (y_lo, y_hi) = order(src.1, tgt.1);
-        let mid_x = pick_clear_column((src.0 + tgt.0) / 2.0, x_lo, x_hi, y_lo, y_hi, obstacles)?;
+        let target = preferred_bend.unwrap_or((src.0 + tgt.0) / 2.0);
+        let mid_x = pick_clear_column(target, x_lo, x_hi, y_lo, y_hi, obstacles)?;
         if !valid_horizontal_trunk(mid_x, src.0, tgt.0, src_edge, tgt_edge) {
             return None;
         }
@@ -148,7 +162,8 @@ fn z_shape(
     } else {
         let (x_lo, x_hi) = order(src.0, tgt.0);
         let (y_lo, y_hi) = order(src.1, tgt.1);
-        let mid_y = pick_clear_row((src.1 + tgt.1) / 2.0, y_lo, y_hi, x_lo, x_hi, obstacles)?;
+        let target = preferred_bend.unwrap_or((src.1 + tgt.1) / 2.0);
+        let mid_y = pick_clear_row(target, y_lo, y_hi, x_lo, x_hi, obstacles)?;
         if !valid_vertical_trunk(mid_y, src.1, tgt.1, src_edge, tgt_edge) {
             return None;
         }
