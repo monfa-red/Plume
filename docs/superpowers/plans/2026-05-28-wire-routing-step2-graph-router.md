@@ -1,5 +1,21 @@
 # Wire Routing — Step 2: Visibility-Grid + A* Router — Implementation Plan
 
+> ## ▶ RESUME HERE (fresh session, 2026-05-28)
+> **Tasks 2.1–2.4 are DONE and merged to `main`.** The new grid+A* router is
+> live: invariants (R1/R4/R5) = 0, no shape piercing, no canvas-wide detours,
+> deterministic. Files: `src/layout/wires/{grid,astar,route_graph,oracle,validate}.rs`.
+> Validator gate: `cargo test --test wire_rules` (baseline R2=17, R3=34, R4=5).
+>
+> **The ONLY remaining task is 2.5: wire-wire separation** (parallel wires
+> between the same pair stack instead of fanning into lanes — cosmetic; nothing
+> pierces or mis-routes). See **Task 2.5 (revised)** below. **Three shortcuts
+> were tried and reverted** (greedy A* penalty weak+strong; blind per-bundle
+> sibling-shift) — read their findings there before coding. The correct fix is
+> **global, obstacle-aware track-assignment**; it's the genuinely hard part of
+> orthogonal routing, a focused several-hundred-LOC pass, not a tweak.
+> First step when resuming: re-render `wires_realistic`/`full_example`, re-read
+> Task 2.5, then implement track-assignment validator-gated.
+
 > **For agentic workers:** execute task-by-task with TDD; the **validator** (`plume::validate_str` / `tests/wire_rules.rs`) is the gate — re-run it after every task and watch the baseline snapshot shrink. Keep every commit green.
 
 **Goal:** Replace the topology-template router (`route.rs`/`lanes.rs`/`stamping.rs` + the edge-relief machinery in `mod.rs`) with an orthogonal **visibility-grid + A\*** router whose bends fall on shape-derived lines and whose discrete tracks give wire separation by construction — driving the validator baseline to **zero invariant + R2** violations and **R3 only when genuinely forced**.
