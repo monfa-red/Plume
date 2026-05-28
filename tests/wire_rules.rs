@@ -45,3 +45,33 @@ fn routing_rules_baseline() {
     }
     insta::assert_snapshot!(report);
 }
+
+/// Routing must be deterministic (spec §7): compiling a sample twice yields
+/// byte-identical SVG, so every routed polyline is reproducible.
+#[test]
+fn routing_is_deterministic() {
+    let opts = plume::Options {
+        bake_vars: true,
+        format: plume::OutputFormat::Svg,
+        ..Default::default()
+    };
+    let mut paths: Vec<PathBuf> = fs::read_dir("samples")
+        .unwrap()
+        .filter_map(|e| {
+            let p = e.unwrap().path();
+            (p.extension().and_then(|x| x.to_str()) == Some("plume")).then_some(p)
+        })
+        .collect();
+    paths.sort();
+
+    for p in paths {
+        let src = fs::read_to_string(&p).unwrap();
+        let (Ok(a), Ok(b)) = (
+            plume::compile_str_with(&src, &opts),
+            plume::compile_str_with(&src, &opts),
+        ) else {
+            continue; // samples that don't compile aren't our concern here
+        };
+        assert_eq!(a, b, "non-deterministic routing for {}", p.display());
+    }
+}
