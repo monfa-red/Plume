@@ -61,9 +61,37 @@
 - Point `route_wires` at `route_graph`. Keep old modules compiling (not yet deleted).
 - **Gate:** `cargo test`; run `tests/wire_rules` → **expect invariant + R2 violations to collapse** (orthogonal, perpendicular, shape-clearing). R3 may remain. Review the snapshot diff; accept. Visually check `wires_realistic` + `full_example` PNGs (no piercing, no canvas detours).
 
-### Task 2.5 — wire–wire separation
-- Thread prior committed segments into the A* `surcharge`: large cost for running parallel within `separation` of a prior segment; small for a perpendicular crossing.
-- **Gate:** `tests/wire_rules` → **R3 drops to forced-only**; bundles render as separated rails. Accept snapshot; visual check `wires_bus`, `wires_chain`.
+### Task 2.5 — wire–wire separation  ⚠ NEEDS TRACK-ASSIGNMENT (revised)
+**Finding (2026-05-28):** a greedy per-wire A* `surcharge` (penalise running
+parallel within `separation` of an already-routed wire), with or without
+inserting `separation`-spaced channel tracks, **regressed** R3 (34 → 58) and
+reintroduced an R1/R5. Reverted. Why it fails:
+- The penalty just makes wire B *detour* around wire A — and the detour then
+  runs parallel-close to wire C, so R4 overlaps convert into *more* R3
+  parallels rather than disappearing.
+- Much of R3 is **inherent**, not a router bug: `wires_chain` (9 wires) and
+  `wires_labels` (5 wires) cram more wires onto a 40 px edge than fit at 16 px
+  spacing — no router can make them ≥ `separation` apart. **First, split the
+  baseline into inherent (bundle-overflow) vs fixable R3 and only target the
+  fixable set** (and `log`/annotate the inherent ones as R6 "no room").
+
+**Correct approach — track assignment (left-edge sweep), not penalties:**
+1. Group wire segments that share a channel (same axis, overlapping span,
+   between the same pair of obstacle edges).
+2. Within each channel, treat it as an interval-graph colouring: sort segments
+   by entry coordinate, assign each the lowest track (offset = `k·separation`
+   from the channel's near edge) not conflicting with an overlapping segment
+   already placed. Tracks are reserved, so wires are ≥ `separation` apart by
+   construction — the classic channel-router result.
+3. Route topology first (A*, shapes only — that's Task 2.4, already shipped),
+   then *shift* each segment onto its assigned track and re-join bends. Fan-out
+   siblings (same `decl_span`) share a track.
+4. If a channel needs more tracks than fit, that's the inherent case → place at
+   min spacing and emit the R3 warning (R6).
+
+- **Gate:** `tests/wire_rules` → **fixable R3/R4 → 0**, inherent R3 annotated;
+  bundles render as separated rails. Accept snapshot; visual `wires_bus`,
+  `wires_realistic`, `wires_fan`.
 
 ### Task 2.6 — determinism + polish
 - Add a determinism test (route a sample twice via `validate_str`/layout → identical polylines).
