@@ -20,6 +20,7 @@
 
 use super::channels::{clear_x_intervals, clear_y_intervals};
 use super::endpoints::Endpoints;
+use super::geometry::{AbsBbox, Edge};
 use super::planning::SegmentSpec;
 use super::scene::SceneIndex;
 use super::stamping::Bundle;
@@ -47,6 +48,11 @@ pub struct BundleBend {
     pub clear: (f64, f64),
     /// Number of siblings the bundle stamps.
     pub size: usize,
+    /// Actual perpendicular spacing between siblings — equals `wire-gap`
+    /// when the endpoint bin had room, less when the bin compressed lanes
+    /// to fit. The channel allocator uses this to keep each bundle's
+    /// bends *and* its sibling stamps clear of neighbouring bundles.
+    pub stamping_gap: f64,
     /// Wire-decl span — bundles sharing the same span are fan-out
     /// siblings and must keep their trunks merged.
     pub span: Span,
@@ -97,12 +103,35 @@ pub fn compute_bundle_bends(
                 &canonical_spec.tgt_id,
                 canonical_spec.gap,
             );
+            // If an obstacle straddles both endpoint axes and sits
+            // between src and tgt, no Z-shape can clear it — the router
+            // will produce a 5-segment detour instead. Such bundles
+            // don't compete for the channel's Z-trunk space, so leave
+            // them out of redistribution.
+            if z_shape_blocked(
+                canonical_src_x,
+                canonical_src_y,
+                canonical_tgt_x,
+                canonical_tgt_y,
+                bundle.src_edge.is_horizontal_exit(),
+                &obstacles,
+            ) {
+                return None;
+            }
             let size = bundle.size();
-            // Stamping puts each sibling at `canonical ± k·gap`, so the
-            // canonical's clear range must shrink by `(size-1)/2 · gap`
-            // on each side — otherwise the outermost siblings would
-            // overflow into a shape obstacle.
-            let sibling_radius = (size as f64 - 1.0) / 2.0 * canonical_spec.gap;
+            let stamping_gap = bundle_endpoint_spacing(bundle, endpoints, canonical_spec.gap);
+            // Stamping puts each sibling at `canonical ± k·stamping_gap`,
+            // so the canonical's clear range must shrink by
+            // `(size-1)/2 · stamping_gap` on each side — otherwise the
+            // outermost siblings would overflow into a shape obstacle.
+            let sibling_radius = (size as f64 - 1.0) / 2.0 * stamping_gap;
+            // The trunk also has to sit clear of the src and tgt shapes'
+            // own halos. Without this the router rejects the Z (its
+            // strict-clearance check forbids middle segments running
+            // parallel close to either endpoint shape) and falls back to
+            // a 5-segment detour, which adds two unnecessary bends.
+            let src_halo = canonical_spec.src_bbox.inflate(canonical_spec.gap);
+            let tgt_halo = canonical_spec.tgt_bbox.inflate(canonical_spec.gap);
             let (axis, natural, clear) = if bundle.src_edge.is_horizontal_exit() {
                 let y_lo = canonical_src_y.min(canonical_tgt_y);
                 let y_hi = canonical_src_y.max(canonical_tgt_y);
@@ -111,6 +140,15 @@ pub fn compute_bundle_bends(
                 let xs = clear_x_intervals(y_lo, y_hi, &obstacles, x_lo, x_hi);
                 let natural_x = (canonical_src_x + canonical_tgt_x) / 2.0;
                 let raw = pick_widest_interval(&xs, natural_x).unwrap_or((x_lo, x_hi));
+                let (halo_lo, halo_hi) =
+                    trunk_halo_bounds_horizontal(bundle.src_edge, &src_halo, &tgt_halo);
+                let trunk_lo = raw.0.max(halo_lo);
+                let trunk_hi = raw.1.min(halo_hi);
+                let raw = if trunk_lo + sibling_radius < trunk_hi - sibling_radius {
+                    (trunk_lo, trunk_hi)
+                } else {
+                    raw
+                };
                 let clear = (raw.0 + sibling_radius, raw.1 - sibling_radius);
                 (BendAxis::Vertical, natural_x, clear)
             } else {
@@ -121,6 +159,15 @@ pub fn compute_bundle_bends(
                 let ys = clear_y_intervals(x_lo, x_hi, &obstacles, y_lo, y_hi);
                 let natural_y = (canonical_src_y + canonical_tgt_y) / 2.0;
                 let raw = pick_widest_interval(&ys, natural_y).unwrap_or((y_lo, y_hi));
+                let (halo_lo, halo_hi) =
+                    trunk_halo_bounds_vertical(bundle.src_edge, &src_halo, &tgt_halo);
+                let trunk_lo = raw.0.max(halo_lo);
+                let trunk_hi = raw.1.min(halo_hi);
+                let raw = if trunk_lo + sibling_radius < trunk_hi - sibling_radius {
+                    (trunk_lo, trunk_hi)
+                } else {
+                    raw
+                };
                 let clear = (raw.0 + sibling_radius, raw.1 - sibling_radius);
                 (BendAxis::Horizontal, natural_y, clear)
             };
@@ -129,10 +176,113 @@ pub fn compute_bundle_bends(
                 natural,
                 clear,
                 size,
+                stamping_gap,
                 span: canonical_spec.wire.span,
             })
         })
         .collect()
+}
+
+/// True when an obstacle straddles both endpoints' bend axes AND sits
+/// between them on the bend axis — i.e., the bundle has to wrap around
+/// it, so no Z is possible and the router will fall back to a detour.
+fn z_shape_blocked(
+    src_x: f64,
+    src_y: f64,
+    tgt_x: f64,
+    tgt_y: f64,
+    horizontal_exit: bool,
+    obstacles: &[AbsBbox],
+) -> bool {
+    if horizontal_exit {
+        let (x_lo, x_hi) = if src_x <= tgt_x {
+            (src_x, tgt_x)
+        } else {
+            (tgt_x, src_x)
+        };
+        let (y_lo, y_hi) = if src_y <= tgt_y {
+            (src_y, tgt_y)
+        } else {
+            (tgt_y, src_y)
+        };
+        obstacles
+            .iter()
+            .any(|o| o.y <= y_lo && y_hi <= o.bottom() && x_lo < o.right() && o.x < x_hi)
+    } else {
+        let (x_lo, x_hi) = if src_x <= tgt_x {
+            (src_x, tgt_x)
+        } else {
+            (tgt_x, src_x)
+        };
+        let (y_lo, y_hi) = if src_y <= tgt_y {
+            (src_y, tgt_y)
+        } else {
+            (tgt_y, src_y)
+        };
+        obstacles
+            .iter()
+            .any(|o| o.x <= x_lo && x_hi <= o.right() && y_lo < o.bottom() && o.y < y_hi)
+    }
+}
+
+/// For a facing-horizontal Z (src on Right or Left, tgt on the opposite),
+/// the trunk's x must lie east of one halo and west of the other.
+/// Returns `(allowed_lo, allowed_hi)` — the open interval the trunk x
+/// can land in without crossing either endpoint's halo.
+fn trunk_halo_bounds_horizontal(
+    src_edge: Edge,
+    src_halo: &AbsBbox,
+    tgt_halo: &AbsBbox,
+) -> (f64, f64) {
+    match src_edge {
+        // src exits east → src west of tgt → trunk between src.right.halo and tgt.left.halo
+        Edge::Right => (src_halo.right(), tgt_halo.x),
+        Edge::Left => (tgt_halo.right(), src_halo.x),
+        _ => (f64::NEG_INFINITY, f64::INFINITY),
+    }
+}
+
+/// Mirror of `trunk_halo_bounds_horizontal` for facing-vertical bundles.
+fn trunk_halo_bounds_vertical(
+    src_edge: Edge,
+    src_halo: &AbsBbox,
+    tgt_halo: &AbsBbox,
+) -> (f64, f64) {
+    match src_edge {
+        Edge::Bottom => (src_halo.bottom(), tgt_halo.y),
+        Edge::Top => (tgt_halo.bottom(), src_halo.y),
+        _ => (f64::NEG_INFINITY, f64::INFINITY),
+    }
+}
+
+/// Same calculation mod.rs's `bundle_stamping_gap` uses: the actual
+/// perpendicular spread between consecutive sibling endpoints. When the
+/// source bin compressed lanes (too many wires for the edge length), this
+/// is smaller than `wire-gap`, and the channel allocator needs to know
+/// because the bundle's bend stamps share that same spacing.
+fn bundle_endpoint_spacing(bundle: &Bundle, endpoints: &Endpoints, fallback_gap: f64) -> f64 {
+    let size = bundle.size();
+    if size <= 1 {
+        return fallback_gap;
+    }
+    let horizontal_exit = bundle.src_edge.is_horizontal_exit();
+    let mut min = f64::INFINITY;
+    let mut max = f64::NEG_INFINITY;
+    for &i in &bundle.spec_indices {
+        let v = if horizontal_exit {
+            endpoints.src[i].1
+        } else {
+            endpoints.src[i].0
+        };
+        min = min.min(v);
+        max = max.max(v);
+    }
+    let spread = (max - min).max(0.0);
+    if spread > 0.5 {
+        spread / (size as f64 - 1.0)
+    } else {
+        fallback_gap
+    }
 }
 
 /// Pick the clear interval most likely to contain the natural bend —
@@ -232,14 +382,22 @@ pub fn group_by_channel(bends: &[Option<BundleBend>], gap: f64) -> Vec<Vec<usize
     buckets.into_values().filter(|g| g.len() > 1).collect()
 }
 
-/// Redistribute the bundles in each channel group into evenly-spaced
-/// lanes WITHIN the channel's shared clear interval. If the desired
-/// `gap` spacing doesn't fit, the spacing is compressed proportionally
-/// so every bundle still lands inside its reachable interval — closer
-/// than ideal but never overlapping a shape obstacle.
+/// Redistribute the bundles in each channel group so every bundle's
+/// stamped sibling bends sit clear of every other bundle's stamped
+/// siblings. A bundle's actual stamped span is
+/// `(size − 1) · stamping_gap` — when its endpoint bin compressed lanes
+/// (too many wires on one edge), `stamping_gap < wire-gap`, and the
+/// channel allocator has to respect that smaller spacing or the
+/// neighbour's bends end up interleaved between this bundle's stamps.
+///
+/// Sibling spans are never compressed (the stamps come from the endpoint
+/// allocation and shifting them in the channel would desync the bend
+/// from the start/end points). What we *can* compress is the buffer
+/// between bundles — full `wire-gap` ideally, less if the channel is
+/// tight, down to zero only when no other choice exists.
 ///
 /// Returns `None` for bundles that don't need redistribution (fan-out
-/// siblings, no channel conflict).
+/// siblings or no channel conflict).
 pub fn redistribute_channels(
     bends: &[Option<BundleBend>],
     groups: &[Vec<usize>],
@@ -268,49 +426,46 @@ pub fn redistribute_channels(
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        // Lanes have to fit inside the intersection of every bundle's
-        // clear interval — that's the set of positions every bundle can
-        // actually reach. Use that as the usable channel.
-        let channel_lo = sorted
+        let n = sorted.len();
+        let half_spans: Vec<f64> = sorted
             .iter()
-            .map(|&i| bends[i].as_ref().unwrap().clear.0)
-            .fold(f64::NEG_INFINITY, f64::max);
-        let channel_hi = sorted
-            .iter()
-            .map(|&i| bends[i].as_ref().unwrap().clear.1)
-            .fold(f64::INFINITY, f64::min);
-        let channel_width = (channel_hi - channel_lo).max(0.0);
+            .map(|&i| {
+                let b = bends[i].as_ref().unwrap();
+                (b.size as f64 - 1.0) / 2.0 * b.stamping_gap
+            })
+            .collect();
+        let total_internal: f64 = half_spans.iter().map(|h| 2.0 * h).sum();
 
-        let total_slots: usize = sorted
-            .iter()
-            .map(|&i| bends[i].as_ref().unwrap().size)
-            .sum();
-        if total_slots <= 1 {
-            continue;
-        }
-        // Spacing is `gap` when the channel has room; otherwise compress
-        // proportionally so the full slot span still fits inside the
-        // channel.
-        let needed_span = (total_slots as f64 - 1.0) * gap;
-        let spacing = if needed_span <= channel_width {
-            gap
+        // Available room: leftmost bundle's centre can sit as far left
+        // as its `clear.0`, with `half_spans[0]` of its stamps reaching
+        // further left; symmetric on the right.
+        let leftmost = bends[sorted[0]].as_ref().unwrap().clear.0;
+        let rightmost = bends[sorted[n - 1]].as_ref().unwrap().clear.1;
+        let available = (rightmost + half_spans[n - 1]) - (leftmost - half_spans[0]);
+
+        let needed = total_internal + (n as f64 - 1.0) * gap;
+        let buffer = if n > 1 && needed > available {
+            let leftover = available - total_internal;
+            (leftover / (n as f64 - 1.0)).max(0.0)
         } else {
-            channel_width / (total_slots as f64 - 1.0)
+            gap
         };
+        let used = total_internal + (n as f64 - 1.0) * buffer;
 
-        // Centre the lane span inside the channel.
-        let total_span = (total_slots as f64 - 1.0) * spacing;
-        let first_lane = channel_lo + (channel_width - total_span) / 2.0;
-
-        let mut slot = 0;
-        for &bi in &sorted {
-            let size = bends[bi].as_ref().unwrap().size;
-            let canonical_slot = slot as f64 + (size as f64 - 1.0) / 2.0;
-            let canonical_position = first_lane + canonical_slot * spacing;
-            out[bi] = Some(BundleLane {
-                bend: canonical_position,
-            });
-            slot += size;
+        // Centre the laid-out stack inside the available range.
+        let stack_start = (leftmost - half_spans[0]) + (available - used) / 2.0;
+        let mut cursor = stack_start;
+        for (idx, &bi) in sorted.iter().enumerate() {
+            let centre_raw = cursor + half_spans[idx];
+            // Clamp into this bundle's own reachable range so its
+            // outermost sibling never overflows into a shape obstacle.
+            let b = bends[bi].as_ref().unwrap();
+            let centre = centre_raw.clamp(b.clear.0, b.clear.1);
+            out[bi] = Some(BundleLane { bend: centre });
+            cursor += 2.0 * half_spans[idx];
+            if idx + 1 < n {
+                cursor += buffer;
+            }
         }
     }
     out

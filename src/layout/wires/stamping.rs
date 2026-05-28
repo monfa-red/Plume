@@ -68,24 +68,44 @@ pub fn stamp_sibling(canonical: &[(f64, f64)], k: usize, size: usize, gap: f64) 
     }
 }
 
-/// Shift an orthogonal polyline by `delta` perpendicular to each segment.
-/// Horizontal segments move on the y-axis; vertical segments move on the
-/// x-axis. At each bend the new corner is the intersection of the two
-/// shifted lines — so straight stretches stay parallel and bend topology
+/// Parallel-offset an orthogonal polyline by `delta` perpendicular to
+/// each segment. Bends become the intersection of consecutive shifted
+/// lines, so straight stretches stay exactly parallel and bend topology
 /// is preserved.
+///
+/// The shift direction for each segment depends on whether the polyline
+/// reverses direction anywhere:
+///
+/// * **Monotone path** (every horizontal heads the same way, every
+///   vertical heads the same way — Z, L, simple staircase): shift along
+///   a *fixed global perpendicular* (horizontal segs in +y, vertical
+///   segs in +x). For an N-sibling Z bundle this lays the bends out as
+///   a clean staircase — outer sibling has the outer bend.
+/// * **Path with a reversal** (U-shape, 4-bend detour wrapping around
+///   obstacles): shift along the **right-of-forward** perpendicular at
+///   each segment. Without this flip, the "outer at start" sibling
+///   becomes "inner at end" — siblings literally cross.
+///
+/// Both conventions agree wherever forward goes East or North; they
+/// disagree on West or South segments.
 pub fn shift_polyline(path: &[(f64, f64)], delta: f64) -> Vec<(f64, f64)> {
     if path.len() < 2 {
         return path.to_vec();
     }
+    let has_reversal = path_has_reversal(path);
     let mut shifted: Vec<((f64, f64), (f64, f64))> = Vec::with_capacity(path.len() - 1);
     for w in path.windows(2) {
         let (a, b) = (w[0], w[1]);
-        let dy = (b.1 - a.1).abs();
-        let dx = (b.0 - a.0).abs();
-        let segment = if dy < 0.5 {
-            ((a.0, a.1 + delta), (b.0, b.1 + delta))
-        } else if dx < 0.5 {
-            ((a.0 + delta, a.1), (b.0 + delta, b.1))
+        let dy = b.1 - a.1;
+        let dx = b.0 - a.0;
+        let segment = if dy.abs() < 0.5 && dx.abs() >= 0.5 {
+            // Horizontal. Global perp = +y. Right-of-forward perp = sign(dx)*y.
+            let s = if has_reversal { dx.signum() } else { 1.0 };
+            ((a.0, a.1 + s * delta), (b.0, b.1 + s * delta))
+        } else if dx.abs() < 0.5 && dy.abs() >= 0.5 {
+            // Vertical. Global perp = +x. Right-of-forward perp = -sign(dy)*x.
+            let s = if has_reversal { -dy.signum() } else { 1.0 };
+            ((a.0 + s * delta, a.1), (b.0 + s * delta, b.1))
         } else {
             (a, b)
         };
@@ -101,6 +121,29 @@ pub fn shift_polyline(path: &[(f64, f64)], delta: f64) -> Vec<(f64, f64)> {
     }
     out.push(shifted.last().unwrap().1);
     out
+}
+
+/// True if the polyline has two segments on the same axis that head in
+/// opposite directions — i.e. it wraps around at some point. Direction-
+/// reversing paths need a flow-aware perpendicular offset to keep
+/// siblings from crossing; monotone paths don't.
+fn path_has_reversal(path: &[(f64, f64)]) -> bool {
+    let (mut had_east, mut had_west, mut had_north, mut had_south) = (false, false, false, false);
+    for w in path.windows(2) {
+        let dx = w[1].0 - w[0].0;
+        let dy = w[1].1 - w[0].1;
+        if dx > 0.5 {
+            had_east = true;
+        } else if dx < -0.5 {
+            had_west = true;
+        }
+        if dy > 0.5 {
+            had_south = true;
+        } else if dy < -0.5 {
+            had_north = true;
+        }
+    }
+    (had_east && had_west) || (had_north && had_south)
 }
 
 /// Intersection of two perpendicular axis-aligned lines: one passes

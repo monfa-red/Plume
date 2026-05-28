@@ -5,15 +5,16 @@
 
   --accent:#0a84ff
 
-  .thin   stroke:#444 thickness:1
-  .bold   weight:bold
-  .loud   stroke:red thickness:2
-  .quiet  stroke:blue stroke-style:dashed
-  .ghost  opacity:0.3
+  .thin stroke:#444 thickness:1
+  .bold weight:bold
+  .loud stroke:red thickness:2
+  .quiet stroke:blue stroke-style:dashed
+  .ghost opacity:0.3
 
-  |treat:rect|  radius:5
-  |nest:slant|  fill:gray
-  |alert:oval|  stroke:red size:36                    // circle = oval with scalar size
+  |treat:rect| radius:5
+  |nest:slant| fill:gray
+  |alert:oval| stroke:red size:36
+  // circle = oval with scalar size
 
   |widget:group| layout:column gap:8 padding:8 {
     |rect| size:(100, 40) fill:lightblue radius:4
@@ -30,20 +31,22 @@ kitchen |group| "Kitchen" cell:(2, 1) layout:column gap:20 {
     bowl  |treat| "Bowl of oats"
     water |nest|  "Water"
   }
-  shelf |group| "Shelf" layout:row gap:10 {
+  shelf   |group| "Shelf" layout:row gap:10 {
     apple |treat| "Apple"
     mug   |nest|  "Mug"
   }
 }
 
 garden |group| "Garden" cell:(3, 1) layout:column gap:40 {
-  den |group| "Den" layout:row gap:15 {
-    rabbit |alert| "Rabbit" { |badge| "FAST" }
+  den  |group| "Den" layout:row gap:15 {
+    rabbit |alert| "Rabbit" {
+      |badge| "FAST"
+    }
     carrot |rect|  "Carrot patch" double:4 size:(80, 40) fill:white
   }
   pond |group| "Pond" layout:row gap:15 {
-    frog |rect| "Frog"      double:4 size:(60, 40)
-    fish |rect| "Goldfish"  double:4 size:(80, 40)
+    frog |rect| "Frog" double:4 size:(60, 40)
+    fish |rect| "Goldfish" double:4 size:(80, 40)
   }
 }
 

@@ -138,7 +138,7 @@ input_file: samples/full_example.plume
       <path d="M 37.25 -77.3 L 47.25 -77.3" fill="none" stroke="red" stroke-width="2"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="garden.den.carrot">
-      <path d="M 117 -85.3 L 145.5375 -85.3 L 145.5375 -81 L 212.025 -81" fill="none" stroke="red" stroke-width="2"/>
+      <path d="M 117 -85.3 L 172.5125 -85.3 L 172.5125 -81 L 212.025 -81" fill="none" stroke="red" stroke-width="2"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="garden.den.carrot">
       <path d="M 249.025 -73 L 260.025 -73" fill="none" stroke="red" stroke-width="2"/>
@@ -152,7 +152,7 @@ input_file: samples/full_example.plume
       <polygon class="plume-marker plume-marker-arrow" points="21.225,-6.7 15.225,-3.7 15.225,-9.7" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="kitchen.counter.water" data-to="garden.pond.fish">
-      <path d="M 117 -69.3 L 133 -69.3 L 133 -30.15 L 187.6 -30.15 L 187.6 9 L 203.6 9" fill="none" stroke="#444" stroke-width="1"/>
+      <path d="M 117 -69.3 L 156.5125 -69.3 L 156.5125 9 L 203.6 9" fill="none" stroke="#444" stroke-width="1"/>
     </g>
     <g class="plume-wire" data-from="kitchen.counter.water" data-to="garden.pond.fish">
       <path d="M 264.6 9 L 275.6 9" fill="none" stroke="#444" stroke-width="1"/>
