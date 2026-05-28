@@ -26,6 +26,17 @@ pub struct RoutedWire {
     /// emitted as `data-from` / `data-to` for CSS / a11y hooks.
     pub data_from: String,
     pub data_to: String,
+    /// This segment's own endpoint ids (resolved dot-paths). For a chain
+    /// `a -> b -> c`, the `b -> c` segment has `seg_from = "b"`, `seg_to = "c"`
+    /// (whereas `data_from`/`data_to` stay the chain ends `a`/`c`). The
+    /// validator uses these to know which shapes the wire may touch.
+    pub seg_from: String,
+    pub seg_to: String,
+    /// Span of the wire *declaration* this segment came from. Segments sharing
+    /// a `decl_span` are siblings of one statement (chain links or a
+    /// `a -> b & c` fan-out) and are exempt from wire-spacing checks where
+    /// they coincide.
+    pub decl_span: Span,
 }
 
 #[derive(Clone)]

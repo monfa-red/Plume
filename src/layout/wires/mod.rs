@@ -786,6 +786,9 @@ fn build_routed_wire(spec: &SegmentSpec, path: Vec<(f64, f64)>) -> RoutedWire {
         },
         data_from: spec.data_from.clone(),
         data_to: spec.data_to.clone(),
+        seg_from: spec.src_id.clone(),
+        seg_to: spec.tgt_id.clone(),
+        decl_span: spec.wire.span,
         path,
     }
 }
