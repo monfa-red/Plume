@@ -33,6 +33,9 @@ mod route;
 mod scene;
 mod stamping;
 mod text;
+mod validate;
+
+pub use validate::{validate_routing, Rule, Severity, Violation};
 
 use crate::error::Error;
 use crate::layout::ir::{PlacedNode, RoutedWire};
