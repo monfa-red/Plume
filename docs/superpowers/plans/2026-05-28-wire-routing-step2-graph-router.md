@@ -1,20 +1,55 @@
 # Wire Routing — Step 2: Visibility-Grid + A* Router — Implementation Plan
 
-> ## ▶ RESUME HERE (fresh session, 2026-05-28)
-> **Tasks 2.1–2.4 are DONE and merged to `main`.** The new grid+A* router is
-> live: invariants (R1/R4/R5) = 0, no shape piercing, no canvas-wide detours,
-> deterministic. Files: `src/layout/wires/{grid,astar,route_graph,oracle,validate}.rs`.
-> Validator gate: `cargo test --test wire_rules` (baseline R2=17, R3=34, R4=5).
+ > ## ▶▶ RESUME HERE — self-contained brief (portable; works after a fresh `git clone` on any machine)
+> *This block is the whole handoff. You do NOT need any prior chat or local memory — everything is in this repo.*
 >
-> **The ONLY remaining task is 2.5: wire-wire separation** (parallel wires
-> between the same pair stack instead of fanning into lanes — cosmetic; nothing
-> pierces or mis-routes). See **Task 2.5 (revised)** below. **Three shortcuts
-> were tried and reverted** (greedy A* penalty weak+strong; blind per-bundle
-> sibling-shift) — read their findings there before coding. The correct fix is
-> **global, obstacle-aware track-assignment**; it's the genuinely hard part of
-> orthogonal routing, a focused several-hundred-LOC pass, not a tweak.
-> First step when resuming: re-render `wires_realistic`/`full_example`, re-read
-> Task 2.5, then implement track-assignment validator-gated.
+> **The job:** finish the wire router. Tasks 2.1–2.4 are DONE and on `main`
+> (new orthogonal **visibility-grid + A\*** router; files
+> `src/layout/wires/{grid,astar,route_graph,oracle,validate}.rs`). Invariants
+> R1/R4/R5 = 0, no shape piercing, no canvas detours, deterministic.
+> The remaining work is **Task 2.5: wire-wire separation** — parallel wires
+> between the same pair currently stack on top of each other instead of fanning
+> into neat parallel lanes. Make them fan into lanes ≥ separation apart, without
+> clipping shapes.
+>
+> **You have FULL FREEDOM to break and restructure.** The code is not in use by
+> anyone. Delete, rewrite, restructure modules, change interfaces — whatever
+> gives the cleanest result. Do **not** preserve backward-compat, and do **not**
+> waste effort keeping every intermediate commit green: only the **final** state
+> must compile + pass `cargo test` + `cargo clippy --all-targets -- -D warnings`
+> + `cargo fmt --check`. Feel free to redesign `route_graph.rs`/`grid.rs` or add
+> new modules (e.g. channel decomposition + a track-assignment pass).
+>
+> **KEEP these (they're the foundation, don't rewrite):** `validate.rs` (the
+> R1–R6 contract checker — your gate), `oracle.rs` (clearance authority),
+> `scene.rs` (scene index), and the rules in
+> `docs/superpowers/specs/2026-05-28-wire-routing-rules-design.md`. The locked
+> rule: wire→shape clearance = shape's parent-container gap; wire→wire = max of
+> the two wires' gaps.
+>
+> **The gate / how to measure progress:** `cargo test --test wire_rules` snapshots
+> a per-sample violation report. Baseline now: **R2=17, R3=34, R4=5, R1=R5=0**.
+> Goal: drive *fixable* R3/R4 → 0 while keeping R1/R4/R5 = 0 and not raising R2.
+> Also render to eyeball: `cargo run -- samples/wires_realistic.plume --bake-vars
+> -o /tmp/x.svg && resvg /tmp/x.svg /tmp/x.png` (also `full_example`, `wires_bus`,
+> `wires_fan`).
+>
+> **The correct approach = GLOBAL, obstacle-aware track-assignment** (what
+> ELK/libavoid do): decide *all* wires' lanes together, per channel, via
+> left-edge interval colouring, where each assigned lane is itself A\*-clear of
+> shapes. First split R3 into **inherent** (bundle overflow — `wires_chain`/
+> `wires_labels` cram 9/5 wires onto a 40px edge; physically can't fit — flag as
+> R6, don't chase) vs **fixable**, and only target fixable.
+>
+> **DO NOT repeat these three dead ends** (all tried + reverted — details in
+> Task 2.5 below): (1) greedy per-wire A\* parallel-penalty, weak *or* strong —
+> penalty strength makes no difference, greedy detours just create new parallels
+> (R3 34→58); (2) blind per-bundle perpendicular sibling-shift — separates but
+> clips shape clearance + drifts off-edge. The lesson: separation must be decided
+> globally AND every lane must be obstacle-clear.
+>
+> Start by: render the samples to see today's state, re-read Task 2.5, then build
+> the track-assignment.
 
 > **For agentic workers:** execute task-by-task with TDD; the **validator** (`plume::validate_str` / `tests/wire_rules.rs`) is the gate — re-run it after every task and watch the baseline snapshot shrink. Keep every commit green.
 
