@@ -6,9 +6,6 @@
 //! lines — channel centres, where tidy bends land. A\* travels the
 //! intersections of these lines, so every bend sits on a meaningful coordinate
 //! shared across wires.
-//!
-//! `dead_code` is allowed until the orchestrator wires this in (Step 2 Task 2.4).
-#![allow(dead_code)]
 
 use super::geometry::AbsBbox;
 

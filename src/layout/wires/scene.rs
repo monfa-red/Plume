@@ -118,34 +118,6 @@ impl SceneIndex {
             .map(|i| self.nodes[i].clearance)
     }
 
-    /// Obstacles for a wire between `src_id` and `tgt_id`. Each shape is an
-    /// obstacle UNLESS it is an endpoint or an ancestor of an endpoint, in
-    /// which case the path is allowed to cross its boundary. Each obstacle
-    /// is inflated by `clamp(shape.clearance, wire_gap, 2 * wire_gap)` —
-    /// wires never sit closer to a shape than `wire_gap`, and we honour
-    /// the parent's `gap` setting up to a sensible cap so a generous
-    /// layout gap (e.g. `gap:80`) doesn't inflate obstacles so wide that
-    /// the wire can't route around them at all.
-    pub fn obstacles_for(&self, src_id: &str, tgt_id: &str, wire_gap: f64) -> Vec<AbsBbox> {
-        let passable = self.passable_set(src_id, tgt_id);
-        let cap = wire_gap * 2.0;
-        let mut out = Vec::new();
-        for (i, n) in self.nodes.iter().enumerate() {
-            if passable.contains(&i) {
-                continue;
-            }
-            if !n.ancestors.iter().all(|a| passable.contains(a)) {
-                continue;
-            }
-            if !n.is_leaf && n.bbox.w == 0.0 && n.bbox.h == 0.0 {
-                continue;
-            }
-            let pad = wire_gap.max(n.clearance.min(cap));
-            out.push(n.bbox.inflate(pad));
-        }
-        out
-    }
-
     /// Indices of nodes a wire between `src_id` and `tgt_id` may cross: the
     /// endpoints and all their named ancestors.
     fn passable_set(&self, src_id: &str, tgt_id: &str) -> Vec<usize> {
@@ -178,6 +150,17 @@ impl SceneIndex {
             out.push((n.path.clone(), n.bbox));
         }
         out
+    }
+
+    /// Every shape's `(path, bbox)` — used to seed the global visibility
+    /// lattice with every shape's clearance edges. Skips zero-size groups
+    /// (same rule as `raw_obstacles`).
+    pub fn all_boxes(&self) -> Vec<(String, AbsBbox)> {
+        self.nodes
+            .iter()
+            .filter(|n| n.is_leaf || n.bbox.w != 0.0 || n.bbox.h != 0.0)
+            .map(|n| (n.path.clone(), n.bbox))
+            .collect()
     }
 
     /// World bounds spanning every node. Used by the perimeter-route fallback

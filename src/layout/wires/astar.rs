@@ -5,9 +5,6 @@
 //! fewer corners (spec §6 ranks fewer bends above raw length). A caller-
 //! supplied `surcharge` adds a per-segment cost — used in Step 2.5 to push
 //! wires off each other; pass `&|_, _| 0.0` for plain shortest-path.
-//!
-//! `dead_code` is allowed until the orchestrator wires this in (Step 2 Task 2.4).
-#![allow(dead_code)]
 
 use super::geometry::AbsBbox;
 use super::grid::{edge_clear, Grid};
@@ -161,7 +158,7 @@ fn reconstruct(
 }
 
 /// Drop collinear interior points so straight runs are single segments.
-fn collapse(pts: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
+pub(super) fn collapse(pts: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
     if pts.len() < 3 {
         return pts;
     }

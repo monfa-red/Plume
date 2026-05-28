@@ -22,7 +22,7 @@
 use super::geometry::{edge_midpoint, shift_along_edge, AbsBbox, Edge};
 use super::planning::SegmentSpec;
 use crate::span::Span;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub struct Endpoints {
     /// Per spec: exact world coords where the wire lands on its source.
@@ -30,10 +30,8 @@ pub struct Endpoints {
     /// Per spec: exact world coords where the wire lands on its target.
     pub tgt: Vec<(f64, f64)>,
     /// Per spec: which edge of the source shape is used.
-    #[allow(dead_code)]
     pub src_edge: Vec<Edge>,
     /// Per spec: which edge of the target shape is used.
-    #[allow(dead_code)]
     pub tgt_edge: Vec<Edge>,
 }
 
@@ -82,7 +80,7 @@ fn allocate_lanes(specs: &[SegmentSpec], edges: &[Edge], side: Side) -> Vec<f64>
     let mut lanes = vec![0.0_f64; specs.len()];
 
     // Group spec indices by (shape_id, edge) bin.
-    let mut bins: HashMap<(String, Edge), Vec<usize>> = HashMap::new();
+    let mut bins: BTreeMap<(String, Edge), Vec<usize>> = BTreeMap::new();
     for (i, spec) in specs.iter().enumerate() {
         let key = match side {
             Side::Src => (spec.src_id.clone(), edges[i]),
@@ -95,8 +93,8 @@ fn allocate_lanes(specs: &[SegmentSpec], edges: &[Edge], side: Side) -> Vec<f64>
 
     for ((_, edge), indices) in &bins {
         // Assign slots, collapsing fan-out specs (same wire span) onto one.
-        let mut span_to_slot: HashMap<Span, usize> = HashMap::new();
-        let mut spec_slot: HashMap<usize, usize> = HashMap::new();
+        let mut span_to_slot: BTreeMap<Span, usize> = BTreeMap::new();
+        let mut spec_slot: BTreeMap<usize, usize> = BTreeMap::new();
         let mut slot_count = 0;
         for &i in indices {
             let span = specs[i].wire.span;
@@ -174,8 +172,8 @@ fn align_free_bundles(
         ));
     }
 
-    let mut src_bin_bundles: HashMap<(String, Edge), HashSet<BundleKey>> = HashMap::new();
-    let mut tgt_bin_bundles: HashMap<(String, Edge), HashSet<BundleKey>> = HashMap::new();
+    let mut src_bin_bundles: BTreeMap<(String, Edge), BTreeSet<BundleKey>> = BTreeMap::new();
+    let mut tgt_bin_bundles: BTreeMap<(String, Edge), BTreeSet<BundleKey>> = BTreeMap::new();
     for (i, spec) in specs.iter().enumerate() {
         src_bin_bundles
             .entry((spec.src_id.clone(), src_edge[i]))
@@ -187,7 +185,7 @@ fn align_free_bundles(
             .insert(bundle_keys[i].clone());
     }
 
-    let mut by_bundle: HashMap<BundleKey, Vec<usize>> = HashMap::new();
+    let mut by_bundle: BTreeMap<BundleKey, Vec<usize>> = BTreeMap::new();
     for (i, key) in bundle_keys.iter().enumerate() {
         by_bundle.entry(key.clone()).or_default().push(i);
     }

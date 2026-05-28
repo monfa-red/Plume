@@ -4,7 +4,7 @@ assertion_line: 26
 expression: svg
 input_file: samples/wires_bus.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-186.75 -44.8 373.5 137.6" width="373.5" height="137.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-186.75 -44.8 373.5 89.6" width="373.5" height="89.6" class="plume">
   <defs/>
   <g class="plume-scene" color="#222">
     <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-139.025,0)">
@@ -28,19 +28,19 @@ input_file: samples/wires_bus.plume
   </g>
   <g class="plume-wires">
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -123.025 24.8 L -123.025 40.8 L -19.575 40.8 L -19.575 28.8" fill="none" stroke="#444" stroke-width="1.5"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-19.575,25.8 -15.825,33.3 -23.325,33.3" fill="#444"/>
+      <path d="M -111.3 -20.8 L -103.3 -20.8 L -103.3 -16 L -35.3 -16" fill="none" stroke="#444" stroke-width="1.5"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-32.3,-16 -39.8,-12.25 -39.8,-19.75" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -139.025 24.8 L -139.025 56.8 L -3.575 56.8 L -3.575 28.8" fill="none" stroke="#444" stroke-width="1.5"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-3.575,25.8 0.175,33.3 -7.325,33.3" fill="#444"/>
+      <path d="M -111.3 -6.9333 L -103.3 -6.9333 L -103.3 0 L -35.3 0" fill="none" stroke="#444" stroke-width="1.5"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-32.3,0 -39.8,3.75 -39.8,-3.75" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -155.025 24.8 L -155.025 72.8 L 12.425 72.8 L 12.425 28.8" fill="none" stroke="#444" stroke-width="1.5"/>
-      <polygon class="plume-marker plume-marker-arrow" points="12.425,25.8 16.175,33.3 8.675,33.3" fill="#444"/>
+      <path d="M -111.3 6.9333 L -103.3 6.9333 L -103.3 16 L -35.3 16" fill="none" stroke="#444" stroke-width="1.5"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-32.3,16 -39.8,19.75 -39.8,12.25" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="bird">
-      <path d="M -111.3 0 L 100.15 0" fill="none" stroke="#444" stroke-width="1.5"/>
+      <path d="M -111.3 20.8 L 96.15 20.8 L 96.15 0 L 100.15 0" fill="none" stroke="#444" stroke-width="1.5"/>
       <polygon class="plume-marker plume-marker-arrow" points="103.15,0 95.65,3.75 95.65,-3.75" fill="#444"/>
     </g>
   </g>

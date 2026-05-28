@@ -65,8 +65,8 @@ input_file: samples/wires_chain.plume
       <polygon class="plume-marker plume-marker-arrow" points="-132.9,-5.2 -126.9,-8.2 -126.9,-2.2" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -129.9 -0 L -113.9 -0" fill="none" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-132.9,-0 -126.9,-3 -126.9,3" fill="#444"/>
+      <path d="M -129.9 0 L -113.9 0" fill="none" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-132.9,0 -126.9,-3 -126.9,3" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="dog">
       <path d="M -129.9 5.2 L -113.9 5.2" fill="none" stroke="#444" stroke-width="1" stroke-dasharray="1,3"/>
