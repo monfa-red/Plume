@@ -83,7 +83,9 @@ fn allocate_lanes(specs: &[SegmentSpec], edges: &[Edge], side: Side) -> Vec<f64>
         bins.entry(key).or_default().push(i);
     }
 
-    for indices in bins.values() {
+    const INSET: f64 = 4.0;
+
+    for ((_, edge), indices) in &bins {
         // Assign slots, collapsing fan-out specs (same wire span) onto one.
         let mut span_to_slot: HashMap<Span, usize> = HashMap::new();
         let mut spec_slot: HashMap<usize, usize> = HashMap::new();
@@ -101,10 +103,32 @@ fn allocate_lanes(specs: &[SegmentSpec], edges: &[Edge], side: Side) -> Vec<f64>
             continue;
         }
         let gap = specs[indices[0]].gap;
+
+        // Compress the lane spacing if the natural span would overflow
+        // the edge length. Bin overflow happens when too many wires share
+        // one (shape, edge) — e.g. N parallel `cat -> dog` specs all
+        // entering dog's left edge. Without compression, the outer lanes
+        // clamp onto each other; with compression, each spec gets its
+        // own slot evenly distributed across the usable edge length.
+        let first_spec_bbox = match side {
+            Side::Src => &specs[indices[0]].src_bbox,
+            Side::Tgt => &specs[indices[0]].tgt_bbox,
+        };
+        let usable = match edge {
+            Edge::Left | Edge::Right => (first_spec_bbox.h - 2.0 * INSET).max(0.0),
+            Edge::Top | Edge::Bottom => (first_spec_bbox.w - 2.0 * INSET).max(0.0),
+        };
+        let natural_span = (slot_count as f64 - 1.0) * gap;
+        let effective_gap = if slot_count > 1 && natural_span > usable {
+            (usable / (slot_count as f64 - 1.0)).max(1.0)
+        } else {
+            gap
+        };
+
         let centre = (slot_count as f64 - 1.0) / 2.0;
         for &i in indices {
             let slot = spec_slot[&i] as f64;
-            lanes[i] = (slot - centre) * gap;
+            lanes[i] = (slot - centre) * effective_gap;
         }
     }
 

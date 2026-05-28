@@ -84,9 +84,14 @@ pub fn route_wires(
         );
 
         let size = bundle.size();
-        let gap = specs[bundle.spec_indices[0]].gap;
+        // Stamp siblings using the spec endpoints' *actual* spread —
+        // this matches the compressed-lane allocation done in
+        // endpoints.rs when too many wires share one (shape, edge).
+        // Otherwise siblings would land at the full `gap` while their
+        // endpoints sat at compressed positions, breaking parallelism.
+        let stamping_gap = bundle_stamping_gap(bundle, &endpoints, &specs);
         for (k, &spec_idx) in bundle.spec_indices.iter().enumerate() {
-            let path = stamp_sibling(&canonical_path, k, size, gap);
+            let path = stamp_sibling(&canonical_path, k, size, stamping_gap);
             prior_paths.push(path.clone());
             routed[spec_idx] = Some(build_routed_wire(&specs[spec_idx], path));
         }
@@ -245,6 +250,41 @@ fn candidate_edges(my: &AbsBbox, other: &AbsBbox, default: Edge) -> Vec<Edge> {
         }
     }
     out
+}
+
+/// The actual perpendicular distance between consecutive siblings of
+/// `bundle`. For a bundle whose endpoint lanes weren't compressed,
+/// equals `spec.gap`. For an overflowing bin (more wires than fit at
+/// `gap`), equals the compressed step that allocate_lanes used.
+fn bundle_stamping_gap(
+    bundle: &Bundle,
+    endpoints: &endpoints::Endpoints,
+    specs: &[SegmentSpec],
+) -> f64 {
+    let size = bundle.size();
+    if size <= 1 {
+        return specs[bundle.spec_indices[0]].gap;
+    }
+    // For facing-horizontal bundles siblings differ in y; for vertical
+    // siblings differ in x. Use whichever axis the edge spans.
+    let horizontal_exit = bundle.src_edge.is_horizontal_exit();
+    let mut min = f64::INFINITY;
+    let mut max = f64::NEG_INFINITY;
+    for &i in &bundle.spec_indices {
+        let v = if horizontal_exit {
+            endpoints.src[i].1
+        } else {
+            endpoints.src[i].0
+        };
+        min = min.min(v);
+        max = max.max(v);
+    }
+    let spread = (max - min).max(0.0);
+    if spread > 0.5 {
+        spread / (size as f64 - 1.0)
+    } else {
+        specs[bundle.spec_indices[0]].gap
+    }
 }
 
 fn centroid(mut pts: impl Iterator<Item = (f64, f64)>) -> (f64, f64) {
