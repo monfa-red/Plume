@@ -300,25 +300,12 @@ fn try_one_relief(specs: &mut [SegmentSpec], scene: &SceneIndex, world: AbsBbox)
     }
     let mut overload: Option<(String, Edge)> = None;
     for ((shape, edge), keys) in &bins {
-        // Only Z-bundles (facing edges) share a trunk channel — and only
-        // ones that actually bend (not straight aligned ones), because
-        // straight wires don't occupy any trunk x/y.
-        let z_keys: Vec<&Key> = keys
-            .iter()
-            .filter(|k| {
-                if k.1.opposite() != k.3 {
-                    return false;
-                }
-                let sample = &specs[bundle_specs[*k][0]];
-                let src_bbox = sample.src_bbox;
-                let tgt_bbox = sample.tgt_bbox;
-                if k.1.is_horizontal_exit() {
-                    (src_bbox.cy() - tgt_bbox.cy()).abs() > 0.5
-                } else {
-                    (src_bbox.cx() - tgt_bbox.cx()).abs() > 0.5
-                }
-            })
-            .collect();
+        // Only Z-bundles (facing edges) share a trunk channel. Even
+        // when the canonical is straight (src.y == tgt.y for a
+        // facing-horizontal bundle), the siblings of a >1-spec bundle
+        // bend because their lane offsets differ on each side — so we
+        // still need to count them as channel occupants.
+        let z_keys: Vec<&Key> = keys.iter().filter(|k| k.1.opposite() == k.3).collect();
         if z_keys.len() < 2 {
             continue;
         }
@@ -339,7 +326,6 @@ fn try_one_relief(specs: &mut [SegmentSpec], scene: &SceneIndex, world: AbsBbox)
         let this_clearance = scene.clearance(shape).unwrap_or(0.0).max(gap);
         let mut min_partner_gap = f64::INFINITY;
         let mut min_partner_clearance = f64::INFINITY;
-        let mut required = (unique_spans.len() as f64 - 1.0) * gap;
         for k in &z_keys {
             let on_src = k.0 == *shape && k.1 == *edge;
             let partner = if on_src { &k.2 } else { &k.0 };
@@ -354,12 +340,11 @@ fn try_one_relief(specs: &mut [SegmentSpec], scene: &SceneIndex, world: AbsBbox)
             if pc < min_partner_clearance {
                 min_partner_clearance = pc;
             }
-            let span_slots: HashSet<_> = bundle_specs[*k]
-                .iter()
-                .map(|&i| specs[i].wire.span)
-                .collect();
-            required += (span_slots.len() as f64 - 1.0).max(0.0) * gap;
         }
+        // Each unique wire decl occupies one trunk slot at `gap` spacing
+        // — that already covers spacing both within and between bundles
+        // (since fan-out specs share a span and so collapse to one slot).
+        let required = (unique_spans.len() as f64 - 1.0) * gap;
         let available = (min_partner_gap - this_clearance - min_partner_clearance).max(0.0);
         if required > available {
             overload = Some((shape.clone(), *edge));

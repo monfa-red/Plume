@@ -8,8 +8,8 @@
 //   - a wire that has to detour around an unrelated group
 
 {
-  |scene| layout:row gap:20
-  |wire| gap:20
+  |scene| layout:row gap:25
+  |wire| gap:15
   |group| stroke:#aaa
 
   .loud stroke:red thickness:2

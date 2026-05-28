@@ -125,7 +125,7 @@ fn generate_candidates(
         ));
     } else {
         // Same-direction — U-shape.
-        out.push(u_shape(src, tgt, src_edge, obstacles, world));
+        out.push(u_shape(src, tgt, src_edge, obstacles, world, gap));
     }
 
     out
@@ -249,54 +249,91 @@ fn l_shape(src: (f64, f64), tgt: (f64, f64), src_edge: Edge) -> Option<Polyline>
 // ─────────────────────────── 2-bend U-shape ───────────────────────────
 
 /// U-shape for two same-direction edges — the wire has to loop out past
-/// both shapes' shared side and come back. Builds the loop in a clear
-/// row/column outside the relevant shape projection.
+/// both shapes' shared side and come back. The trunk sits at the
+/// nearest clear strip's *near edge* (the side closest to src/tgt), so
+/// the wire detours only as far as the obstacles force it. Picking the
+/// strip's midline instead — as we used to — pushed the trunk halfway
+/// to the world bound, which read as a random-looking long detour.
 fn u_shape(
     src: (f64, f64),
     tgt: (f64, f64),
     src_edge: Edge,
     obstacles: &[AbsBbox],
     world: AbsBbox,
+    gap: f64,
 ) -> Polyline {
+    // Loop size: a reasonable target distance past src/tgt. When no
+    // obstacle forces a deeper loop, this keeps the trunk a fixed
+    // breathing-room amount past the edge — enough that perpendicular-
+    // shifted siblings still have headroom and don't degenerate.
+    let breathing = gap.max(16.0) * 2.0;
     match src_edge {
         Edge::Right => {
             let y_lo = src.1.min(tgt.1);
             let y_hi = src.1.max(tgt.1);
-            let beyond = src.0.max(tgt.0) + 32.0;
-            let xs = clear_x_intervals(y_lo, y_hi, obstacles, src.0.max(tgt.0), world.right());
-            let mid_x = nearest_interval(&xs, beyond)
-                .map(|iv| iv.mid())
-                .unwrap_or(beyond);
+            let beyond = src.0.max(tgt.0);
+            let target = beyond + breathing;
+            let xs = clear_x_intervals(y_lo, y_hi, obstacles, beyond, world.right());
+            let mid_x = nearest_interval(&xs, target)
+                .map(|iv| {
+                    if iv.contains(target) {
+                        target
+                    } else {
+                        iv.min.max(target)
+                    }
+                })
+                .unwrap_or(target);
             vec![src, (mid_x, src.1), (mid_x, tgt.1), tgt]
         }
         Edge::Left => {
             let y_lo = src.1.min(tgt.1);
             let y_hi = src.1.max(tgt.1);
-            let beyond = src.0.min(tgt.0) - 32.0;
-            let xs = clear_x_intervals(y_lo, y_hi, obstacles, world.x, src.0.min(tgt.0));
-            let mid_x = nearest_interval(&xs, beyond)
-                .map(|iv| iv.mid())
-                .unwrap_or(beyond);
+            let beyond = src.0.min(tgt.0);
+            let target = beyond - breathing;
+            let xs = clear_x_intervals(y_lo, y_hi, obstacles, world.x, beyond);
+            let mid_x = nearest_interval(&xs, target)
+                .map(|iv| {
+                    if iv.contains(target) {
+                        target
+                    } else {
+                        iv.max.min(target)
+                    }
+                })
+                .unwrap_or(target);
             vec![src, (mid_x, src.1), (mid_x, tgt.1), tgt]
         }
         Edge::Top => {
             let x_lo = src.0.min(tgt.0);
             let x_hi = src.0.max(tgt.0);
-            let beyond = src.1.min(tgt.1) - 32.0;
-            let ys = clear_y_intervals(x_lo, x_hi, obstacles, world.y, src.1.min(tgt.1));
-            let mid_y = nearest_interval(&ys, beyond)
-                .map(|iv| iv.mid())
-                .unwrap_or(beyond);
+            let beyond = src.1.min(tgt.1);
+            let target = beyond - breathing;
+            let ys = clear_y_intervals(x_lo, x_hi, obstacles, world.y, beyond);
+            let mid_y = nearest_interval(&ys, target)
+                .map(|iv| {
+                    if iv.contains(target) {
+                        target
+                    } else {
+                        iv.max.min(target)
+                    }
+                })
+                .unwrap_or(target);
             vec![src, (src.0, mid_y), (tgt.0, mid_y), tgt]
         }
         Edge::Bottom => {
             let x_lo = src.0.min(tgt.0);
             let x_hi = src.0.max(tgt.0);
-            let beyond = src.1.max(tgt.1) + 32.0;
-            let ys = clear_y_intervals(x_lo, x_hi, obstacles, src.1.max(tgt.1), world.bottom());
-            let mid_y = nearest_interval(&ys, beyond)
-                .map(|iv| iv.mid())
-                .unwrap_or(beyond);
+            let beyond = src.1.max(tgt.1);
+            let target = beyond + breathing;
+            let ys = clear_y_intervals(x_lo, x_hi, obstacles, beyond, world.bottom());
+            let mid_y = nearest_interval(&ys, target)
+                .map(|iv| {
+                    if iv.contains(target) {
+                        target
+                    } else {
+                        iv.min.max(target)
+                    }
+                })
+                .unwrap_or(target);
             vec![src, (src.0, mid_y), (tgt.0, mid_y), tgt]
         }
     }
