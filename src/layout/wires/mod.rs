@@ -27,6 +27,7 @@ mod channels;
 mod endpoints;
 mod geometry;
 mod lanes;
+mod oracle;
 mod planning;
 mod route;
 mod scene;
