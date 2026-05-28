@@ -23,6 +23,7 @@
 //! No grid, no A\*. Endpoints are pixel-perfect by construction; bends
 //! are deterministic — same layout always produces the same routing.
 
+mod astar;
 mod channels;
 mod endpoints;
 mod geometry;
