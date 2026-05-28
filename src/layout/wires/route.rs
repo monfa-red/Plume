@@ -48,6 +48,8 @@ pub fn route(
     _prior_paths: &[Polyline],
     gap: f64,
     preferred_bend: Option<f64>,
+    src_bbox: AbsBbox,
+    tgt_bbox: AbsBbox,
 ) -> Polyline {
     let candidates = generate_candidates(
         src,
@@ -60,11 +62,16 @@ pub fn route(
         preferred_bend,
     );
 
-    // Pick the first candidate that clears every shape obstacle. Falls
-    // back to the last attempt if nothing fully clears.
+    // For the *middle* segments of each candidate, treat src and tgt as
+    // soft obstacles too — gap-inflated. The first and last segments are
+    // allowed to touch their respective endpoint's edge, but middle legs
+    // shouldn't run parallel close to a shape they're not connected to.
+    let src_halo = src_bbox.inflate(gap);
+    let tgt_halo = tgt_bbox.inflate(gap);
+
     let mut fallback: Option<Polyline> = None;
     for cand in candidates {
-        if segments_clear(&cand, obstacles) {
+        if segments_clear_strict(&cand, obstacles, &src_halo, &tgt_halo) {
             return cand;
         }
         fallback = Some(cand);
@@ -569,10 +576,56 @@ fn pick_bend_row(
 
 // ─────────────────────────── Validation ───────────────────────────
 
-/// Public alias of `segments_clear` — callers use this to decide whether
-/// to retry with alternative edges.
-pub fn path_is_clear(path: &[(f64, f64)], obstacles: &[AbsBbox]) -> bool {
-    segments_clear(path, obstacles)
+/// Same validation `route` uses internally — callers use this to decide
+/// whether to retry with alternative edges.
+pub fn path_is_clear(
+    path: &[(f64, f64)],
+    obstacles: &[AbsBbox],
+    src_halo: &AbsBbox,
+    tgt_halo: &AbsBbox,
+) -> bool {
+    segments_clear_strict(path, obstacles, src_halo, tgt_halo)
+}
+
+/// Stricter validation than `segments_clear`: in addition to every
+/// shape obstacle, the *middle* segments (not first, not last) must also
+/// stay gap-clear of `src_halo` and `tgt_halo`. The endpoints' own
+/// shapes are passable in general but a middle segment running parallel
+/// close to them looks cramped.
+fn segments_clear_strict(
+    path: &[(f64, f64)],
+    obstacles: &[AbsBbox],
+    src_halo: &AbsBbox,
+    tgt_halo: &AbsBbox,
+) -> bool {
+    if !segments_clear(path, obstacles) {
+        return false;
+    }
+    let n = path.len();
+    if n < 4 {
+        return true; // 0 or 1 middle segment is allowed to be at edge
+    }
+    for i in 1..n - 2 {
+        let (a, b) = (path[i], path[i + 1]);
+        if !segment_clear_of(a, b, src_halo) || !segment_clear_of(a, b, tgt_halo) {
+            return false;
+        }
+    }
+    true
+}
+
+/// True if the axis-aligned segment a→b is entirely outside `box`.
+fn segment_clear_of(a: (f64, f64), b: (f64, f64), b_box: &AbsBbox) -> bool {
+    if (a.1 - b.1).abs() < 0.5 {
+        // Horizontal at y = a.1
+        let (x_lo, x_hi) = order(a.0, b.0);
+        !(b_box.y < a.1 && a.1 < b_box.bottom() && b_box.right() > x_lo && b_box.x < x_hi)
+    } else if (a.0 - b.0).abs() < 0.5 {
+        let (y_lo, y_hi) = order(a.1, b.1);
+        !(b_box.x < a.0 && a.0 < b_box.right() && b_box.bottom() > y_lo && b_box.y < y_hi)
+    } else {
+        true
+    }
 }
 
 /// True if every segment of `path` (assumed axis-aligned) is gap-clear

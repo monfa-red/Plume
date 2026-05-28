@@ -58,7 +58,7 @@ pub fn route_wires(
     // crowd the same channel, redistribute their canonical bends evenly so
     // every unrelated wire ends up `gap` apart. Fan-out bundles (same
     // wire span) are exempted — their shared trunks are by design.
-    let bends = compute_bundle_bends(&bundles, &specs, &endpoints);
+    let bends = compute_bundle_bends(&bundles, &specs, &endpoints, &scene);
     let channel_groups = group_by_channel(
         &bends,
         specs.iter().map(|s| s.gap).fold(0.0_f64, f64::max).max(8.0),
@@ -131,6 +131,9 @@ fn route_bundle_canonical(
     let canonical_src = centroid(bundle.spec_indices.iter().map(|&i| endpoints.src[i]));
     let canonical_tgt = centroid(bundle.spec_indices.iter().map(|&i| endpoints.tgt[i]));
 
+    let src_halo = canonical_spec.src_bbox.inflate(canonical_spec.gap);
+    let tgt_halo = canonical_spec.tgt_bbox.inflate(canonical_spec.gap);
+
     let mut fallback: Option<Vec<(f64, f64)>> = None;
     for (se, te) in edge_combos {
         let src_pt = if se == bundle.src_edge {
@@ -161,8 +164,13 @@ fn route_bundle_canonical(
             prior_paths,
             canonical_spec.gap,
             preferred_bend,
+            canonical_spec.src_bbox,
+            canonical_spec.tgt_bbox,
         );
-        if route::path_is_clear(&path, &obstacles) {
+        // Strict clearance: middle segments must avoid running parallel
+        // close to src or tgt. If this edge combo can't satisfy that,
+        // try the next one before settling.
+        if route::path_is_clear(&path, &obstacles, &src_halo, &tgt_halo) {
             return path;
         }
         if fallback.is_none() {

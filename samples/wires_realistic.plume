@@ -8,7 +8,7 @@
 //   - a wire that has to detour around an unrelated group
 
 {
-  |scene| layout:row gap:12
+  |scene| layout:row gap:18
   |wire| gap:12
   |group| stroke:#aaa
 
@@ -42,6 +42,8 @@ bowl -> dog .loud
 
 // Cross-group with labels
 water <- dog .quiet
+water <- dog .quiet
+
 water <-> bird .quiet
 
 // Group-interior → top-level (must exit kitchen and reach roof past garden)
