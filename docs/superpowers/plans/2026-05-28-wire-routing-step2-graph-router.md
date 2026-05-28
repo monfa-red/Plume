@@ -75,7 +75,9 @@ reintroduced an R1/R5. Reverted. Why it fails:
   baseline into inherent (bundle-overflow) vs fixable R3 and only target the
   fixable set** (and `log`/annotate the inherent ones as R6 "no room").
 
-**Correct approach — track assignment (left-edge sweep), not penalties:**
+**Second attempt — per-bundle canonical + perpendicular sibling shift (also reverted, 2026-05-28):** route one canonical A* path per bundle, then offset each sibling by `shift_polyline` (flow-aware perpendicular). This *did* separate (R4 → 0, `wires_realistic` rendered as clean rails) but had two real flaws: (a) the blind offset **clips shape clearance** — siblings shifted into obstacle zones (R2 17 → 21, e.g. `water->roof` rails within 8 of garden); (b) bend re-intersection **drifts** ~0.3 px, breaking orthogonality/attachment (R5). These are the exact problems the *old* engine's runway/sibling-radius/clear-range machinery existed to patch — so this path leads straight back to that complexity. Conclusion: **separation must be obstacle-aware**, i.e. each sibling's track must itself be A*-clear, not a blind offset.
+
+**Correct approach — obstacle-aware track assignment (left-edge sweep), not penalties or blind shifts:**
 1. Group wire segments that share a channel (same axis, overlapping span,
    between the same pair of obstacle edges).
 2. Within each channel, treat it as an interval-graph colouring: sort segments
