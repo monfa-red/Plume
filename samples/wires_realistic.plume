@@ -41,7 +41,7 @@ bowl -> dog .loud
 bowl -> dog .loud
 
 // Cross-group with labels
-water <- dog "shares" .quiet
+water <- dog .quiet
 water <-> bird .quiet
 
 // Group-interior → top-level (must exit kitchen and reach roof past garden)

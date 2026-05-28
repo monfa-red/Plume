@@ -117,7 +117,16 @@ fn route_bundle_canonical(
         } else {
             edge_midpoint(&canonical_spec.tgt_bbox, te)
         };
-        let path = route::route(src_pt, tgt_pt, se, te, &obstacles, world, prior_paths);
+        let path = route::route(
+            src_pt,
+            tgt_pt,
+            se,
+            te,
+            &obstacles,
+            world,
+            prior_paths,
+            canonical_spec.gap,
+        );
         if route::path_is_clear(&path, &obstacles) {
             return path;
         }

@@ -45,8 +45,9 @@ pub fn route(
     obstacles: &[AbsBbox],
     world: AbsBbox,
     _prior_paths: &[Polyline],
+    gap: f64,
 ) -> Polyline {
-    let candidates = generate_candidates(src, tgt, src_edge, tgt_edge, obstacles, world);
+    let candidates = generate_candidates(src, tgt, src_edge, tgt_edge, obstacles, world, gap);
 
     // Pick the first candidate that clears every shape obstacle. Falls
     // back to the last attempt if nothing fully clears.
@@ -62,6 +63,7 @@ pub fn route(
 
 /// Build the ordered candidate list for an edge pair, cheapest topology
 /// first. Each candidate is a complete polyline — caller validates.
+#[allow(clippy::too_many_arguments)]
 fn generate_candidates(
     src: (f64, f64),
     tgt: (f64, f64),
@@ -69,6 +71,7 @@ fn generate_candidates(
     tgt_edge: Edge,
     obstacles: &[AbsBbox],
     world: AbsBbox,
+    gap: f64,
 ) -> Vec<Polyline> {
     let mut out = Vec::with_capacity(4);
 
@@ -80,7 +83,9 @@ fn generate_candidates(
         if let Some(p) = z_shape(src, tgt, src_edge, obstacles) {
             out.push(p);
         }
-        out.push(detour_facing(src, tgt, src_edge, obstacles, world));
+        out.push(detour_facing(
+            src, tgt, src_edge, tgt_edge, obstacles, world, gap,
+        ));
     } else if src_edge.is_horizontal_exit() != tgt_edge.is_horizontal_exit() {
         // Perpendicular — L-shape.
         if let Some(p) = l_shape(src, tgt, src_edge) {
@@ -117,24 +122,81 @@ fn straight(src: (f64, f64), tgt: (f64, f64), src_edge: Edge) -> Option<Polyline
 /// Natural Z-shape for facing edges. Picks the bend coordinate at the
 /// midline of the channel between the two shapes — the natural midpoint
 /// when it lies in a clear strip, otherwise the nearest clear strip's
-/// midline. Returns `None` if even that strip can't be found.
+/// midline.
+///
+/// Returns `None` if the chosen bend coordinate would land on the wrong
+/// side of either endpoint's edge — i.e., the trunk would extend back
+/// into a shape's interior. (Common when two shapes in the same row are
+/// connected `Bottom→Top`: the midpoint of `src.bottom` and `tgt.top`
+/// lands inside both shapes.) When that happens the caller falls through
+/// to a 4-bend detour that wraps the trunk around the shapes.
 fn z_shape(
     src: (f64, f64),
     tgt: (f64, f64),
     src_edge: Edge,
     obstacles: &[AbsBbox],
 ) -> Option<Polyline> {
+    let tgt_edge = src_edge.opposite();
     if src_edge.is_horizontal_exit() {
         let (x_lo, x_hi) = order(src.0, tgt.0);
         let (y_lo, y_hi) = order(src.1, tgt.1);
         let mid_x = pick_clear_column((src.0 + tgt.0) / 2.0, x_lo, x_hi, y_lo, y_hi, obstacles)?;
+        if !valid_horizontal_trunk(mid_x, src.0, tgt.0, src_edge, tgt_edge) {
+            return None;
+        }
         Some(vec![src, (mid_x, src.1), (mid_x, tgt.1), tgt])
     } else {
         let (x_lo, x_hi) = order(src.0, tgt.0);
         let (y_lo, y_hi) = order(src.1, tgt.1);
         let mid_y = pick_clear_row((src.1 + tgt.1) / 2.0, y_lo, y_hi, x_lo, x_hi, obstacles)?;
+        if !valid_vertical_trunk(mid_y, src.1, tgt.1, src_edge, tgt_edge) {
+            return None;
+        }
         Some(vec![src, (src.0, mid_y), (tgt.0, mid_y), tgt])
     }
+}
+
+/// The trunk x of a facing-horizontal Z must lie on the exit side of the
+/// source edge and the entry side of the target edge — otherwise the
+/// vertical bend would run back inside one of the endpoints' shapes.
+fn valid_horizontal_trunk(
+    mid_x: f64,
+    src_x: f64,
+    tgt_x: f64,
+    src_edge: Edge,
+    tgt_edge: Edge,
+) -> bool {
+    let src_ok = match src_edge {
+        Edge::Right => mid_x > src_x + 0.5,
+        Edge::Left => mid_x < src_x - 0.5,
+        _ => true,
+    };
+    let tgt_ok = match tgt_edge {
+        Edge::Right => mid_x > tgt_x + 0.5,
+        Edge::Left => mid_x < tgt_x - 0.5,
+        _ => true,
+    };
+    src_ok && tgt_ok
+}
+
+fn valid_vertical_trunk(
+    mid_y: f64,
+    src_y: f64,
+    tgt_y: f64,
+    src_edge: Edge,
+    tgt_edge: Edge,
+) -> bool {
+    let src_ok = match src_edge {
+        Edge::Bottom => mid_y > src_y + 0.5,
+        Edge::Top => mid_y < src_y - 0.5,
+        _ => true,
+    };
+    let tgt_ok = match tgt_edge {
+        Edge::Bottom => mid_y > tgt_y + 0.5,
+        Edge::Top => mid_y < tgt_y - 0.5,
+        _ => true,
+    };
+    src_ok && tgt_ok
 }
 
 // ─────────────────────────── 1-bend L-shape ───────────────────────────
@@ -224,25 +286,32 @@ fn u_shape(
 ///                            │
 ///                            └── tgt
 /// ```
+#[allow(clippy::too_many_arguments)]
 fn detour_facing(
     src: (f64, f64),
     tgt: (f64, f64),
     src_edge: Edge,
+    tgt_edge: Edge,
     obstacles: &[AbsBbox],
     world: AbsBbox,
+    gap: f64,
 ) -> Polyline {
     if src_edge.is_horizontal_exit() {
-        detour_facing_horizontal(src, tgt, obstacles, world)
+        detour_facing_horizontal(src, tgt, src_edge, tgt_edge, obstacles, world, gap)
     } else {
-        detour_facing_vertical(src, tgt, obstacles, world)
+        detour_facing_vertical(src, tgt, src_edge, tgt_edge, obstacles, world, gap)
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn detour_facing_horizontal(
     src: (f64, f64),
     tgt: (f64, f64),
+    src_edge: Edge,
+    tgt_edge: Edge,
     obstacles: &[AbsBbox],
     world: AbsBbox,
+    gap: f64,
 ) -> Polyline {
     // Pick a horizontal trunk clear across the full x-span between src
     // and tgt. The trunk is the row the wire travels along between the
@@ -252,12 +321,13 @@ fn detour_facing_horizontal(
     let preferred_y = (src.1 + tgt.1) / 2.0;
     let trunk_y = pick_trunk(&ys, preferred_y);
 
-    // Bend columns: midpoints of the clear strips flanking the obstacle
-    // band, in the y-strip leading from each endpoint to the trunk.
+    // Bend columns on each side: `b1` flanks the obstacle band on src's
+    // side, `b2` on tgt's side. Each must lie on the *exit* side of its
+    // endpoint's edge so the wire heads outward, not back into the shape.
     let (sy_lo, sy_hi) = order(src.1, trunk_y);
     let (ty_lo, ty_hi) = order(trunk_y, tgt.1);
-    let b1 = pick_bend_column(src.0, sy_lo, sy_hi, x_lo, x_hi, obstacles);
-    let b2 = pick_bend_column(tgt.0, ty_lo, ty_hi, x_lo, x_hi, obstacles);
+    let b1 = bend_column_for(src.0, src_edge, sy_lo, sy_hi, obstacles, world, gap);
+    let b2 = bend_column_for(tgt.0, tgt_edge, ty_lo, ty_hi, obstacles, world, gap);
 
     collapse_collinear(vec![
         src,
@@ -269,12 +339,20 @@ fn detour_facing_horizontal(
     ])
 }
 
+#[allow(clippy::too_many_arguments)]
 fn detour_facing_vertical(
     src: (f64, f64),
     tgt: (f64, f64),
+    src_edge: Edge,
+    tgt_edge: Edge,
     obstacles: &[AbsBbox],
     world: AbsBbox,
+    gap: f64,
 ) -> Polyline {
+    // For same-row Bottom↔Top wires the trunk has to live OUTSIDE both
+    // shapes' y range. Pick `b1` and `b2` based on the exit/entry edge so
+    // the wire's first and last legs head outward, then connect them
+    // through a clear trunk column.
     let (y_lo, y_hi) = order(src.1, tgt.1);
     let xs = clear_x_intervals(y_lo, y_hi, obstacles, world.x, world.right());
     let preferred_x = (src.0 + tgt.0) / 2.0;
@@ -282,8 +360,8 @@ fn detour_facing_vertical(
 
     let (sx_lo, sx_hi) = order(src.0, trunk_x);
     let (tx_lo, tx_hi) = order(trunk_x, tgt.0);
-    let b1 = pick_bend_row(src.1, sx_lo, sx_hi, y_lo, y_hi, obstacles);
-    let b2 = pick_bend_row(tgt.1, tx_lo, tx_hi, y_lo, y_hi, obstacles);
+    let b1 = bend_row_for(src.1, src_edge, sx_lo, sx_hi, obstacles, world, gap);
+    let b2 = bend_row_for(tgt.1, tgt_edge, tx_lo, tx_hi, obstacles, world, gap);
 
     collapse_collinear(vec![
         src,
@@ -293,6 +371,55 @@ fn detour_facing_vertical(
         (tgt.0, b2),
         tgt,
     ])
+}
+
+/// Pick a horizontal-jog y-coord on the *exit* side of `edge`. The wire
+/// bends `gap` past the anchor by default — far enough to look clean —
+/// and snaps to the nearest clear strip beyond the edge so it never
+/// folds back into the shape's interior.
+#[allow(clippy::too_many_arguments)]
+fn bend_row_for(
+    anchor: f64,
+    edge: Edge,
+    x_lo: f64,
+    x_hi: f64,
+    obstacles: &[AbsBbox],
+    world: AbsBbox,
+    gap: f64,
+) -> f64 {
+    let (search_lo, search_hi, desired) = match edge {
+        Edge::Bottom => (anchor + 0.5, world.bottom(), anchor + gap),
+        Edge::Top => (world.y, anchor - 0.5, anchor - gap),
+        _ => (world.y, world.bottom(), anchor),
+    };
+    if search_hi <= search_lo {
+        return desired;
+    }
+    let ys = clear_y_intervals(x_lo, x_hi, obstacles, search_lo, search_hi);
+    pick_trunk(&ys, desired)
+}
+
+/// Mirror of `bend_row_for` for vertical-jog x-coords.
+#[allow(clippy::too_many_arguments)]
+fn bend_column_for(
+    anchor: f64,
+    edge: Edge,
+    y_lo: f64,
+    y_hi: f64,
+    obstacles: &[AbsBbox],
+    world: AbsBbox,
+    gap: f64,
+) -> f64 {
+    let (search_lo, search_hi, desired) = match edge {
+        Edge::Right => (anchor + 0.5, world.right(), anchor + gap),
+        Edge::Left => (world.x, anchor - 0.5, anchor - gap),
+        _ => (world.x, world.right(), anchor),
+    };
+    if search_hi <= search_lo {
+        return desired;
+    }
+    let xs = clear_x_intervals(y_lo, y_hi, obstacles, search_lo, search_hi);
+    pick_trunk(&xs, desired)
 }
 
 /// Detour for perpendicular edge pairs (e.g. R+B, T+L). The first and last
@@ -378,11 +505,19 @@ fn pick_clear_row(
     })
 }
 
-/// Midline of the interval closest to `target`. Used to choose the trunk
-/// row/column of a detour.
+/// Pick a trunk row/column close to `target`. If `target` falls inside a
+/// clear interval, use it exactly (so the wire's middle leg lands at the
+/// natural geometric centre); otherwise snap to the closest interval's
+/// midline.
 fn pick_trunk(intervals: &[super::channels::Interval], target: f64) -> f64 {
     nearest_interval(intervals, target)
-        .map(|iv| iv.mid())
+        .map(|iv| {
+            if iv.contains(target) {
+                target
+            } else {
+                iv.mid()
+            }
+        })
         .unwrap_or(target)
 }
 
