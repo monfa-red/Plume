@@ -62,7 +62,7 @@ input_file: samples/wires_realistic.plume
       <polygon class="plume-marker plume-marker-arrow" points="-85.675,-16.5 -95.675,-11.5 -95.675,-21.5" fill="red"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="kitchen.water">
-      <path d="M -130.75 0 L -109.5 0 L -109.5 48.1 L -92.25 48.1" fill="none" stroke="red" stroke-width="2"/>
+      <path d="M -130.75 0 L -125.2312 0 L -125.2312 48.1 L -92.25 48.1" fill="none" stroke="red" stroke-width="2"/>
       <polygon class="plume-marker plume-marker-arrow" points="-89.25,48.1 -99.25,53.1 -99.25,43.1" fill="red"/>
     </g>
     <g class="plume-wire" data-from="kitchen.bowl" data-to="garden.dog">
@@ -74,9 +74,9 @@ input_file: samples/wires_realistic.plume
       <polygon class="plume-marker plume-marker-arrow" points="39.075,-16.5 29.075,-11.5 29.075,-21.5" fill="red"/>
     </g>
     <g class="plume-wire" data-from="kitchen.water" data-to="garden.dog">
-      <path d="M -14.5 36.1 L 10.7875 36.1 L 10.7875 -4.5 L 40.075 -4.5" fill="none" stroke="blue" stroke-width="1"/>
+      <path d="M -14.5 36.1 L -9.5375 36.1 L -9.5375 -4.5 L 40.075 -4.5" fill="none" stroke="blue" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="-17.5,36.1 -11.5,33.1 -11.5,39.1" fill="blue"/>
-      <text x="10.7875" y="15.8" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">shares</text>
+      <text x="-9.5125" y="-4.5" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">shares</text>
     </g>
     <g class="plume-wire" data-from="kitchen.water" data-to="garden.bird">
       <path d="M -14.5 48.1 L 32.5 48.1" fill="none" stroke="blue" stroke-width="1"/>
