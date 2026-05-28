@@ -25,6 +25,8 @@ struct IndexedNode {
     /// Wire clearance uses `max(wire_gap, clearance)` so a wire passing
     /// a shape never sits closer than the layout already spaces shapes.
     clearance: f64,
+    /// Fully-qualified dot-path of this node (same key as `by_path`).
+    path: String,
 }
 
 #[derive(Clone)]
@@ -74,6 +76,7 @@ impl SceneIndex {
                 ancestors: ancestors.to_vec(),
                 is_leaf: node.children.is_empty(),
                 clearance,
+                path: full_path.clone(),
             });
             self.by_path.insert(full_path, i);
             next_ancestors.push(i);
@@ -124,18 +127,7 @@ impl SceneIndex {
     /// layout gap (e.g. `gap:80`) doesn't inflate obstacles so wide that
     /// the wire can't route around them at all.
     pub fn obstacles_for(&self, src_id: &str, tgt_id: &str, wire_gap: f64) -> Vec<AbsBbox> {
-        let src_i = self.by_path.get(src_id).copied();
-        let tgt_i = self.by_path.get(tgt_id).copied();
-        let mut passable: Vec<usize> = Vec::new();
-        if let Some(i) = src_i {
-            passable.push(i);
-            passable.extend(self.nodes[i].ancestors.iter().copied());
-        }
-        if let Some(i) = tgt_i {
-            passable.push(i);
-            passable.extend(self.nodes[i].ancestors.iter().copied());
-        }
-
+        let passable = self.passable_set(src_id, tgt_id);
         let cap = wire_gap * 2.0;
         let mut out = Vec::new();
         for (i, n) in self.nodes.iter().enumerate() {
@@ -150,6 +142,40 @@ impl SceneIndex {
             }
             let pad = wire_gap.max(n.clearance.min(cap));
             out.push(n.bbox.inflate(pad));
+        }
+        out
+    }
+
+    /// Indices of nodes a wire between `src_id` and `tgt_id` may cross: the
+    /// endpoints and all their named ancestors.
+    fn passable_set(&self, src_id: &str, tgt_id: &str) -> Vec<usize> {
+        let mut passable: Vec<usize> = Vec::new();
+        for id in [src_id, tgt_id] {
+            if let Some(&i) = self.by_path.get(id) {
+                passable.push(i);
+                passable.extend(self.nodes[i].ancestors.iter().copied());
+            }
+        }
+        passable
+    }
+
+    /// Like `obstacles_for` but returns each obstacle's *path* and its
+    /// *un-inflated* bbox. The validator inflates by the oracle clearance
+    /// itself, so this stays free of any clearance policy.
+    pub fn raw_obstacles(&self, src_id: &str, tgt_id: &str) -> Vec<(String, AbsBbox)> {
+        let passable = self.passable_set(src_id, tgt_id);
+        let mut out = Vec::new();
+        for (i, n) in self.nodes.iter().enumerate() {
+            if passable.contains(&i) {
+                continue;
+            }
+            if !n.ancestors.iter().all(|a| passable.contains(a)) {
+                continue;
+            }
+            if !n.is_leaf && n.bbox.w == 0.0 && n.bbox.h == 0.0 {
+                continue;
+            }
+            out.push((n.path.clone(), n.bbox));
         }
         out
     }
