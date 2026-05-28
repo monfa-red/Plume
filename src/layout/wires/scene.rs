@@ -7,6 +7,7 @@
 
 use super::geometry::AbsBbox;
 use crate::layout::ir::PlacedNode;
+use crate::resolve::{AttrMap, ResolvedValue};
 use std::collections::HashMap;
 
 pub struct SceneIndex {
@@ -19,6 +20,11 @@ struct IndexedNode {
     /// Indices into `nodes` for every ancestor that has an id, root-first.
     ancestors: Vec<usize>,
     is_leaf: bool,
+    /// Spacing this node enjoys from its layout siblings — driven by the
+    /// parent's `gap` attr (or the scene's gap for top-level shapes).
+    /// Wire clearance uses `max(wire_gap, clearance)` so a wire passing
+    /// a shape never sits closer than the layout already spaces shapes.
+    clearance: f64,
 }
 
 #[derive(Clone)]
@@ -27,13 +33,14 @@ pub struct ShapeRef {
 }
 
 impl SceneIndex {
-    pub fn build(scene_nodes: &[PlacedNode]) -> Self {
+    pub fn build(scene_nodes: &[PlacedNode], scene_attrs: &AttrMap) -> Self {
         let mut idx = SceneIndex {
             nodes: Vec::new(),
             by_path: HashMap::new(),
         };
+        let scene_gap = explicit_gap(scene_attrs).unwrap_or(0.0);
         for node in scene_nodes {
-            idx.walk(node, 0.0, 0.0, &[], &mut Vec::new());
+            idx.walk(node, 0.0, 0.0, &[], &mut Vec::new(), scene_gap);
         }
         idx
     }
@@ -45,6 +52,7 @@ impl SceneIndex {
         parent_cy: f64,
         ancestors: &[usize],
         path_stack: &mut Vec<String>,
+        clearance: f64,
     ) {
         let abs_cx = parent_cx + node.cx;
         let abs_cy = parent_cy + node.cy;
@@ -65,12 +73,26 @@ impl SceneIndex {
                 bbox,
                 ancestors: ancestors.to_vec(),
                 is_leaf: node.children.is_empty(),
+                clearance,
             });
             self.by_path.insert(full_path, i);
             next_ancestors.push(i);
         }
+        // Children inherit this node's `gap` attr as their clearance
+        // (controls space between siblings in this container). Without
+        // an explicit `gap`, fall through to the same clearance we
+        // already have — a deeply-nested unspecified container shouldn't
+        // tighten clearance below the scene-wide default.
+        let child_clearance = explicit_gap(&node.attrs).unwrap_or(clearance);
         for child in &node.children {
-            self.walk(child, abs_cx, abs_cy, &next_ancestors, path_stack);
+            self.walk(
+                child,
+                abs_cx,
+                abs_cy,
+                &next_ancestors,
+                path_stack,
+                child_clearance,
+            );
         }
         if pushed_path {
             path_stack.pop();
@@ -84,10 +106,24 @@ impl SceneIndex {
         })
     }
 
+    /// The clearance this shape inherits from its parent — wire routing
+    /// uses `max(wire_gap, clearance)` for any wire passing this shape.
+    pub fn clearance(&self, path: &str) -> Option<f64> {
+        self.by_path
+            .get(path)
+            .copied()
+            .map(|i| self.nodes[i].clearance)
+    }
+
     /// Obstacles for a wire between `src_id` and `tgt_id`. Each shape is an
     /// obstacle UNLESS it is an endpoint or an ancestor of an endpoint, in
-    /// which case the path is allowed to cross its boundary.
-    pub fn obstacles_for(&self, src_id: &str, tgt_id: &str, gap: f64) -> Vec<AbsBbox> {
+    /// which case the path is allowed to cross its boundary. Each obstacle
+    /// is inflated by `clamp(shape.clearance, wire_gap, 2 * wire_gap)` —
+    /// wires never sit closer to a shape than `wire_gap`, and we honour
+    /// the parent's `gap` setting up to a sensible cap so a generous
+    /// layout gap (e.g. `gap:80`) doesn't inflate obstacles so wide that
+    /// the wire can't route around them at all.
+    pub fn obstacles_for(&self, src_id: &str, tgt_id: &str, wire_gap: f64) -> Vec<AbsBbox> {
         let src_i = self.by_path.get(src_id).copied();
         let tgt_i = self.by_path.get(tgt_id).copied();
         let mut passable: Vec<usize> = Vec::new();
@@ -100,22 +136,20 @@ impl SceneIndex {
             passable.extend(self.nodes[i].ancestors.iter().copied());
         }
 
+        let cap = wire_gap * 2.0;
         let mut out = Vec::new();
         for (i, n) in self.nodes.iter().enumerate() {
             if passable.contains(&i) {
                 continue;
             }
-            // A container only contributes its own frame if all its named
-            // ancestors are passable (otherwise its outer container would
-            // already cover it).
             if !n.ancestors.iter().all(|a| passable.contains(a)) {
                 continue;
             }
-            // Skip degenerate (zero-sized) container labels.
             if !n.is_leaf && n.bbox.w == 0.0 && n.bbox.h == 0.0 {
                 continue;
             }
-            out.push(n.bbox.inflate(gap));
+            let pad = wire_gap.max(n.clearance.min(cap));
+            out.push(n.bbox.inflate(pad));
         }
         out
     }
@@ -147,5 +181,25 @@ impl SceneIndex {
             w: max_x - min_x + pad * 4.0,
             h: max_y - min_y + pad * 4.0,
         }
+    }
+}
+
+/// `gap` attribute as a single scalar — either the value itself or the
+/// larger of `(y_gap, x_gap)` when it's a tuple, so the wire clearance
+/// covers the worst-case axis. Returns `None` if no `gap` attr was set.
+fn explicit_gap(attrs: &AttrMap) -> Option<f64> {
+    let v = attrs.get("gap")?;
+    match v {
+        ResolvedValue::Number(n) => Some(*n),
+        ResolvedValue::Tuple(parts) => {
+            let mut best: Option<f64> = None;
+            for p in parts {
+                if let ResolvedValue::Number(n) = p {
+                    best = Some(best.map_or(*n, |b: f64| b.max(*n)));
+                }
+            }
+            best
+        }
+        _ => None,
     }
 }

@@ -4,7 +4,7 @@ assertion_line: 26
 expression: svg
 input_file: samples/wires_bus.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-186.75 -44.8 373.5 113.6" width="373.5" height="113.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-186.75 -44.8 373.5 121.6" width="373.5" height="121.6" class="plume">
   <defs/>
   <g class="plume-scene" color="#222">
     <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-139.025,0)">
@@ -40,7 +40,7 @@ input_file: samples/wires_bus.plume
       <polygon class="plume-marker plume-marker-arrow" points="-32.3,16 -39.8,19.75 -39.8,12.25" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="bird">
-      <path d="M -139.025 24.8 L -139.025 48.8 L 135.45 48.8 L 135.45 28.8" fill="none" stroke="#444" stroke-width="1.5"/>
+      <path d="M -139.025 24.8 L -139.025 56.8 L 135.45 56.8 L 135.45 28.8" fill="none" stroke="#444" stroke-width="1.5"/>
       <polygon class="plume-marker plume-marker-arrow" points="135.45,25.8 139.2,33.3 131.7,33.3" fill="#444"/>
     </g>
   </g>

@@ -8,8 +8,8 @@
 //   - a wire that has to detour around an unrelated group
 
 {
-  |scene| layout:row gap:30
-  |wire| gap:12
+  |scene| layout:row gap:20
+  |wire| gap:20
   |group| stroke:#aaa
 
   .loud stroke:red thickness:2
@@ -21,12 +21,12 @@
 
 cat |oval| "Cat"
 
-kitchen |group| "Kitchen" layout:column gap:15 padding:25 {
+kitchen |group| "Kitchen" layout:column gap:20 padding:25 {
   bowl  |treat| "Bowl"
   water |treat| "Water"
 }
 
-garden |group| "Garden" layout:column gap:15 padding:12 {
+garden |group| "Garden" layout:column gap:20 padding:12 {
   dog  |treat| "Dog"
   bird |treat| "Bird"
 }

@@ -671,7 +671,16 @@ pub fn redistribute_channels(
             // Clamp into this bundle's own reachable range so its
             // outermost sibling never overflows into a shape obstacle.
             let b = bends[bi].as_ref().unwrap();
-            let centre = centre_raw.clamp(b.clear.0, b.clear.1);
+            let (lo, hi) = if b.clear.0 <= b.clear.1 {
+                (b.clear.0, b.clear.1)
+            } else {
+                // Sibling spread already exceeds the clear strip — pick
+                // the midpoint and accept that outer stamps will
+                // encroach into the obstacle/halo.
+                let mid = (b.clear.0 + b.clear.1) / 2.0;
+                (mid, mid)
+            };
+            let centre = centre_raw.clamp(lo, hi);
             out[bi] = Some(BundleLane {
                 bend: centre,
                 kind: b.kind,

@@ -49,7 +49,7 @@ pub fn route_wires(
     program: &Program,
     scene_nodes: &[PlacedNode],
 ) -> Result<Vec<RoutedWire>, Error> {
-    let scene = SceneIndex::build(scene_nodes);
+    let scene = SceneIndex::build(scene_nodes, &program.scene.attrs);
     let mut specs = plan_segments(program, &scene)?;
 
     // Pad the world bounds by the largest gap so perimeter detours have
@@ -300,19 +300,46 @@ fn try_one_relief(specs: &mut [SegmentSpec], scene: &SceneIndex, world: AbsBbox)
     }
     let mut overload: Option<(String, Edge)> = None;
     for ((shape, edge), keys) in &bins {
-        // Only Z-bundles (facing edges) share a trunk channel.
-        let z_keys: Vec<&Key> = keys.iter().filter(|k| k.1.opposite() == k.3).collect();
+        // Only Z-bundles (facing edges) share a trunk channel — and only
+        // ones that actually bend (not straight aligned ones), because
+        // straight wires don't occupy any trunk x/y.
+        let z_keys: Vec<&Key> = keys
+            .iter()
+            .filter(|k| {
+                if k.1.opposite() != k.3 {
+                    return false;
+                }
+                let sample = &specs[bundle_specs[*k][0]];
+                let src_bbox = sample.src_bbox;
+                let tgt_bbox = sample.tgt_bbox;
+                if k.1.is_horizontal_exit() {
+                    (src_bbox.cy() - tgt_bbox.cy()).abs() > 0.5
+                } else {
+                    (src_bbox.cx() - tgt_bbox.cx()).abs() > 0.5
+                }
+            })
+            .collect();
         if z_keys.len() < 2 {
+            continue;
+        }
+        // Fan-out bundles (e.g. `cat -> bowl & water` becomes a cat→bowl
+        // bundle and a cat→water bundle, both with the same wire span)
+        // are MEANT to share the trunk — they don't crowd each other.
+        // Only count unique wire decls toward the buffer-between count.
+        let unique_spans: HashSet<_> = z_keys
+            .iter()
+            .flat_map(|k| bundle_specs[*k].iter().map(|&i| specs[i].wire.span))
+            .collect();
+        if unique_spans.len() < 2 {
             continue;
         }
         let Some(this_bbox) = scene.lookup(shape).map(|s| s.bbox) else {
             continue;
         };
-        // Channel width = nearest partner edge minus this edge, then
-        // shrunk by the two halos. Use the *closest* partner since
-        // that's the binding constraint.
+        let this_clearance = scene.clearance(shape).unwrap_or(0.0).max(gap);
         let mut min_partner_gap = f64::INFINITY;
-        let mut required = (z_keys.len() as f64 - 1.0) * gap;
+        let mut min_partner_clearance = f64::INFINITY;
+        let mut required = (unique_spans.len() as f64 - 1.0) * gap;
         for k in &z_keys {
             let on_src = k.0 == *shape && k.1 == *edge;
             let partner = if on_src { &k.2 } else { &k.0 };
@@ -323,13 +350,17 @@ fn try_one_relief(specs: &mut [SegmentSpec], scene: &SceneIndex, world: AbsBbox)
             if pg < min_partner_gap {
                 min_partner_gap = pg;
             }
+            let pc = scene.clearance(partner).unwrap_or(0.0).max(gap);
+            if pc < min_partner_clearance {
+                min_partner_clearance = pc;
+            }
             let span_slots: HashSet<_> = bundle_specs[*k]
                 .iter()
                 .map(|&i| specs[i].wire.span)
                 .collect();
             required += (span_slots.len() as f64 - 1.0).max(0.0) * gap;
         }
-        let available = (min_partner_gap - 2.0 * gap).max(0.0);
+        let available = (min_partner_gap - this_clearance - min_partner_clearance).max(0.0);
         if required > available {
             overload = Some((shape.clone(), *edge));
             break;
