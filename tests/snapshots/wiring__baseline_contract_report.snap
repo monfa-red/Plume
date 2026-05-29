@@ -2,8 +2,8 @@
 source: tests/wiring.rs
 expression: report
 ---
-Dumb-router baseline — validator counts per sample.
-A* invariants (A3 = shared parallel runs); B1 = node overlap;
+Router contract scorecard — validator counts per sample.
+A1–A5 invariants; A3 = shared parallel runs; B1 = node overlap;
 B2n = wire-node clearance; B2w = wire-wire separation; X = B3 crossings.
 
 anchors.plume          A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
@@ -22,10 +22,10 @@ templates_all.plume    A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 type_defaults.plume    A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 wires_anchors.plume    A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 wires_basic.plume      A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
-wires_chain.plume      A1:0 A2:0 A3:1 A4:0 A5:0  B1:0 B2n:0 B2w:1  X:0
+wires_chain.plume      A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:1
 wires_dense.plume      A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
-wires_fan.plume        A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:1  X:1
+wires_fan.plume        A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:1
 wires_labels.plume     A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:9  X:0
-wires_realistic.plume  A1:0 A2:0 A3:4 A4:0 A5:0  B1:0 B2n:0 B2w:4  X:6
+wires_realistic.plume  A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:8
 
-TOTAL                  A1:0 A2:0 A3:5 A4:0 A5:0  B1:0 B2n:0 B2w:15  X:7
+TOTAL                  A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:9  X:10

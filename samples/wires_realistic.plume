@@ -8,25 +8,25 @@
 //   - a wire that has to detour around an unrelated group
 
 {
-  |scene| layout:row gap:8
-  |wire| clearance:6   // < the scene gap:8, so wires can thread between nodes
+  |scene| layout:row gap:48
+  |wire| clearance:6   // « the channel widths, so parallel bundles fan cleanly
   |group| stroke:#aaa
 
   .loud stroke:red thickness:2
   .quiet stroke:blue
   .happy stroke:green
 
-  |treat:rect| radius:4 fill:#eee
+  |treat:rect| radius:4 fill:#eee size:(90,64)
 }
 
 cat |oval| "Cat"
 
-kitchen |group| "Kitchen" layout:column padding:20 {
+kitchen |group| "Kitchen" layout:column padding:24 gap:48 {
   bowl  |treat| "Bowl"
   water |treat| "Water"
 }
 
-garden |group| "Garden" layout:column padding:10 {
+garden |group| "Garden" layout:column padding:24 gap:48 {
   dog  |treat| "Dog"
   bird |treat| "Bird"
 }

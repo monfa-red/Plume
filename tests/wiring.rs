@@ -68,16 +68,17 @@ fn rule_counts(src: &str) -> [usize; 9] {
     c
 }
 
-/// The dumb router's contract scorecard across the whole sample suite — the
-/// measured starting point each later phase drives toward zero. A1/A2/A4/A5 are
-/// already clean by construction; A3 (shared runs), B1 (node overlap) and B2
-/// (clearance / separation) are the dumb router's expected, now-quantified debt.
+/// The router's contract scorecard across the whole sample suite. Invariants
+/// (A1–A5) and B1/B2n hold everywhere; A3 shared runs are gone; the only B2w left
+/// is `wires_labels`, where five wires are crammed onto one tiny edge — genuine
+/// C5 overflow that WIRING flags rather than removes. X counts perpendicular
+/// crossings, which are normal output.
 #[test]
 fn baseline_contract_report() {
     use std::fmt::Write;
     let mut report = String::new();
-    report.push_str("Dumb-router baseline — validator counts per sample.\n");
-    report.push_str("A* invariants (A3 = shared parallel runs); B1 = node overlap;\n");
+    report.push_str("Router contract scorecard — validator counts per sample.\n");
+    report.push_str("A1–A5 invariants; A3 = shared parallel runs; B1 = node overlap;\n");
     report.push_str("B2n = wire-node clearance; B2w = wire-wire separation; X = B3 crossings.\n\n");
 
     let mut totals = [0usize; 9];

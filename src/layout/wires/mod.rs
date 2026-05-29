@@ -8,6 +8,7 @@
 
 mod geometry;
 mod graph;
+mod nudge;
 mod oracle;
 mod ports;
 mod route;
@@ -83,6 +84,10 @@ pub fn route_wires(program: &Program, nodes: &[PlacedNode]) -> Result<Vec<Routed
         .unwrap_or_else(|| dumb_route(plan.port_a, plan.side_a, plan.port_b, plan.side_b));
         out.push(build_wire(meta, req, path));
     }
+
+    // 4. Global nudge: spread shared/near-parallel runs onto clean tracks,
+    //    committing only the separations that keep wires clear of nodes.
+    nudge::nudge(&mut out, nodes);
     Ok(out)
 }
 

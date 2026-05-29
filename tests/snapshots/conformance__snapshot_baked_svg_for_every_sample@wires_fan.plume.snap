@@ -45,12 +45,12 @@ input_file: samples/wires_fan.plume
   </g>
   <g class="plume-wires">
     <g class="plume-wire" data-from="fox" data-to="mouse">
-      <path d="M -11.725 -144.2 L -11.725 -159.2 L -16 -159.2 L -16 -170.2" fill="none" stroke="#444" stroke-width="1"/>
+      <path d="M -11.725 -144.2 L -11.725 -151.95 L -16 -151.95 L -16 -170.2" fill="none" stroke="#444" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="-16,-174.2 -13.5,-169.2 -18.5,-169.2" fill="#444"/>
       <text x="-13.8625" y="-159.2" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">hunts</text>
     </g>
     <g class="plume-wire" data-from="owl" data-to="mouse">
-      <path d="M 0 -64.6 L 0 -78.6 L -43.725 -78.6 L -43.725 -160.2 L 0 -160.2 L 0 -170.2" fill="none" stroke="#444" stroke-width="1"/>
+      <path d="M 0 -64.6 L 0 -78.6 L -43.725 -78.6 L -43.725 -167.95 L 0 -167.95 L 0 -170.2" fill="none" stroke="#444" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="0,-174.2 2.5,-169.2 -2.5,-169.2" fill="#444"/>
       <text x="-43.725" y="-119.4" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">hunts</text>
     </g>
