@@ -237,7 +237,6 @@ pub enum LineStyle {
     Solid,  // -
     Dashed, // --
     Dotted, // -.-
-    Double, // =
     Wavy,   // ~
 }
 
@@ -247,7 +246,6 @@ impl LineStyle {
             Self::Solid => "-",
             Self::Dashed => "--",
             Self::Dotted => "-.-",
-            Self::Double => "=",
             Self::Wavy => "~",
         }
     }

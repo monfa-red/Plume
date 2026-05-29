@@ -1,12 +1,11 @@
 ---
 source: tests/conformance.rs
-assertion_line: 26
 expression: svg
 input_file: samples/markers_all.plume
 ---
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-80.5 -73 161 146" width="161" height="146" class="plume">
   <defs/>
-  <g class="plume-scene" color="#222">
+  <g class="plume-scene" color="black">
     <g class="plume-node plume-shape-line" transform="translate(0,-52.5)">
       <line x1="-60" y1="0" x2="60" y2="0" stroke="#444" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="59,0 53,3 53,-3" fill="#444"/>

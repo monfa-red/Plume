@@ -1,22 +1,21 @@
 ---
 source: tests/conformance.rs
-assertion_line: 26
 expression: svg
 input_file: samples/wires_dense.plume
 ---
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-141 -100.5 282 201" width="282" height="201" class="plume">
   <defs/>
-  <g class="plume-scene" color="#222">
+  <g class="plume-scene" color="black">
     <g class="plume-node plume-shape-rect" data-id="src" transform="translate(-90.5,0)">
       <rect x="-30" y="-80" width="60" height="160" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Src</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Src</text>
       </g>
     </g>
     <g class="plume-node plume-shape-rect" data-id="dst" transform="translate(90.5,0)">
       <rect x="-30" y="-80" width="60" height="160" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Dst</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Dst</text>
       </g>
     </g>
   </g>

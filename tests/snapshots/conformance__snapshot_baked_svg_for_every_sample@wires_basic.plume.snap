@@ -1,22 +1,21 @@
 ---
 source: tests/conformance.rs
-assertion_line: 26
 expression: svg
 input_file: samples/wires_basic.plume
 ---
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-85.45 -44.8 170.9 89.6" width="170.9" height="89.6" class="plume">
   <defs/>
-  <g class="plume-scene" color="#222">
+  <g class="plume-scene" color="black">
     <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-37.725,0)">
       <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Cat</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Cat</text>
       </g>
     </g>
     <g class="plume-node plume-shape-rect" data-id="dog" transform="translate(37.725,0)">
       <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Dog</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Dog</text>
       </g>
     </g>
   </g>

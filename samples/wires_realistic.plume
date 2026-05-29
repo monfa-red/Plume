@@ -9,7 +9,7 @@
 
 {
   |scene| layout:row gap:8
-  |wire| gap:10
+  |wire| clearance:10
   |group| stroke:#aaa
 
   .loud stroke:red thickness:2

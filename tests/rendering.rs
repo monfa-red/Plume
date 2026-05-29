@@ -32,9 +32,9 @@ fn bake_mode_resolves_var_refs_to_literals() {
     assert!(svg.contains("fill=\"white\""), "{}", svg);
     assert!(svg.contains("stroke=\"#444\""), "{}", svg);
     // Text fill is `currentColor` (SVG-native cascade), and the scene root
-    // sets `color` to the baked `--text-color` (= --fg = #222).
+    // sets `color` to the baked `--text-color` (= --fg = black).
     assert!(svg.contains("fill=\"currentColor\""), "{}", svg);
-    assert!(svg.contains("color=\"#222\""), "{}", svg);
+    assert!(svg.contains("color=\"black\""), "{}", svg);
     assert!(
         !svg.contains("@layer plume.defaults"),
         "bake mode should omit the defaults style block"

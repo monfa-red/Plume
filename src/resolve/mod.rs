@@ -764,9 +764,8 @@ fn inject_line_style(attrs: &mut AttrMap, line: LineStyle) {
         LineStyle::Solid => return,
         LineStyle::Dashed => "dashed",
         LineStyle::Dotted => "dotted",
-        // double / wavy aren't first-class in the renderer yet — treat as solid
-        // visually but tag them so render can branch later.
-        LineStyle::Double => "double",
+        // wavy isn't first-class in the renderer yet — tagged so render can
+        // branch later.
         LineStyle::Wavy => "wavy",
     };
     // Don't override an explicit stroke-style attr.

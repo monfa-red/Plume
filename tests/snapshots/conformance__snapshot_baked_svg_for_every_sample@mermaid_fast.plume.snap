@@ -1,70 +1,69 @@
 ---
 source: tests/conformance.rs
-assertion_line: 26
 expression: svg
 input_file: samples/mermaid_fast.plume
 ---
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-412.275 -44.8 824.55 89.6" width="824.55" height="89.6" class="plume">
   <defs/>
-  <g class="plume-scene" color="#222">
+  <g class="plume-scene" color="black">
     <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-364.55,0)">
       <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">cat</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">cat</text>
       </g>
     </g>
     <g class="plume-node plume-shape-rect" data-id="dog" transform="translate(-289.1,0)">
       <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">dog</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">dog</text>
       </g>
     </g>
     <g class="plume-node plume-shape-rect" data-id="bird" transform="translate(-210.075,0)">
       <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">bird</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">bird</text>
       </g>
     </g>
     <g class="plume-node plume-shape-rect" data-id="fox" transform="translate(-131.05,0)">
       <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">fox</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">fox</text>
       </g>
     </g>
     <g class="plume-node plume-shape-rect" data-id="owl" transform="translate(-55.6,0)">
       <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">owl</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">owl</text>
       </g>
     </g>
     <g class="plume-node plume-shape-rect" data-id="mouse" transform="translate(27,0)">
       <rect x="-34.375" y="-24.3" width="68.75" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">mouse</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">mouse</text>
       </g>
     </g>
     <g class="plume-node plume-shape-rect" data-id="frog" transform="translate(113.175,0)">
       <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">frog</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">frog</text>
       </g>
     </g>
     <g class="plume-node plume-shape-rect" data-id="pond" transform="translate(195.775,0)">
       <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">pond</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">pond</text>
       </g>
     </g>
     <g class="plume-node plume-shape-rect" data-id="fish" transform="translate(278.375,0)">
       <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">fish</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">fish</text>
       </g>
     </g>
     <g class="plume-node plume-shape-rect" data-id="bowl" transform="translate(360.975,0)">
       <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">bowl</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">bowl</text>
       </g>
     </g>
   </g>

@@ -108,7 +108,7 @@ impl<'a> Lexer<'a> {
                 }
                 b'+' => self.lex_number()?,
                 // Wire-op starts: any of these characters can begin a wire op.
-                b'-' | b'=' | b'~' | b'<' | b'>' => self.lex_wire_op()?,
+                b'-' | b'~' | b'<' | b'>' => self.lex_wire_op()?,
                 // `o` is a wire-op start marker only when followed by a line char.
                 b'o' if self.peek(1).is_some_and(is_wire_line_start) => self.lex_wire_op()?,
                 d if d.is_ascii_digit() => self.lex_number()?,
@@ -364,7 +364,7 @@ impl<'a> Lexer<'a> {
 
     fn consume_line(&self, p: &mut usize) -> Option<LineStyle> {
         let rest = self.bytes.get(*p..)?;
-        // Longest match: `-.-`, `--`, `-`, `=`, `~`.
+        // Longest match: `-.-`, `--`, `-`, `~`.
         if rest.starts_with(b"-.-") {
             *p += 3;
             return Some(LineStyle::Dotted);
@@ -384,10 +384,6 @@ impl<'a> Lexer<'a> {
                 *p += 1;
                 Some(LineStyle::Solid)
             }
-            b'=' => {
-                *p += 1;
-                Some(LineStyle::Double)
-            }
             b'~' => {
                 *p += 1;
                 Some(LineStyle::Wavy)
@@ -404,7 +400,7 @@ enum MarkerSide {
 }
 
 fn is_wire_line_start(c: u8) -> bool {
-    matches!(c, b'-' | b'=' | b'~')
+    matches!(c, b'-' | b'~')
 }
 
 fn is_ident_start(c: u8) -> bool {

@@ -3,4 +3,4 @@
 cat -> dog -> bird           // 3 implicit rects, 2 wires
 fox & owl -> mouse           // fan-in
 frog ~> pond                 // wavy
-fish =o bowl                 // double + dot end
+fish --> bowl                // dashed arrow

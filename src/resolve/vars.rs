@@ -9,7 +9,7 @@ pub fn built_in_defaults() -> VarTable {
 
     // Visual vars — live at runtime.
     set_visual(&mut t, "bg", ResolvedValue::Ident("white".into()));
-    set_visual(&mut t, "fg", ResolvedValue::Hex("222".into()));
+    set_visual(&mut t, "fg", ResolvedValue::Ident("black".into()));
     set_visual(&mut t, "fill", ResolvedValue::Ident("white".into()));
     set_visual(&mut t, "stroke", ResolvedValue::Hex("444".into()));
     set_visual(&mut t, "accent", ResolvedValue::Hex("0a84ff".into()));
@@ -18,11 +18,7 @@ pub fn built_in_defaults() -> VarTable {
     set_visual(&mut t, "danger", ResolvedValue::Ident("crimson".into()));
     set_visual(&mut t, "warn", ResolvedValue::Ident("orange".into()));
     set_visual(&mut t, "note-bg", ResolvedValue::Hex("fff9c4".into()));
-    set_visual(
-        &mut t,
-        "font",
-        ResolvedValue::String("system-ui, -apple-system, sans-serif".into()),
-    );
+    set_visual(&mut t, "font", ResolvedValue::String("sans-serif".into()));
     // text-color defaults to var(--plume-fg).
     set_visual(
         &mut t,
@@ -62,7 +58,7 @@ pub fn built_in_defaults() -> VarTable {
     set_layout_n(&mut t, "arrow-head", 6.0);
     set_layout_n(&mut t, "icon-size", 24.0);
     set_layout_n(&mut t, "canvas-pad", 20.0);
-    set_layout_n(&mut t, "wire-gap", 16.0);
+    set_layout_n(&mut t, "clearance", 16.0);
 
     t
 }

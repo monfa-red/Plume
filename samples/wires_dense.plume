@@ -2,7 +2,7 @@
 // into clean evenly-spaced rails (room exists, so zero R3).
 {
   |scene| layout:row gap:120
-  |wire| gap:12
+  |wire| clearance:12
 }
 
 src |rect| "Src" size:(60,160)
