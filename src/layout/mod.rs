@@ -5,10 +5,8 @@ mod ir;
 mod primitives;
 mod text;
 mod values;
-mod wires;
 
 pub use ir::*;
-pub use wires::{Rule, Severity, Violation};
 
 use crate::error::Error;
 use crate::resolve::{Program, ResolvedInst, ResolvedValue, ShapeKind, VarTable};
@@ -33,40 +31,21 @@ pub fn layout(program: &Program) -> Result<LaidOut, Error> {
         Span::empty(),
     )?;
 
-    // Route wires after nodes are placed.
-    let routed_wires = wires::route_wires(program, &top_nodes)?;
-
-    // Compute viewbox = (scene bbox ∪ wire paths) + canvas-pad on every side.
+    // Compute viewbox = scene bbox + canvas-pad on every side.
     let pad = values::layout_var(&program.vars, "canvas-pad").unwrap_or(20.0);
-    let mut bbox = scene_bbox;
-    for w in &routed_wires {
-        for (x, y) in &w.path {
-            bbox.min_x = bbox.min_x.min(*x);
-            bbox.min_y = bbox.min_y.min(*y);
-            bbox.max_x = bbox.max_x.max(*x);
-            bbox.max_y = bbox.max_y.max(*y);
-        }
-    }
     let vb = ViewBox {
-        x: bbox.min_x - pad,
-        y: bbox.min_y - pad,
-        w: bbox.w() + 2.0 * pad,
-        h: bbox.h() + 2.0 * pad,
+        x: scene_bbox.min_x - pad,
+        y: scene_bbox.min_y - pad,
+        w: scene_bbox.w() + 2.0 * pad,
+        h: scene_bbox.h() + 2.0 * pad,
     };
 
     Ok(LaidOut {
         viewbox: vb,
         scene_attrs: program.scene.attrs.clone(),
         nodes: top_nodes,
-        wires: routed_wires,
         vars: program.vars.clone(),
     })
-}
-
-/// Run the routing validator over a laid-out scene. See
-/// `docs/superpowers/specs/2026-05-28-wire-routing-rules-design.md`.
-pub fn validate_routing(laid: &LaidOut) -> Vec<Violation> {
-    wires::validate_routing(&laid.nodes, &laid.scene_attrs, &laid.wires, &laid.vars)
 }
 
 /// Recursively lay out a single instance into a PlacedNode.
@@ -473,112 +452,6 @@ mod tests {
         );
         let dx = l.nodes[1].cx - l.nodes[0].cx;
         assert!((dx - 100.0).abs() < 2.0, "dx={}", dx);
-    }
-
-    #[test]
-    fn wire_between_two_rects_produces_path() {
-        let l = lay_out(
-            "{ |scene| layout:row gap:80 }\n\
-             cat |rect| size:(60, 40)\n\
-             dog |rect| size:(60, 40)\n\
-             cat -> dog\n",
-        );
-        assert_eq!(l.wires.len(), 1);
-        let w = &l.wires[0];
-        assert!(w.path.len() >= 2, "path={:?}", w.path);
-        assert_eq!(w.markers.start, crate::resolve::MarkerKind::None);
-        assert_eq!(w.markers.end, crate::resolve::MarkerKind::Arrow);
-    }
-
-    #[test]
-    fn chain_wire_splits_into_subwires_with_markers_on_outer_ends() {
-        let l = lay_out(
-            "{ |scene| layout:row gap:40 }\n\
-             cat  |rect| size:(40, 40)\n\
-             dog  |rect| size:(40, 40)\n\
-             bird |rect| size:(40, 40)\n\
-             cat -> dog -> bird\n",
-        );
-        assert_eq!(l.wires.len(), 2, "expected 2 sub-wires for cat→dog→bird");
-        assert_eq!(l.wires[0].markers.end, crate::resolve::MarkerKind::None);
-        assert_eq!(l.wires[1].markers.end, crate::resolve::MarkerKind::Arrow);
-    }
-
-    #[test]
-    fn auto_edge_picks_right_when_target_to_the_right() {
-        let l = lay_out(
-            "{ |scene| layout:row gap:80 }\n\
-             cat |rect| size:(60, 40)\n\
-             dog |rect| size:(60, 40)\n\
-             cat -> dog\n",
-        );
-        let w = &l.wires[0];
-        let a = &l.nodes[0];
-        let a_right = a.cx + a.bbox.w() / 2.0;
-        assert!(
-            (w.path[0].0 - a_right).abs() < 1.0,
-            "first point x={} != cat's right edge {}",
-            w.path[0].0,
-            a_right
-        );
-    }
-
-    #[test]
-    fn wire_routes_around_intermediate_shape() {
-        let l = lay_out(
-            "{ |scene| padding:20 }\n\
-             cat  |rect| size:(40, 40) at:(0, 0)\n\
-             dog  |rect| size:(40, 40) at:(100, 0)\n\
-             bird |rect| size:(40, 40) at:(200, 0)\n\
-             cat -> bird\n",
-        );
-        let w = &l.wires[0];
-        let mid = &l.nodes[1];
-        let m_left = mid.cx - mid.bbox.w() / 2.0;
-        let m_right = mid.cx + mid.bbox.w() / 2.0;
-        let m_top = mid.cy - mid.bbox.h() / 2.0;
-        let m_bot = mid.cy + mid.bbox.h() / 2.0;
-        for &(x, y) in &w.path {
-            let inside =
-                x > m_left + 0.5 && x < m_right - 0.5 && y > m_top + 0.5 && y < m_bot - 0.5;
-            assert!(!inside, "path point ({}, {}) inside dog's bbox", x, y);
-        }
-    }
-
-    #[test]
-    fn wire_label_lands_on_path() {
-        let l = lay_out(
-            "{ |scene| layout:row gap:80 }\n\
-             cat |rect| size:(60, 40)\n\
-             dog |rect| size:(60, 40)\n\
-             cat -> dog \"CAN\"\n",
-        );
-        let w = &l.wires[0];
-        assert_eq!(w.texts.len(), 1);
-        assert_eq!(w.texts[0].content, "CAN");
-        let mid_x = (w.path[0].0 + w.path.last().unwrap().0) / 2.0;
-        assert!(
-            (w.texts[0].position.0 - mid_x).abs() < 30.0,
-            "label x={} far from midpoint {}",
-            w.texts[0].position.0,
-            mid_x
-        );
-    }
-
-    #[test]
-    fn full_spec_example_routes_all_wires() {
-        let src = std::fs::read_to_string("samples/full_example.plume").unwrap();
-        let tokens = crate::lexer::lex(&src).expect("lex");
-        let file = crate::parser::parse(&tokens).expect("parse");
-        let program = crate::resolve::resolve(file).expect("resolve");
-        let l = layout(&program).expect("layout");
-        // The §20 example has 5 wire decls totalling 10 sub-segments:
-        //   cat→bowl→water→rabbit→carrot (4)
-        //   cat→apple→mug                (2)
-        //   water→frog→fish              (2)
-        //   treehouse↔kitchen            (1)
-        //   owl→rabbit                   (1)
-        assert_eq!(l.wires.len(), 10, "got {} routed wires", l.wires.len());
     }
 
     #[test]

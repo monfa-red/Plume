@@ -1,9 +1,10 @@
 ---
 source: tests/conformance.rs
+assertion_line: 26
 expression: svg
 input_file: samples/wires_bus.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-186.75 -44.8 373.5 169.6" width="373.5" height="169.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-186.75 -44.8 373.5 89.6" width="373.5" height="89.6" class="plume">
   <defs/>
   <g class="plume-scene" color="#222">
     <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-139.025,0)">
@@ -25,22 +26,5 @@ input_file: samples/wires_bus.plume
       </g>
     </g>
   </g>
-  <g class="plume-wires">
-    <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -111.3 -20.8 L -103.3 -20.8 L -103.3 -16 L -35.3 -16" fill="none" stroke="#444" stroke-width="1.5"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-32.3,-16 -39.8,-12.25 -39.8,-19.75" fill="#444"/>
-    </g>
-    <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -111.3 -4.9333 L -103.3 -4.9333 L -103.3 0 L -35.3 0" fill="none" stroke="#444" stroke-width="1.5"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-32.3,0 -39.8,3.75 -39.8,-3.75" fill="#444"/>
-    </g>
-    <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -111.3 10.9333 L -103.3 10.9333 L -103.3 16 L -35.3 16" fill="none" stroke="#444" stroke-width="1.5"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-32.3,16 -39.8,19.75 -39.8,12.25" fill="#444"/>
-    </g>
-    <g class="plume-wire" data-from="cat" data-to="bird">
-      <path d="M -139.025 24.8 L -139.025 104.8 L 135.45 104.8 L 135.45 28.8" fill="none" stroke="#444" stroke-width="1.5"/>
-      <polygon class="plume-marker plume-marker-arrow" points="135.45,25.8 139.2,33.3 131.7,33.3" fill="#444"/>
-    </g>
-  </g>
+  <g class="plume-wires"/>
 </svg>

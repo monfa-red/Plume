@@ -23,7 +23,6 @@ See [SPEC.md](SPEC.md) for the language reference and [IMPLEMENTATION.md](IMPLEM
 - **User-defined shapes** that can carry internal children **and** internal wires that follow you into every instance.
 - **Styles** as reusable attribute bundles (`.loud stroke:red thickness:2`).
 - **CSS-themable.** Visual defaults emit as live `var()` references; `--bake-vars` inlines them for resvg, librsvg, email.
-- **Smart wire routing.** Orthogonal A* with bend penalty, multi-edge candidates, lane fanning for parallels, 4-tier fallback.
 - **Formatter, linter, live dev server** with SSE auto-reload, all in the same binary.
 - **LSP-formatted errors** (`file:line:col: error: …`).
 
@@ -144,7 +143,7 @@ cargo run -- serve samples/full_example.plume
 
 ## Status
 
-Pre-1.0. Spec is frozen; the compiler ships the full pipeline (lex → parse → resolve → layout → route → render) with 86 passing tests over 25 samples.
+Pre-1.0. Spec is frozen; the compiler ships the pipeline (lex → parse → resolve → layout → render) with 83 passing tests over 25 samples. Wire routing/rendering is being rebuilt — wires parse and resolve, but are not yet drawn.
 
 ## License
 

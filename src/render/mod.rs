@@ -2,7 +2,6 @@ mod markers;
 mod primitives;
 mod style_block;
 mod values;
-mod wires;
 
 use crate::layout::{LaidOut, PlacedNode};
 use crate::resolve::ResolvedValue;
@@ -47,15 +46,8 @@ pub fn render(laid_out: &LaidOut, opts: &Options) -> String {
     }
     out.push_str("  </g>\n");
 
-    if laid_out.wires.is_empty() {
-        out.push_str("  <g class=\"plume-wires\"/>\n");
-    } else {
-        out.push_str("  <g class=\"plume-wires\">\n");
-        for wire in &laid_out.wires {
-            wires::render_wire(&mut out, wire, &laid_out.vars, opts);
-        }
-        out.push_str("  </g>\n");
-    }
+    // Wires resolve but are not drawn yet; emit an empty placeholder group.
+    out.push_str("  <g class=\"plume-wires\"/>\n");
 
     out.push_str("</svg>\n");
     out

@@ -13,7 +13,6 @@ mod theme;
 
 pub use error::{Diagnostic, Error, Level};
 pub use fmt::format as format_source;
-pub use layout::{Rule, Severity, Violation};
 pub use serve::serve;
 pub use theme::extract_plume_vars;
 
@@ -99,45 +98,6 @@ pub fn check(src: &str) -> Result<(), Error> {
 pub fn check_with(src: &str, opts: &Options) -> Result<(), Error> {
     let _ = resolve_pipeline(src, opts)?;
     Ok(())
-}
-
-/// Lex, parse, resolve, lay out, route, then validate the routing against the
-/// contract (R1–R6 in the rules-spec). Returns the list of violations (empty =
-/// clean). Parse or resolve errors surface as `Err`.
-pub fn validate_str(src: &str) -> Result<Vec<Violation>, Error> {
-    let program = resolve_pipeline(src, &Options::default())?;
-    let laid_out = layout::layout(&program)?;
-    Ok(layout::validate_routing(&laid_out))
-}
-
-/// One routed wire's polyline and its segment endpoint ids — the raw material
-/// for routing-quality analysis and tests.
-pub struct WirePath {
-    pub from: String,
-    pub to: String,
-    pub points: Vec<(f64, f64)>,
-    /// Absolute centres of the source and target shapes (edge-choice
-    /// independent), for scoring a route against the straight shape distance.
-    pub from_center: (f64, f64),
-    pub to_center: (f64, f64),
-}
-
-/// Route `src` and return every wire's polyline (in scene coordinates). For
-/// quality analysis beyond the legality contract (detours, crossings, bends).
-pub fn route_str(src: &str) -> Result<Vec<WirePath>, Error> {
-    let program = resolve_pipeline(src, &Options::default())?;
-    let laid_out = layout::layout(&program)?;
-    Ok(laid_out
-        .wires
-        .iter()
-        .map(|w| WirePath {
-            from: w.seg_from.clone(),
-            to: w.seg_to.clone(),
-            points: w.path.clone(),
-            from_center: w.from_center,
-            to_center: w.to_center,
-        })
-        .collect())
 }
 
 fn resolve_pipeline(src: &str, opts: &Options) -> Result<resolve::Program, Error> {

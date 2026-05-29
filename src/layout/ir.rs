@@ -9,48 +9,9 @@ pub struct LaidOut {
     pub viewbox: ViewBox,
     pub scene_attrs: AttrMap,
     pub nodes: Vec<PlacedNode>,
-    pub wires: Vec<RoutedWire>,
     /// Resolved CSS variables — carried through to render so the `<style>`
     /// block and `--bake-vars` mode can both read them.
     pub vars: VarTable,
-}
-
-#[derive(Clone)]
-pub struct RoutedWire {
-    /// Orthogonal polyline through the scene, in scene coordinates.
-    pub path: Vec<(f64, f64)>,
-    pub markers: Markers,
-    pub attrs: AttrMap,
-    pub texts: Vec<RoutedText>,
-    /// First and last endpoint IDs of the chain this segment belongs to —
-    /// emitted as `data-from` / `data-to` for CSS / a11y hooks.
-    pub data_from: String,
-    pub data_to: String,
-    /// This segment's own endpoint ids (resolved dot-paths). For a chain
-    /// `a -> b -> c`, the `b -> c` segment has `seg_from = "b"`, `seg_to = "c"`
-    /// (whereas `data_from`/`data_to` stay the chain ends `a`/`c`). The
-    /// validator uses these to know which shapes the wire may touch.
-    pub seg_from: String,
-    pub seg_to: String,
-    /// Span of the wire *declaration* this segment came from. Segments sharing
-    /// a `decl_span` are siblings of one statement (chain links or a
-    /// `a -> b & c` fan-out) and are exempt from wire-spacing checks where
-    /// they coincide.
-    pub decl_span: Span,
-    /// Absolute centres of this segment's source and target shapes. Used by the
-    /// routing-quality analysis to score a route against the straight
-    /// shape-to-shape distance (edge choice independent).
-    pub from_center: (f64, f64),
-    pub to_center: (f64, f64),
-}
-
-#[derive(Clone)]
-pub struct RoutedText {
-    pub content: String,
-    pub position: (f64, f64),
-    /// Unit tangent at the text position (for rotation / offset frame).
-    pub tangent: (f64, f64),
-    pub attrs: AttrMap,
 }
 
 #[derive(Debug, Clone, Copy)]

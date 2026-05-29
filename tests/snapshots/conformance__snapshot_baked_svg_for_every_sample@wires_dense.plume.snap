@@ -1,5 +1,6 @@
 ---
 source: tests/conformance.rs
+assertion_line: 26
 expression: svg
 input_file: samples/wires_dense.plume
 ---
@@ -19,26 +20,5 @@ input_file: samples/wires_dense.plume
       </g>
     </g>
   </g>
-  <g class="plume-wires">
-    <g class="plume-wire" data-from="src" data-to="dst">
-      <path d="M -60 -24 L 56 -24" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="59,-24 53,-21 53,-27" fill="#444"/>
-    </g>
-    <g class="plume-wire" data-from="src" data-to="dst">
-      <path d="M -60 -12 L 56 -12" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="59,-12 53,-9 53,-15" fill="#444"/>
-    </g>
-    <g class="plume-wire" data-from="src" data-to="dst">
-      <path d="M -60 0 L 56 0" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="59,0 53,3 53,-3" fill="#444"/>
-    </g>
-    <g class="plume-wire" data-from="src" data-to="dst">
-      <path d="M -60 12 L 56 12" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="59,12 53,15 53,9" fill="#444"/>
-    </g>
-    <g class="plume-wire" data-from="src" data-to="dst">
-      <path d="M -60 24 L 56 24" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="59,24 53,27 53,21" fill="#444"/>
-    </g>
-  </g>
+  <g class="plume-wires"/>
 </svg>
