@@ -50,6 +50,9 @@ plume/
 │   ├── layout/
 │   │   ├── mod.rs, ir.rs, primitives.rs, flex.rs, grid.rs
 │   │   ├── anchors.rs, text.rs, values.rs
+│   │   ├── wires/   # the wire router (see WIRING.md + PLAN.md)
+│   │   │   ├── mod.rs, oracle.rs, scene.rs, graph.rs, route.rs
+│   │   │   ├── ports.rs, nudge.rs, validate.rs, geometry.rs, text.rs
 │   ├── render/
 │   │   ├── mod.rs, primitives.rs, markers.rs
 │   │   ├── values.rs, style_block.rs
@@ -79,7 +82,7 @@ The pipeline is on v2 syntax end-to-end and snapshot-tested against 25 samples i
 | Lexer / parser | v2 syntax: `\|type\|` for refs, `key:value` attrs (no whitespace around `:`), single defs block led by sigil (`\|scene\|`, `\|name:base\|`, `.style`, `--name:value`), composable wire operators (5 line styles × 5 markers each side), `&` fan, dot-path endpoints with optional `.side`. |
 | Resolve | Defs walker (vars / scene config / styles / shapes). Auto-create root rects for unknown wire endpoints. Suffix-match endpoint dot-paths against the scene tree. Cartesian fan expansion. Internal wires in shape defs materialise per-instance with prefixed paths. Visual vs. Layout var-kind split. Cycle / depth-16 inheritance detection. |
 | Layout | All 14 primitives. Auto-size to text + `--text-pad`. Per-shape defaults. `layout:row\|column\|(cols,rows)`. `cell:(c,r)`, `span:(c,r)`, `at:`, `offset:`. All 9 inner + 8 `out-*` anchors. Multi-value `padding`/`gap`/`radius`. Rotation. Embedded char-width table. |
-| Wire routing | **Removed — to be rebuilt.** Wires still parse and resolve (endpoint suffix-match, `.side`, fan expansion, auto-created nodes, internal wires) but are not routed or drawn; render emits an empty `plume-wires` group. The rebuild follows the contract in `WIRING.md` and the phased plan in `PLAN.md`. |
+| Wire routing | **Rebuilt** against `WIRING.md` (validator-first; full history + the current next step in `PLAN.md`). `src/layout/wires/{mod,oracle,scene,graph,route,ports,nudge,validate,geometry,text}.rs`. Pipeline: resolve → layout → **route** → render. Route = `ports::plan` (C1 side / C2 slots / C4 order) → `route::route` (orthogonal visibility-graph A\*, bends-then-length, keeps clearance from obstacles *and own endpoints* except the attaching stub) → `nudge` (global track assignment, B2/B6, bundle crossing-min). Run **twice** (libavoid two-pass): a provisional route feeds real exit-headings back as `ports::PlanHint` so side/slot choice is obstacle-aware. `plume::validate_str` is the independent contract checker (ground truth); `plume::routing_diagnostics` + `--strict` surface B1/B2 relaxations. State: hard invariants A1–A5 + B1 + A3 clean suite-wide; B2n 0; B2w only `wires_labels` (C5 overflow); a few topological convergence crossings remain — see `PLAN.md` **NEXT STEP**. |
 | Render | Document shell with `@layer plume.defaults`. Per-shape SVG emitters. Shadow filters de-duped in `<defs>`. Auto-classes (`plume-node plume-shape-{type} plume-shape-{parent} plume-style-{name}`). `--bake-vars` for non-CSS renderers. Markers sized `max(--arrow-head=6, thickness × 5)`, tip inset 1 px from shape edge, line shortened 4 px so stroke never pokes past marker. Wire labels with `paint-order=stroke` halo in `--bg` (visually clips the wire under the label). `stroke-style=dashed\|dotted` works on both primitives and wires. |
 | CLI | `plume FILE`, `plume fmt`, `plume serve`, `--watch`, `--check`, `--theme`, `--bake-vars`, `--no-warn`, `--strict`, stdin via `-`. Exit codes per SPEC. |
 | Linter | One rule shipped: `visual-attr-inline` (fill/stroke/weight/… inline outside a style → warning). Default-on; `--no-warn` silences; `--strict` promotes to error. |

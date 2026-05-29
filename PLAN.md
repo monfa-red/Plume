@@ -324,7 +324,72 @@ must come from the **real obstacle-aware route**, not a blind dumb-route probe.
 Result suite-wide: **B2n = 0 and B2w = `wires_labels` only** (the C5 overflow);
 `wires_chain`/`mermaid_fast`/`wires_fan` route cleanly (wires re-elect to the
 bottom and run under the row); `wires_realistic` crossings **6 → 4** (the
-`water↔bird`×green ones gone). The remaining 4 are `bird→roof`×`water→roof` — two
-independent bundles converging on `roof` from the same quadrant; reducing those
-further is the NP-hard global crossing-min WIRING explicitly does not promise
-("perfect" = obeys every rule and looks clean, not provably minimal).
+`water↔bird`×green ones gone).
+
+---
+
+## NEXT STEP — crossing-aware convergence (predictable, no oscillation)
+
+**State at handoff:** HEAD `f1e9ba8`, tree clean, `cargo test` green (11 suites),
+clippy/fmt clean. Scorecard: all hard guarantees 0, B2n 0, B2w = `wires_labels:9`,
+`wires_realistic` X:4, `wires_chain` X:1 (geometry-forced), rest 0.
+
+**The remaining 4 crossings** on `wires_realistic` are all `bird→roof`×`water→roof`
+— two *independent* bundles (different sources, same target `roof`) converging from
+the same lower-left quadrant. `bird→roof` enters roof's **bottom** (via a leftward
+run under it); `water→roof` wraps under `garden` and rises on roof's **left**, so
+its rising rail crosses bird→roof's run. They cross because they pick *different
+sides* of the shared target and so can't nest.
+
+**Fix (do this next):** crossing-aware side unification, folded into the **existing
+two-pass** so it stays deterministic and cannot oscillate (there is no new
+iteration — still exactly two routing passes, plus an optional keep-the-better
+compare). In `mod::derive_hints`, before emitting `reside`:
+
+1. Compute pass-1 crossings (reuse `geometry::perp_crossing` over the provisional
+   paths, sorted deterministically).
+2. Keep only pairs whose wires **share a target endpoint node** (`seg_to` equal, or
+   any shared endpoint) and are **not fan siblings** — these are converging bundles.
+3. For each such pair, unify both ends onto **one** side of the shared node: the
+   side of the **earliest-declared** wire in the group (declaration order is stable
+   → deterministic). Emit `reside` hints moving the other end(s) to that side.
+   The existing `lead`-based C4 ordering then nests them along that side.
+4. **Safety (predictability, no regression):** route the second pass *both* ways —
+   with and without the unification hints — and keep whichever has fewer total
+   crossings; tie → the non-unified (current) result, so a unification that doesn't
+   help is a guaranteed no-op. This makes X monotonically non-increasing and the
+   output a deterministic function of the input. (Routing is cheap; a third pass is
+   fine.)
+
+**Acceptance:** `wires_realistic` X strictly drops below 4 (ideally 0 for the
+bird/water→roof convergence) with **B2n still 0 and all hard guarantees 0
+suite-wide**; `wires_chain` X:1 unchanged (geometry-forced); byte-identical across
+two runs; clippy/fmt clean. Add a `ports`/`mod` unit test that two wires converging
+on one node from the same side get nested (non-crossing) slot order, and an
+integration assertion that `wires_realistic` X < 4.
+
+**Verify on a fresh machine:** `git pull`; re-orient per `CLAUDE.md` (read this
+file + `WIRING.md`); `cargo test` (must be green at `f1e9ba8`); render
+`wires_realistic` to PNG (`./target/debug/plume samples/wires_realistic.plume
+--bake-vars -o /tmp/x.svg && resvg /tmp/x.svg /tmp/x.png`) to see the 4 crossings;
+then implement the above. The `baseline_contract_report` snapshot and
+`no_sample_breaks_a_hard_guarantee` are the gates.
+
+**Do NOT:** add a per-wire greedy crossing penalty (fails — see the locked lesson
+below), or an iterative re-elect/re-route loop (can oscillate). Keep it to the
+fixed two-pass + a deterministic, monotone keep-better compare.
+
+### Locked lessons (don't relearn the hard way)
+
+- **Crossing/separation minimisation is global** — it belongs in the ports
+  ordering + nudge, never a single-wire A\* penalty. A greedy per-wire penalty was
+  tried 3× and always shuffled the problem onto a later wire or forced a self-cross
+  (A5).
+- **The two-pass key must come from the *real* obstacle-aware route**, not a blind
+  `dumb_route` probe — a blind probe gives the same wrong order as straight-line aim
+  (it can't see the detour). (Confirmed by adversarial review.)
+- **Endpoint clearance** is shared by three consumers via `scene::obstacles_for`
+  (validator, router grid, nudge) — any change must keep all three consistent.
+- Reserved words can't be node ids in test `.plume` scenes (`b t l r mid` …); use
+  `aa bb`, `src via dst`. Accept snapshots with `INSTA_UPDATE=always cargo test`
+  then delete `*.snap.new`. Render-check with `resvg` and actually read the PNG.
