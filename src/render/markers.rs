@@ -57,10 +57,10 @@ pub fn emit_marker(
     stroke: &str,
     thickness: f64,
 ) {
-    // Marker scales linearly with line thickness, with a small floor so thin
-    // lines still get a visible head — 5 gives a 1 px line a clear arrow
-    // without it looking chunky.
-    let size = 5.0_f64.max(thickness * 5.0);
+    // Marker scales gently with line thickness, with a small floor so thin
+    // lines still get a visible head — 5 gives a 1 px line a clear arrow, and
+    // a 4× slope keeps thicker wires' heads in proportion without chunking.
+    let size = 5.0_f64.max(thickness * 4.0);
     let ux = direction.0;
     let uy = direction.1;
     let px = -uy;

@@ -886,7 +886,7 @@ expand the bbox; apply `padding`, then place via `at:`/`offset:`; `rotation` las
 
 **Route wires.** Per the contract in [`WIRING.md`](WIRING.md) — orthogonal,
 clearance-respecting, deterministic. Then place markers (sized `max(arrow-head,
-thickness × 5)`, tip on the endpoint) and wire-text at their anchors.
+thickness × 4)`, tip on the endpoint) and wire-text at their anchors.
 
 **Render.** Depth-first emit SVG per [SVG Output](#14-svg-output).
 

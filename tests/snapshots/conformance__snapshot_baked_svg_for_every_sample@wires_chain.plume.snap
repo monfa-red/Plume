@@ -40,7 +40,7 @@ input_file: samples/wires_chain.plume
     </g>
     <g class="plume-wire" data-from="cat" data-to="fish">
       <path d="M 65.45 0 L 81.45 0" fill="none" stroke="red" stroke-width="2"/>
-      <polygon class="plume-marker plume-marker-arrow" points="85.45,0 75.45,5 75.45,-5" fill="red"/>
+      <polygon class="plume-marker plume-marker-arrow" points="85.45,0 77.45,4 77.45,-4" fill="red"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="bird">
       <path d="M -92.6 0 L -88.6 0 L -88.6 40.8 L -1.15 40.8 L -1.15 0 L 2.85 0" fill="none" stroke="#444" stroke-width="1"/>
