@@ -29,8 +29,9 @@ pub fn emit_inline_markers(
     }
 }
 
-/// Position the marker tip inset 4 px from the line endpoint, with the
-/// direction unit-vector pointing outward.
+/// The marker tip sits exactly on the line endpoint (the shape edge), with the
+/// direction unit-vector pointing into the shape. The line itself stops short
+/// (see `shorten_for_markers`) so the marker body still covers its end.
 pub fn marker_anchor(
     from: (f64, f64),
     to: (f64, f64),
@@ -43,15 +44,8 @@ pub fn marker_anchor(
     if len < 1e-9 {
         return Some((anchor, (1.0, 0.0)));
     }
-    let ux = dx / len;
-    let uy = dy / len;
-    // Visible gap between the marker tip and the shape edge. Kept small —
-    // the user's intuition is that the tip should "almost touch" the shape.
-    // The line stop point (in render/wires.rs `shorten_for_markers`) sits
-    // further back along the segment so the marker body still covers it.
-    let inset = 1.0_f64.min(len * 0.5);
-    let tip = (anchor.0 - ux * inset, anchor.1 - uy * inset);
-    Some((tip, (ux, uy)))
+    // Tip on the endpoint so the arrow touches the shape edge.
+    Some((anchor, (dx / len, dy / len)))
 }
 
 pub fn emit_marker(
@@ -63,11 +57,10 @@ pub fn emit_marker(
     stroke: &str,
     thickness: f64,
 ) {
-    // Marker scales linearly with line thickness, with a small floor so
-    // 1 px lines still get a visible head. Floor was 10 — too big — and
-    // 0 — too small. 6 gives 1 px lines a clearly visible arrow without
-    // overwhelming the line.
-    let size = 6.0_f64.max(thickness * 5.0);
+    // Marker scales linearly with line thickness, with a small floor so thin
+    // lines still get a visible head — 5 gives a 1 px line a clear arrow
+    // without it looking chunky.
+    let size = 5.0_f64.max(thickness * 5.0);
     let ux = direction.0;
     let uy = direction.1;
     let px = -uy;

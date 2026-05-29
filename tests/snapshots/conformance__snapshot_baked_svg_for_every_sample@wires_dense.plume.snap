@@ -22,23 +22,23 @@ input_file: samples/wires_dense.plume
   <g class="plume-wires">
     <g class="plume-wire" data-from="src" data-to="dst">
       <path d="M -60 0 L 56 0" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="59,0 53,3 53,-3" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="60,0 55,2.5 55,-2.5" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="src" data-to="dst">
       <path d="M -60 0 L 56 0" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="59,0 53,3 53,-3" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="60,0 55,2.5 55,-2.5" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="src" data-to="dst">
       <path d="M -60 0 L 56 0" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="59,0 53,3 53,-3" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="60,0 55,2.5 55,-2.5" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="src" data-to="dst">
       <path d="M -60 0 L 56 0" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="59,0 53,3 53,-3" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="60,0 55,2.5 55,-2.5" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="src" data-to="dst">
       <path d="M -60 0 L 56 0" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="59,0 53,3 53,-3" fill="#444"/>
+      <polygon class="plume-marker plume-marker-arrow" points="60,0 55,2.5 55,-2.5" fill="#444"/>
     </g>
   </g>
 </svg>

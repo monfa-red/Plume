@@ -400,7 +400,7 @@ an ellipse in a 60×40 box; `|oval| size:40` is a circle.
 | `marker-end:X` | End end (wire target). |
 
 Values: `none`, `arrow`, `dot`, `diamond`, `crow`. Markers scale with thickness,
-floor 6 px; color follows the stroke. `|line|` is bare by default — write `|line|
+floor 5 px; color follows the stroke. `|line|` is bare by default — write `|line|
 marker-end:arrow` for a one-shot arrow. For wires the operator picks markers (see
 [Wires](#10-wires)). Source order wins: `marker:arrow marker-end:dot` → start
 arrow, end dot.
@@ -549,7 +549,7 @@ nodes and from other wires; set it on `|wire|`, a style, or per-wire.
 
 The full routing contract — clearance, spacing, crossings, priority, fan-out,
 self-loops — lives in [`WIRING.md`](WIRING.md), the source of truth for routing.
-Markers sit 1 px in from their endpoint.
+Marker tips sit on their endpoint, touching the shape edge.
 
 ---
 
@@ -666,7 +666,7 @@ Baked compile-time defaults — override per-node, per-wire, on `|scene|` /
 
 ```
 text-size 13   text-pad 16   thickness 1   radius 0
-gap 20         padding 0     arrow-head 6  clearance 16
+gap 20         padding 0     arrow-head 5  clearance 16
 icon-size 24   canvas-pad 20
 ```
 
@@ -886,7 +886,7 @@ expand the bbox; apply `padding`, then place via `at:`/`offset:`; `rotation` las
 
 **Route wires.** Per the contract in [`WIRING.md`](WIRING.md) — orthogonal,
 clearance-respecting, deterministic. Then place markers (sized `max(arrow-head,
-thickness × 5)`, tip 1 px in) and wire-text at their anchors.
+thickness × 5)`, tip on the endpoint) and wire-text at their anchors.
 
 **Render.** Depth-first emit SVG per [SVG Output](#14-svg-output).
 
