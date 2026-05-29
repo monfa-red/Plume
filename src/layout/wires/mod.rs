@@ -7,6 +7,7 @@
 //! step against the contract in WIRING.md.
 
 mod geometry;
+mod oracle;
 mod scene;
 mod text;
 mod validate;

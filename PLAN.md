@@ -246,7 +246,7 @@ router will share.
 ## Status
 
 - [x] **Phase 0** — pipeline + invariant validator (A1/A2/A5 gated; A3 reported, gated from the multi-wire phases; A4 deferred to Phase 1)
-- [ ] **Phase 1** — oracle + obstacles + full validator (baseline report)
+- [x] **Phase 1** — oracle + obstacles + full validator (A1–A5 all checked, incl. A4; B1/B2 measured, B3 crossings counted; baseline report snapshotted)
 - [ ] **Phase 2** — visibility graph + A\* (single wire)
 - [ ] **Phase 3** — multi-wire: ports, ordering, crossings
 - [ ] **Phase 4** — nudge / separate

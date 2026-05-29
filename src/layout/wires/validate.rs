@@ -1,30 +1,42 @@
-//! The routing validator — checks routed wires against WIRING.md's invariants
-//! (section A). It re-derives everything from the polylines and the scene, so it
-//! is independent of the router that produced them. Later phases extend it to
-//! the constraints (section B); the reserved Severity levels are for those.
-#![allow(dead_code)]
+//! The routing validator — checks routed wires against WIRING.md.
+//!
+//! It re-derives everything from the polylines and the placed scene, so it is
+//! independent of the router that produced them: any router, written any way,
+//! is judged against the same rules. Section A invariants are absolute; the
+//! section B constraints are reported with the severity WIRING assigns to a
+//! relaxation (B1 → error, B2 → warning), and B3 crossings are counted as
+//! ordinary output.
 
-use super::geometry::{close, EPS};
-use super::scene::SceneIndex;
+use super::geometry::{
+    close, collinear_overlap, perp_crossing, rect_penetrated_by, seg_rect_distance,
+    seg_seg_distance, segments_intersect, Pt, Seg, EPS,
+};
+use super::oracle;
+use super::scene::{obstacles_for, SceneIndex};
 use crate::layout::ir::{PlacedNode, RoutedWire};
-use crate::resolve::{AttrMap, VarTable};
-
-type Pt = (f64, f64);
-type Seg = (Pt, Pt);
+use crate::resolve::{AttrMap, ShapeKind, VarTable};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Rule {
+    // A — hard invariants, never violated.
     Orthogonality, // A1
     Attachment,    // A2
     PerpCrossing,  // A3
+    SidesOnly,     // A4
     SelfCross,     // A5
+    // B — constraints (flagged when relaxed) and the crossing metric.
+    NodeOverlap, // B1
+    Clearance,   // B2, wire ↔ node
+    Separation,  // B2, wire ↔ wire
+    Crossing,    // B3 — a normal, reported crossing, not a violation
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Severity {
-    Invariant,
-    Error,
-    Warning,
+    Invariant, // A — absolute
+    Error,     // a relaxed B1 (node overlap)
+    Warning,   // a relaxed B2 (sub-clearance / sub-separation)
+    Info,      // B3 crossings — output, not a problem
 }
 
 #[derive(Clone, Debug)]
@@ -40,12 +52,25 @@ impl Rule {
             Rule::Orthogonality => "A1",
             Rule::Attachment => "A2",
             Rule::PerpCrossing => "A3",
+            Rule::SidesOnly => "A4",
             Rule::SelfCross => "A5",
+            Rule::NodeOverlap => "B1",
+            Rule::Clearance | Rule::Separation => "B2",
+            Rule::Crossing => "B3",
         }
     }
 
     pub fn severity(self) -> Severity {
-        Severity::Invariant
+        match self {
+            Rule::Orthogonality
+            | Rule::Attachment
+            | Rule::PerpCrossing
+            | Rule::SidesOnly
+            | Rule::SelfCross => Severity::Invariant,
+            Rule::NodeOverlap => Severity::Error,
+            Rule::Clearance | Rule::Separation => Severity::Warning,
+            Rule::Crossing => Severity::Info,
+        }
     }
 }
 
@@ -58,11 +83,14 @@ pub fn validate_routing(
     let index = SceneIndex::build(nodes);
     let mut out = Vec::new();
     for w in wires {
-        check_orthogonality(w, &mut out);
-        check_attachment(w, &index, &mut out);
-        check_self_cross(w, &mut out);
+        check_orthogonality(w, &mut out); // A1
+        check_attachment(w, &index, &mut out); // A2
+        check_sides_only(w, &index, &mut out); // A4
+        check_self_cross(w, &mut out); // A5
+        check_node_clearance(w, nodes, &mut out); // B1, B2 (wire ↔ node)
     }
-    check_crossings(wires, &mut out);
+    check_shared_runs(wires, &mut out); // A3
+    check_separation(wires, &mut out); // B2 (wire ↔ wire), B3
     out
 }
 
@@ -77,6 +105,21 @@ fn push(out: &mut Vec<Violation>, rule: Rule, w: &RoutedWire, detail: &str) {
         detail: detail.to_string(),
     });
 }
+
+fn pair(out: &mut Vec<Violation>, rule: Rule, a: &RoutedWire, b: &RoutedWire, detail: String) {
+    out.push(Violation {
+        rule,
+        wires: vec![label(a), label(b)],
+        detail,
+    });
+}
+
+/// A wire's polyline as its list of axis-aligned segments.
+fn segments(w: &RoutedWire) -> Vec<Seg> {
+    w.path.windows(2).map(|s| (s[0], s[1])).collect()
+}
+
+// ───────────────────────────── A — invariants ─────────────────────────────
 
 // A1 — every segment axis-aligned and non-zero; consecutive segments meet at 90°.
 fn check_orthogonality(w: &RoutedWire, out: &mut Vec<Violation>) {
@@ -165,9 +208,23 @@ fn check_end(
     }
 }
 
+// A4 — wires attach to shape sides only, never to a text node.
+fn check_sides_only(w: &RoutedWire, index: &SceneIndex, out: &mut Vec<Violation>) {
+    for path in [&w.seg_from, &w.seg_to] {
+        if index.shape(path) == Some(ShapeKind::Text) {
+            push(
+                out,
+                Rule::SidesOnly,
+                w,
+                &format!("endpoint '{path}' is a text node"),
+            );
+        }
+    }
+}
+
 // A5 — a wire never crosses or overlaps itself (non-adjacent segments).
 fn check_self_cross(w: &RoutedWire, out: &mut Vec<Violation>) {
-    let segs: Vec<Seg> = w.path.windows(2).map(|s| (s[0], s[1])).collect();
+    let segs = segments(w);
     for i in 0..segs.len() {
         for j in (i + 2)..segs.len() {
             if segments_intersect(segs[i], segs[j]) {
@@ -179,77 +236,86 @@ fn check_self_cross(w: &RoutedWire, out: &mut Vec<Violation>) {
 
 // A3 — two different wires may only cross perpendicularly; never share a run.
 // (The fan-sibling trunk exemption arrives with the multi-wire phases.)
-fn check_crossings(wires: &[RoutedWire], out: &mut Vec<Violation>) {
+fn check_shared_runs(wires: &[RoutedWire], out: &mut Vec<Violation>) {
+    let segs: Vec<Vec<Seg>> = wires.iter().map(segments).collect();
     for i in 0..wires.len() {
         for j in (i + 1)..wires.len() {
-            if shares_run(&wires[i], &wires[j]) {
-                out.push(Violation {
-                    rule: Rule::PerpCrossing,
-                    wires: vec![label(&wires[i]), label(&wires[j])],
-                    detail: "wires share a parallel run".into(),
-                });
+            let shares = segs[i]
+                .iter()
+                .any(|a| segs[j].iter().any(|b| collinear_overlap(*a, *b)));
+            if shares {
+                pair(
+                    out,
+                    Rule::PerpCrossing,
+                    &wires[i],
+                    &wires[j],
+                    "wires share a parallel run".into(),
+                );
             }
         }
     }
 }
 
-fn shares_run(a: &RoutedWire, b: &RoutedWire) -> bool {
-    for sa in a.path.windows(2) {
-        for sb in b.path.windows(2) {
-            if collinear_overlap((sa[0], sa[1]), (sb[0], sb[1])) {
-                return true;
+// ───────────────────────────── B — constraints ─────────────────────────────
+
+// B1 / B2 — a wire never enters a node's interior, and stays `clearance` away.
+fn check_node_clearance(w: &RoutedWire, nodes: &[PlacedNode], out: &mut Vec<Violation>) {
+    let obstacles = obstacles_for(nodes, [&w.seg_from, &w.seg_to]);
+    let clearance = oracle::clearance(&w.attrs);
+    let segs = segments(w);
+    for obs in &obstacles {
+        if segs.iter().any(|s| rect_penetrated_by(*obs, *s)) {
+            push(out, Rule::NodeOverlap, w, "wire crosses a node's interior");
+        } else {
+            let gap = segs
+                .iter()
+                .map(|s| seg_rect_distance(*obs, *s))
+                .fold(f64::INFINITY, f64::min);
+            if gap + EPS < clearance {
+                push(
+                    out,
+                    Rule::Clearance,
+                    w,
+                    &format!("{gap:.1} from a node (< clearance {clearance:.0})"),
+                );
             }
         }
     }
-    false
 }
 
-// ── axis-aligned segment helpers ──
-
-/// `Some(true)` = horizontal, `Some(false)` = vertical, `None` = zero-length or diagonal.
-fn orient(s: Seg) -> Option<bool> {
-    let ((ax, ay), (bx, by)) = s;
-    match (close(ay, by), close(ax, bx)) {
-        (true, false) => Some(true),
-        (false, true) => Some(false),
-        _ => None,
-    }
-}
-
-fn range_overlap(a0: f64, a1: f64, b0: f64, b1: f64) -> bool {
-    let lo = a0.min(a1).max(b0.min(b1));
-    let hi = a0.max(a1).min(b0.max(b1));
-    hi - lo > EPS
-}
-
-fn within(t: f64, a: f64, b: f64) -> bool {
-    t >= a.min(b) - EPS && t <= a.max(b) + EPS
-}
-
-/// Two same-orientation segments lying on the same line with overlapping extent.
-fn collinear_overlap(a: Seg, b: Seg) -> bool {
-    let (((ax0, ay0), (ax1, ay1)), ((bx0, by0), (bx1, by1))) = (a, b);
-    match (orient(a), orient(b)) {
-        (Some(true), Some(true)) => close(ay0, by0) && range_overlap(ax0, ax1, bx0, bx1),
-        (Some(false), Some(false)) => close(ax0, bx0) && range_overlap(ay0, ay1, by0, by1),
-        _ => false,
-    }
-}
-
-/// True if two axis-aligned segments meet — perpendicular crossing or overlap.
-fn segments_intersect(a: Seg, b: Seg) -> bool {
-    match (orient(a), orient(b)) {
-        (Some(x), Some(y)) if x == y => collinear_overlap(a, b),
-        (Some(_), Some(_)) => {
-            let (h, v) = if orient(a) == Some(true) {
-                (a, b)
-            } else {
-                (b, a)
-            };
-            let ((hx0, hy), (hx1, _)) = h;
-            let ((vx, vy0), (_, vy1)) = v;
-            within(vx, hx0, hx1) && within(hy, vy0, vy1)
+// B2 (wire ↔ wire) and B3 — wires keep `separation` apart, except where they
+// cross perpendicularly. A crossing is exempt from B2 and merely counted (B3);
+// shared parallel runs are A3's business, not double-counted here.
+fn check_separation(wires: &[RoutedWire], out: &mut Vec<Violation>) {
+    let segs: Vec<Vec<Seg>> = wires.iter().map(segments).collect();
+    for i in 0..wires.len() {
+        for j in (i + 1)..wires.len() {
+            let separation = oracle::separation(&wires[i].attrs, &wires[j].attrs);
+            let mut gap = f64::INFINITY;
+            for a in &segs[i] {
+                for b in &segs[j] {
+                    if perp_crossing(*a, *b) {
+                        pair(
+                            out,
+                            Rule::Crossing,
+                            &wires[i],
+                            &wires[j],
+                            "perpendicular crossing".into(),
+                        );
+                    } else if !collinear_overlap(*a, *b) {
+                        gap = gap.min(seg_seg_distance(*a, *b));
+                    }
+                }
+            }
+            if gap + EPS < separation {
+                pair(
+                    out,
+                    Rule::Separation,
+                    &wires[i],
+                    &wires[j],
+                    format!("{gap:.1} between wires (< separation {separation:.0})"),
+                );
+            }
         }
-        _ => false,
     }
 }

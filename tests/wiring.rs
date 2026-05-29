@@ -20,11 +20,15 @@ fn dumb_router_holds_per_wire_invariants() {
     for path in sample_paths() {
         let src = std::fs::read_to_string(&path).unwrap();
         let violations = plume::validate_str(&src).expect("validate");
-        // A1/A2/A5 are guaranteed by construction; A3 (PerpCrossing) is a
-        // multi-wire property and not yet gated.
+        // Gate the per-wire invariants the dumb router guarantees by construction
+        // (A1/A2/A4/A5). A3 (PerpCrossing) is a multi-wire property it can't yet
+        // satisfy, and the B-constraints are the measured baseline, not a gate.
         let blocking: Vec<&plume::Violation> = violations
             .iter()
-            .filter(|v| !matches!(v.rule, plume::Rule::PerpCrossing))
+            .filter(|v| {
+                v.rule.severity() == plume::Severity::Invariant
+                    && v.rule != plume::Rule::PerpCrossing
+            })
             .collect();
         assert!(
             blocking.is_empty(),
@@ -33,6 +37,134 @@ fn dumb_router_holds_per_wire_invariants() {
             blocking
         );
     }
+}
+
+fn count_rule(src: &str, rule: plume::Rule) -> usize {
+    plume::validate_str(src)
+        .expect("validate")
+        .iter()
+        .filter(|v| v.rule == rule)
+        .count()
+}
+
+/// Tally violations per rule for one source: indices follow the column order
+/// A1, A2, A3, A4, A5, B1, B2-node, B2-wire, B3.
+fn rule_counts(src: &str) -> [usize; 9] {
+    let mut c = [0usize; 9];
+    for v in plume::validate_str(src).expect("validate") {
+        let i = match v.rule {
+            plume::Rule::Orthogonality => 0,
+            plume::Rule::Attachment => 1,
+            plume::Rule::PerpCrossing => 2,
+            plume::Rule::SidesOnly => 3,
+            plume::Rule::SelfCross => 4,
+            plume::Rule::NodeOverlap => 5,
+            plume::Rule::Clearance => 6,
+            plume::Rule::Separation => 7,
+            plume::Rule::Crossing => 8,
+        };
+        c[i] += 1;
+    }
+    c
+}
+
+/// The dumb router's contract scorecard across the whole sample suite — the
+/// measured starting point each later phase drives toward zero. A1/A2/A4/A5 are
+/// already clean by construction; A3 (shared runs), B1 (node overlap) and B2
+/// (clearance / separation) are the dumb router's expected, now-quantified debt.
+#[test]
+fn baseline_contract_report() {
+    use std::fmt::Write;
+    let mut report = String::new();
+    report.push_str("Dumb-router baseline — validator counts per sample.\n");
+    report.push_str("A* invariants (A3 = shared parallel runs); B1 = node overlap;\n");
+    report.push_str("B2n = wire-node clearance; B2w = wire-wire separation; X = B3 crossings.\n\n");
+
+    let mut totals = [0usize; 9];
+    for path in sample_paths() {
+        let src = std::fs::read_to_string(&path).unwrap();
+        let c = rule_counts(&src);
+        for (t, v) in totals.iter_mut().zip(c) {
+            *t += v;
+        }
+        let name = path.file_name().unwrap().to_string_lossy();
+        writeln!(
+            report,
+            "{name:<22} A1:{} A2:{} A3:{} A4:{} A5:{}  B1:{} B2n:{} B2w:{}  X:{}",
+            c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8]
+        )
+        .unwrap();
+    }
+    writeln!(
+        report,
+        "\n{:<22} A1:{} A2:{} A3:{} A4:{} A5:{}  B1:{} B2n:{} B2w:{}  X:{}",
+        "TOTAL",
+        totals[0],
+        totals[1],
+        totals[2],
+        totals[3],
+        totals[4],
+        totals[5],
+        totals[6],
+        totals[7],
+        totals[8]
+    )
+    .unwrap();
+
+    insta::assert_snapshot!(report);
+}
+
+#[test]
+fn straight_wire_through_a_box_is_a_node_overlap() {
+    // src → dst routes straight across the row, piercing the non-endpoint via.
+    let source = "{ |scene| layout:row gap:30 }\n\
+                  src |rect| size:(40,40)\n\
+                  via |rect| size:(40,40)\n\
+                  dst |rect| size:(40,40)\n\
+                  src -> dst\n";
+    assert_eq!(
+        count_rule(source, plume::Rule::NodeOverlap),
+        1,
+        "the straight wire pierces exactly one box (via)"
+    );
+}
+
+#[test]
+fn wire_to_a_text_node_violates_sides_only() {
+    // Wires attach to shape sides only, never to a text node (A4).
+    let source = "box |rect| size:(40,40)\n\
+                  txt |text| \"hi\"\n\
+                  box -> txt\n";
+    assert_eq!(count_rule(source, plume::Rule::SidesOnly), 1);
+}
+
+#[test]
+fn wire_grazing_a_box_breaks_clearance() {
+    // Forcing both ports to the top edge runs the wire flush along `near`'s top
+    // edge — outside its interior (no B1) but with zero gap (a B2 clearance hit).
+    let source = "{ |scene| layout:row gap:6 }\n\
+                  lft  |rect| size:(40,40)\n\
+                  near |rect| size:(40,40)\n\
+                  rgt  |rect| size:(40,40)\n\
+                  lft.t -> rgt.t\n";
+    assert_eq!(
+        count_rule(source, plume::Rule::NodeOverlap),
+        0,
+        "it grazes, not pierces"
+    );
+    assert_eq!(count_rule(source, plume::Rule::Clearance), 1);
+}
+
+#[test]
+fn perpendicular_wires_count_as_a_crossing() {
+    // A horizontal wire and a vertical wire meet at one interior point (B3).
+    let source = "h1 |rect| size:(20,20) at:(0,0)\n\
+                  h2 |rect| size:(20,20) at:(200,0)\n\
+                  v1 |rect| size:(20,20) at:(100,-100)\n\
+                  v2 |rect| size:(20,20) at:(100,100)\n\
+                  h1 -> h2\n\
+                  v1 -> v2\n";
+    assert_eq!(count_rule(source, plume::Rule::Crossing), 1);
 }
 
 #[test]

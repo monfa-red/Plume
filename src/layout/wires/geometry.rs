@@ -160,3 +160,176 @@ fn unit(v: Pt) -> Pt {
         (v.0 / l, v.1 / l)
     }
 }
+
+// ───────────────── axis-aligned segment & box math ─────────────────
+//
+// Wire segments are always axis-aligned, so each is exactly its own bounding box
+// and distances reduce to interval arithmetic. The validator (and later the
+// router) share these primitives so "how far apart" is computed one way only.
+
+/// One axis-aligned segment between two bends.
+pub type Seg = (Pt, Pt);
+
+/// `Some(true)` = horizontal, `Some(false)` = vertical, `None` = zero-length or
+/// (never, for our routes) diagonal.
+pub fn orient(s: Seg) -> Option<bool> {
+    let ((ax, ay), (bx, by)) = s;
+    match (close(ay, by), close(ax, bx)) {
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        _ => None,
+    }
+}
+
+/// Do the closed intervals `[a0,a1]` and `[b0,b1]` overlap on more than a point?
+pub fn range_overlap(a0: f64, a1: f64, b0: f64, b1: f64) -> bool {
+    let lo = a0.min(a1).max(b0.min(b1));
+    let hi = a0.max(a1).min(b0.max(b1));
+    hi - lo > EPS
+}
+
+/// Is `t` within `[a,b]` (order-free), with an epsilon of slack?
+pub fn within(t: f64, a: f64, b: f64) -> bool {
+    t >= a.min(b) - EPS && t <= a.max(b) + EPS
+}
+
+/// Two same-orientation segments lying on one line with overlapping extent.
+pub fn collinear_overlap(a: Seg, b: Seg) -> bool {
+    let (((ax0, ay0), (ax1, ay1)), ((bx0, by0), (bx1, by1))) = (a, b);
+    match (orient(a), orient(b)) {
+        (Some(true), Some(true)) => close(ay0, by0) && range_overlap(ax0, ax1, bx0, bx1),
+        (Some(false), Some(false)) => close(ax0, bx0) && range_overlap(ay0, ay1, by0, by1),
+        _ => false,
+    }
+}
+
+/// True if two axis-aligned segments meet — a perpendicular crossing or a
+/// collinear overlap.
+pub fn segments_intersect(a: Seg, b: Seg) -> bool {
+    match (orient(a), orient(b)) {
+        (Some(x), Some(y)) if x == y => collinear_overlap(a, b),
+        (Some(_), Some(_)) => {
+            let (h, v) = if orient(a) == Some(true) {
+                (a, b)
+            } else {
+                (b, a)
+            };
+            let ((hx0, hy), (hx1, _)) = h;
+            let ((vx, vy0), (_, vy1)) = v;
+            within(vx, hx0, hx1) && within(hy, vy0, vy1)
+        }
+        _ => false,
+    }
+}
+
+/// A segment as its (degenerate) bounding box.
+pub fn seg_box(s: Seg) -> Rect {
+    let ((ax, ay), (bx, by)) = s;
+    Rect {
+        min_x: ax.min(bx),
+        min_y: ay.min(by),
+        max_x: ax.max(bx),
+        max_y: ay.max(by),
+    }
+}
+
+/// Euclidean distance between two axis-aligned rectangles — 0 if they touch or
+/// overlap, else the straight gap between them.
+pub fn boxes_distance(a: Rect, b: Rect) -> f64 {
+    let gap_x = (a.min_x - b.max_x).max(b.min_x - a.max_x).max(0.0);
+    let gap_y = (a.min_y - b.max_y).max(b.min_y - a.max_y).max(0.0);
+    (gap_x * gap_x + gap_y * gap_y).sqrt()
+}
+
+/// Distance from an (axis-aligned) segment to a rectangle.
+pub fn seg_rect_distance(rect: Rect, seg: Seg) -> f64 {
+    boxes_distance(rect, seg_box(seg))
+}
+
+/// Distance between two (axis-aligned) segments.
+pub fn seg_seg_distance(a: Seg, b: Seg) -> f64 {
+    boxes_distance(seg_box(a), seg_box(b))
+}
+
+/// Does the segment cross into the rectangle's open interior (not merely touch a
+/// side)? This is the B1 "node overlap" test.
+pub fn rect_penetrated_by(rect: Rect, seg: Seg) -> bool {
+    let inside_x = |x: f64| rect.min_x + EPS < x && x < rect.max_x - EPS;
+    let inside_y = |y: f64| rect.min_y + EPS < y && y < rect.max_y - EPS;
+    let b = seg_box(seg);
+    match orient(seg) {
+        // horizontal at y=b.min_y: strictly between top/bottom, and its x-extent
+        // reaches into the open interior
+        Some(true) => inside_y(b.min_y) && b.max_x > rect.min_x + EPS && b.min_x < rect.max_x - EPS,
+        Some(false) => {
+            inside_x(b.min_x) && b.max_y > rect.min_y + EPS && b.min_y < rect.max_y - EPS
+        }
+        None => false,
+    }
+}
+
+/// Do the two segments cross perpendicularly at a point interior to both? This
+/// is a genuine B3 crossing — not a T-junction or a shared port.
+pub fn perp_crossing(a: Seg, b: Seg) -> bool {
+    let (h, v) = match (orient(a), orient(b)) {
+        (Some(true), Some(false)) => (seg_box(a), seg_box(b)),
+        (Some(false), Some(true)) => (seg_box(b), seg_box(a)),
+        _ => return false, // parallel or degenerate
+    };
+    // They meet at (v.x, h.y); a true crossing is interior to both.
+    h.min_x + EPS < v.min_x
+        && v.min_x < h.max_x - EPS
+        && v.min_y + EPS < h.min_y
+        && h.min_y < v.max_y - EPS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rect(min_x: f64, min_y: f64, max_x: f64, max_y: f64) -> Rect {
+        Rect {
+            min_x,
+            min_y,
+            max_x,
+            max_y,
+        }
+    }
+
+    #[test]
+    fn boxes_distance_is_zero_when_touching_or_overlapping() {
+        let a = rect(0.0, 0.0, 10.0, 10.0);
+        assert_eq!(boxes_distance(a, rect(10.0, 0.0, 20.0, 10.0)), 0.0); // edge-touch
+        assert_eq!(boxes_distance(a, rect(5.0, 5.0, 15.0, 15.0)), 0.0); // overlap
+    }
+
+    #[test]
+    fn boxes_distance_axis_gap() {
+        let a = rect(0.0, 0.0, 10.0, 10.0);
+        assert!((boxes_distance(a, rect(20.0, 0.0, 30.0, 10.0)) - 10.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn boxes_distance_diagonal_gap() {
+        let a = rect(0.0, 0.0, 10.0, 10.0);
+        let d = boxes_distance(a, rect(20.0, 20.0, 30.0, 30.0));
+        assert!((d - (200.0_f64).sqrt()).abs() < 1e-9, "got {d}");
+    }
+
+    #[test]
+    fn penetration_distinguishes_pierce_from_graze() {
+        let r = rect(0.0, 0.0, 10.0, 10.0);
+        assert!(rect_penetrated_by(r, ((-5.0, 5.0), (15.0, 5.0)))); // pierces across
+        assert!(rect_penetrated_by(r, ((5.0, -5.0), (5.0, 15.0)))); // pierces vertically
+        assert!(!rect_penetrated_by(r, ((-5.0, 0.0), (15.0, 0.0)))); // runs along top edge
+        assert!(!rect_penetrated_by(r, ((-5.0, 20.0), (15.0, 20.0)))); // clear of the box
+    }
+
+    #[test]
+    fn perp_crossing_only_for_true_interior_crossings() {
+        let horiz = ((0.0, 5.0), (10.0, 5.0));
+        assert!(perp_crossing(horiz, ((5.0, 0.0), (5.0, 10.0)))); // X
+        assert!(!perp_crossing(horiz, ((0.0, 5.0), (0.0, 10.0)))); // shares an endpoint (T)
+        assert!(!perp_crossing(horiz, ((0.0, 0.0), (10.0, 0.0)))); // parallel
+    }
+}
