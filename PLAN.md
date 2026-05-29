@@ -307,9 +307,24 @@ container).
   on every sample; the scorecard snapshot pins the B2 counts.
 
 Result: `wires_realistic` bird→roof is clean (B2n:0); the systemic skim is closed.
-**Remaining (next):** `wires_chain`/`mermaid_fast`/`wires_fan` still show B2n on
-wires forced through sub-`2·clearance` gaps *because of the side they leave from* —
-the same root as the avoidable crossings: **side/slot selection is not
-obstacle-aware**. The fix is the libavoid two-pass (route → re-side/re-slot from
-real exit headings → re-route), which also removes the avoidable crossings on
-`wires_realistic`. Tracked as the next work item.
+
+## Obstacle-aware ports — the libavoid two-pass (`mod::route_wires`)
+
+Side and slot choice were the deeper root: chosen *before* routing from
+straight-line guesses, so a wire that must detour around an obstacle got the wrong
+slot order (avoidable crossings) or left a side that forced it through a
+sub-`2·clearance` gap (avoidable skims). Now `route_wires` routes **twice**: a
+provisional pass, then `derive_hints` reads each route's real geometry back into a
+`ports::PlanHint` — `lead_*` (where the wire actually heads, so C4 orders slots by
+real exit heading) and `reside_*` (when an end skimmed its own node, the
+perpendicular side it turned toward, so C1 re-elects it). The second pass re-plans
+and re-routes with those hints. The adversarial review's warning held: the key
+must come from the **real obstacle-aware route**, not a blind dumb-route probe.
+
+Result suite-wide: **B2n = 0 and B2w = `wires_labels` only** (the C5 overflow);
+`wires_chain`/`mermaid_fast`/`wires_fan` route cleanly (wires re-elect to the
+bottom and run under the row); `wires_realistic` crossings **6 → 4** (the
+`water↔bird`×green ones gone). The remaining 4 are `bird→roof`×`water→roof` — two
+independent bundles converging on `roof` from the same quadrant; reducing those
+further is the NP-hard global crossing-min WIRING explicitly does not promise
+("perfect" = obeys every rule and looks clean, not provably minimal).

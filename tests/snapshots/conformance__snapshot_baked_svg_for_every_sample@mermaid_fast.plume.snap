@@ -76,8 +76,8 @@ input_file: samples/mermaid_fast.plume
       <polygon class="plume-marker plume-marker-arrow" points="-241.375,0 -246.375,2.5 -246.375,-2.5" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="fox" data-to="mouse">
-      <path d="M -103.325 0 L -99.325 0 L -99.325 40.8 L -11.875 40.8 L -11.875 0 L -7.875 0" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-7.875,0 -12.875,2.5 -12.875,-2.5" fill="#444"/>
+      <path d="M -131.05 24.8 L -131.05 40.8 L 27 40.8 L 27 28.8" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="27,24.8 29.5,29.8 24.5,29.8" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="owl" data-to="mouse">
       <path d="M -27.875 0 L -11.875 0" fill="none" stroke="#444" stroke-width="1"/>

@@ -117,15 +117,13 @@ fn rule_counts(src: &str) -> [usize; 9] {
 }
 
 /// The router's contract scorecard across the whole sample suite. Hard guarantees
-/// (A1–A5 invariants, B1 node overlap, A3 shared runs) are 0 everywhere. B2n now
-/// counts wire↔node clearance *including a wire's own endpoints* (the attaching
-/// stub excepted) — closing a blind spot that silently passed wires skimming the
-/// node they connect to. The remaining B2n live on three over-dense samples
-/// (`wires_chain`, `mermaid_fast`, `wires_fan`: ~20px gaps at clearance 16), where
-/// a wire leaving the wrong side is forced through a sub-clearance gap; they're
-/// flagged relaxations to be cleared by obstacle-aware side selection. B2w is
-/// `wires_labels` (C5 overflow) plus one forced separation in the same dense
-/// `wires_chain` region. X counts perpendicular crossings — normal output.
+/// (A1–A5 invariants, B1 node overlap, A3 shared runs) are 0 everywhere, and so is
+/// B2n — wire↔node clearance now *includes a wire's own endpoints* (only the
+/// attaching stub may approach), and the obstacle-aware two-pass routes every wire
+/// off a side that would otherwise force it through a sub-clearance gap. The only
+/// B2w left is `wires_labels`, five wires crammed onto one tiny edge (genuine C5
+/// overflow that WIRING flags, not removes). X counts perpendicular crossings —
+/// normal output; what remains is topological (two bundles converging on one node).
 #[test]
 fn baseline_contract_report() {
     use std::fmt::Write;

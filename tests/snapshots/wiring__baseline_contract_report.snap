@@ -11,7 +11,7 @@ full_example.plume     A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 hello.plume            A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 internal_wires.plume   A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 markers_all.plume      A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
-mermaid_fast.plume     A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:2 B2w:0  X:0
+mermaid_fast.plume     A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 modifiers.plume        A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 multi_value_box.plume  A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 primitives_all.plume   A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
@@ -22,11 +22,11 @@ templates_all.plume    A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 type_defaults.plume    A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 wires_anchors.plume    A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 wires_basic.plume      A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
-wires_chain.plume      A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:4 B2w:1  X:1
+wires_chain.plume      A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:1
 wires_dense.plume      A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
-wires_fan.plume        A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:6 B2w:0  X:0
+wires_fan.plume        A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 wires_labels.plume     A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:9  X:0
-wires_realistic.plume  A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:6
+wires_realistic.plume  A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:4
 wires_selfloop.plume   A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 
-TOTAL                  A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:12 B2w:10  X:7
+TOTAL                  A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:9  X:5

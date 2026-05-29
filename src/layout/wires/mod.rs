@@ -18,11 +18,12 @@ mod validate;
 
 pub use validate::{validate_routing, Rule, Severity, Violation};
 
+use crate::ast::Side;
 use crate::error::Error;
 use crate::layout::ir::{PlacedNode, RoutedWire};
 use crate::resolve::{MarkerKind, Markers, Program, ResolvedEndpoint, ResolvedWire};
-use geometry::{dumb_route, Rect};
-use ports::SegReq;
+use geometry::{dumb_route, rect_penetrated_by, seg_rect_distance, Pt, Rect, EPS};
+use ports::{Plan, PlanHint, SegReq};
 use scene::SceneIndex;
 use text::place_texts;
 
@@ -73,36 +74,128 @@ pub fn route_wires(program: &Program, nodes: &[PlacedNode]) -> Result<Vec<Routed
         }
     }
 
-    // 2. Plan every segment's ports together (sides + slots, WIRING C).
-    let plans = ports::plan(&reqs);
+    // 2. Plan + route in two passes (the libavoid model). Side and slot choice run
+    //    blind on the first pass (straight-line guesses); the provisional routes
+    //    then say where each wire *actually* went, so the second pass re-elects a
+    //    side that forced an endpoint skim and orders slots by real exit heading —
+    //    removing avoidable crossings and skims at the source.
+    let plans = ports::plan(&reqs, &[]);
+    let provisional: Vec<Vec<(f64, f64)>> = reqs
+        .iter()
+        .zip(&plans)
+        .map(|(req, plan)| route_one(req, plan, nodes))
+        .collect();
+    let hints = derive_hints(&reqs, &provisional);
+    let plans = ports::plan(&reqs, &hints);
 
-    // 3. Route each segment, in order, past the obstacles for its own pair —
-    //    falling back to the dumb route only if its ports are boxed in.
+    // 3. Final route with the informed plan, building each RoutedWire.
     let mut out = Vec::with_capacity(reqs.len());
     for (req, (plan, meta)) in reqs.iter().zip(plans.iter().zip(&metas)) {
-        let path = if req.a_node == req.b_node {
-            // Self-loop (E3): wrap a corner, no obstacle search needed.
-            route::self_loop(req.a, plan.side_a, plan.side_b, req.clearance)
-        } else {
-            let obstacles = scene::obstacles_for(nodes, [&req.a_node, &req.b_node]);
-            route::route(
-                plan.port_a,
-                plan.side_a,
-                plan.port_b,
-                plan.side_b,
-                &obstacles,
-                req.clearance,
-                [req.a, req.b],
-            )
-            .unwrap_or_else(|| dumb_route(plan.port_a, plan.side_a, plan.port_b, plan.side_b))
-        };
-        out.push(build_wire(meta, req, path));
+        out.push(build_wire(meta, req, route_one(req, plan, nodes)));
     }
 
     // 4. Global nudge: spread shared/near-parallel runs onto clean tracks,
     //    committing only the separations that keep wires clear of nodes.
     nudge::nudge(&mut out, nodes);
     Ok(out)
+}
+
+/// Route one segment: a self-loop wraps a corner (E3); otherwise A* around the
+/// obstacles for its pair, falling back to the dumb route only if boxed in.
+fn route_one(req: &SegReq, plan: &Plan, nodes: &[PlacedNode]) -> Vec<Pt> {
+    if req.a_node == req.b_node {
+        return route::self_loop(req.a, plan.side_a, plan.side_b, req.clearance);
+    }
+    let obstacles = scene::obstacles_for(nodes, [&req.a_node, &req.b_node]);
+    route::route(
+        plan.port_a,
+        plan.side_a,
+        plan.port_b,
+        plan.side_b,
+        &obstacles,
+        req.clearance,
+        [req.a, req.b],
+    )
+    .unwrap_or_else(|| dumb_route(plan.port_a, plan.side_a, plan.port_b, plan.side_b))
+}
+
+/// Read each provisional route's geometry back into planning hints (the two-pass
+/// feedback): where each end heads just past its stub, and — when an end's route
+/// skimmed its own node — the side it turned toward, so the next pass leaves there.
+fn derive_hints(reqs: &[SegReq], paths: &[Vec<Pt>]) -> Vec<PlanHint> {
+    reqs.iter()
+        .zip(paths)
+        .map(|(req, path)| {
+            if req.a_node == req.b_node {
+                return PlanHint::default(); // a self-loop routes on its own
+            }
+            PlanHint {
+                lead_a: lead_point(path, true),
+                lead_b: lead_point(path, false),
+                reside_a: reside(path, req.a, req.forced_a, req.clearance, true),
+                reside_b: reside(path, req.b, req.forced_b, req.clearance, false),
+            }
+        })
+        .collect()
+}
+
+/// The point a wire heads to just past its attaching stub (its second vertex from
+/// the relevant end) — the crossing-free C4 order key. `None` for a degenerate path.
+fn lead_point(path: &[Pt], is_a: bool) -> Option<Pt> {
+    let n = path.len();
+    if n < 2 {
+        return None;
+    }
+    let off = 2.min(n - 1);
+    Some(if is_a { path[off] } else { path[n - 1 - off] })
+}
+
+/// The side an end should move to: `Some` only when its provisional route skimmed
+/// its own node (and the side isn't forced) — the perpendicular side the wire
+/// turned toward, so leaving from there avoids threading the sub-clearance gap.
+fn reside(
+    path: &[Pt],
+    rect: Rect,
+    forced: Option<Side>,
+    clearance: f64,
+    is_a: bool,
+) -> Option<Side> {
+    if forced.is_some() || !end_skims(path, rect, clearance) {
+        return None;
+    }
+    let n = path.len();
+    if n < 3 {
+        return None;
+    }
+    let (from, to) = if is_a {
+        (path[1], path[2])
+    } else {
+        (path[n - 2], path[n - 3])
+    };
+    let (dx, dy) = (to.0 - from.0, to.1 - from.1);
+    Some(if dx.abs() >= dy.abs() {
+        if dx >= 0.0 {
+            Side::Right
+        } else {
+            Side::Left
+        }
+    } else if dy >= 0.0 {
+        Side::Bottom
+    } else {
+        Side::Top
+    })
+}
+
+/// Does a non-stub (interior) segment run within `clearance` of `rect` — i.e. did
+/// the wire skim this endpoint?
+fn end_skims(path: &[Pt], rect: Rect, clearance: f64) -> bool {
+    if path.len() < 4 {
+        return false; // < 3 segments ⇒ no interior segment, only stubs
+    }
+    let segs: Vec<(Pt, Pt)> = path.windows(2).map(|s| (s[0], s[1])).collect();
+    segs[1..segs.len() - 1]
+        .iter()
+        .any(|s| rect_penetrated_by(rect, *s) || seg_rect_distance(rect, *s) + EPS < clearance)
 }
 
 /// Assemble one `RoutedWire`, placing markers on the chain's outer ends and the

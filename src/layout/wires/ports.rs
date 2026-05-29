@@ -36,11 +36,28 @@ pub struct Plan {
     pub port_b: Pt,
 }
 
+/// Feedback from a provisional routing pass (the second pass of the router's
+/// two-pass, WIRING appendix). Side selection and slot ordering otherwise run
+/// blind — guessing from straight lines to target centres — which mis-orders a
+/// wire that detours around an obstacle and picks a side that forces it through a
+/// sub-clearance gap. These hints replace the guess with where each end's wire
+/// *actually* went: `lead_*` is the point the wire heads to just past its stub
+/// (the crossing-free C4 order), and `reside_*` is the side an end should move to
+/// when its provisional route skimmed its own node (obstacle-aware C1).
+#[derive(Clone, Copy, Default)]
+pub struct PlanHint {
+    pub lead_a: Option<Pt>,
+    pub lead_b: Option<Pt>,
+    pub reside_a: Option<Side>,
+    pub reside_b: Option<Side>,
+}
+
 /// Plan every segment's ports together, so wires sharing a side can be spread
 /// into uniform slots. `reqs` is in routing order (declaration, then chain); that
-/// order is the deterministic tie-break for slot ordering.
-pub fn plan(reqs: &[SegReq]) -> Vec<Plan> {
-    let sides = pick_all_sides(reqs);
+/// order is the deterministic tie-break for slot ordering. `hints` is empty on the
+/// first pass and carries the provisional-route feedback on the second.
+pub fn plan(reqs: &[SegReq], hints: &[PlanHint]) -> Vec<Plan> {
+    let sides = pick_all_sides(reqs, hints);
     let mut plans: Vec<Plan> = reqs
         .iter()
         .zip(&sides)
@@ -54,7 +71,7 @@ pub fn plan(reqs: &[SegReq]) -> Vec<Plan> {
 
     let groups = group_by_side(reqs, &sides);
     for ends in groups.values() {
-        assign_slots(reqs, ends, &mut plans);
+        assign_slots(reqs, ends, hints, &mut plans);
     }
 
     // C3 — a lone wire on a facing pair of sides slides its port(s) to line up
@@ -139,19 +156,30 @@ impl End {
         }
     }
 
-    /// The opposite end's node centre, projected onto this side's varying axis —
-    /// the key that orders wires so they fan out without crossing (C4).
-    fn aim(&self, reqs: &[SegReq], side: Side) -> f64 {
-        let other = if self.is_a {
-            reqs[self.seg].b
-        } else {
-            reqs[self.seg].a
-        };
-        let (cx, cy) = other.center();
-        if varies_in_y(side) {
-            cy
-        } else {
-            cx
+    /// The coordinate this end's wire heads to, projected onto the side's varying
+    /// axis — the key that orders wires so they fan out without crossing (C4).
+    /// With a provisional-route hint it is where the wire *actually* went (so a
+    /// detour around an obstacle sorts correctly); otherwise it falls back to the
+    /// straight-line aim at the opposite node's centre.
+    fn order_key(&self, reqs: &[SegReq], hints: &[PlanHint], side: Side) -> f64 {
+        let lead = hints
+            .get(self.seg)
+            .and_then(|h| if self.is_a { h.lead_a } else { h.lead_b });
+        match lead {
+            Some(p) => axis_coord(p, side),
+            None => {
+                let other = if self.is_a {
+                    reqs[self.seg].b
+                } else {
+                    reqs[self.seg].a
+                };
+                let (cx, cy) = other.center();
+                if varies_in_y(side) {
+                    cy
+                } else {
+                    cx
+                }
+            }
         }
     }
 }
@@ -182,7 +210,7 @@ fn group_by_side<'a>(
 /// C2/C4 — place a side's wires on uniform slots, symmetric about its centre and
 /// `separation` apart (compacting to fit, C5), ordered so they don't cross (C4).
 /// A side with a single wire is left at its midpoint (C3 may move it later).
-fn assign_slots(reqs: &[SegReq], ends: &[End], plans: &mut [Plan]) {
+fn assign_slots(reqs: &[SegReq], ends: &[End], hints: &[PlanHint], plans: &mut [Plan]) {
     // Collapse fan siblings into one occupant: a fan group's shared end is a
     // single slot (C2 / E2). Every other end is its own occupant.
     let mut occupants: Vec<Vec<&End>> = Vec::new();
@@ -205,14 +233,19 @@ fn assign_slots(reqs: &[SegReq], ends: &[End], plans: &mut [Plan]) {
     let (lo, hi) = side_span(ends[0].rect(reqs), side);
     let centre = (lo + hi) / 2.0;
 
-    // C4 — order occupants by where they head (a fan trunk by its members' mean
-    // aim), breaking ties by routing order.
-    let aim = |occ: &[&End]| occ.iter().map(|e| e.aim(reqs, side)).sum::<f64>() / occ.len() as f64;
+    // C4 — order occupants by where they head (a fan trunk by its members' mean),
+    // breaking ties by routing order.
+    let key = |occ: &[&End]| {
+        occ.iter()
+            .map(|e| e.order_key(reqs, hints, side))
+            .sum::<f64>()
+            / occ.len() as f64
+    };
     let first_seg = |occ: &[&End]| occ.iter().map(|e| e.seg).min().unwrap();
     let mut order: Vec<&Vec<&End>> = occupants.iter().collect();
     order.sort_by(|x, y| {
-        aim(x)
-            .total_cmp(&aim(y))
+        key(x)
+            .total_cmp(&key(y))
             .then(first_seg(x).cmp(&first_seg(y)))
     });
 
@@ -285,23 +318,26 @@ fn side_pref(side: Side) -> u8 {
 /// C1 — the side each end attaches to: a forced side wins; else the geometric
 /// pick, with a least-loaded tie-break for diagonal hops that could leave off
 /// either of two sides.
-fn pick_all_sides(reqs: &[SegReq]) -> Vec<(Side, Side)> {
-    // Pass 1 — forced side, else the geometric pick (dominant axis). A self-loop
-    // (same node both ends) has no geometry to pick from: it defaults to exiting
-    // right and returning to the top (E3), honouring any forced sides.
-    let mut sides: Vec<(Side, Side)> = reqs
-        .iter()
-        .map(|r| {
-            if r.a_node == r.b_node {
-                return (
-                    r.forced_a.unwrap_or(Side::Right),
-                    r.forced_b.unwrap_or(Side::Top),
-                );
-            }
-            let (ga, gb) = pick_edges(r.a, r.b);
-            (r.forced_a.unwrap_or(ga), r.forced_b.unwrap_or(gb))
-        })
-        .collect();
+fn pick_all_sides(reqs: &[SegReq], hints: &[PlanHint]) -> Vec<(Side, Side)> {
+    // The side each end attaches to, most-authoritative first: a forced side, then
+    // a re-elected side (an end whose provisional route skimmed its own node moves
+    // to the side it actually headed toward — obstacle-aware C1), then the
+    // geometric pick. A self-loop has no geometry: it defaults to right→top (E3).
+    let pick = |r: &SegReq, s: usize| -> (Side, Side) {
+        let h = hints.get(s).copied().unwrap_or_default();
+        if r.a_node == r.b_node {
+            return (
+                r.forced_a.unwrap_or(Side::Right),
+                r.forced_b.unwrap_or(Side::Top),
+            );
+        }
+        let (ga, gb) = pick_edges(r.a, r.b);
+        (
+            r.forced_a.or(h.reside_a).unwrap_or(ga),
+            r.forced_b.or(h.reside_b).unwrap_or(gb),
+        )
+    };
+    let mut sides: Vec<(Side, Side)> = reqs.iter().enumerate().map(|(s, r)| pick(r, s)).collect();
 
     let mut load: BTreeMap<(&str, u8), usize> = BTreeMap::new();
     for (r, &(sa, sb)) in reqs.iter().zip(&sides) {
@@ -309,12 +345,14 @@ fn pick_all_sides(reqs: &[SegReq]) -> Vec<(Side, Side)> {
         *load.entry((&r.b_node, side_ord(sb))).or_default() += 1;
     }
 
-    // Pass 2 — rebalance only the genuinely ambiguous (diagonal) ends.
+    // Rebalance only the genuinely ambiguous (diagonal) ends — never a forced or
+    // re-elected one, whose side is already decided.
     for (s, r) in reqs.iter().enumerate() {
-        if r.forced_a.is_none() {
+        let h = hints.get(s).copied().unwrap_or_default();
+        if r.forced_a.is_none() && h.reside_a.is_none() {
             sides[s].0 = least_loaded(&r.a_node, r.a, r.b, sides[s].0, &mut load);
         }
-        if r.forced_b.is_none() {
+        if r.forced_b.is_none() && h.reside_b.is_none() {
             sides[s].1 = least_loaded(&r.b_node, r.b, r.a, sides[s].1, &mut load);
         }
     }
@@ -402,7 +440,7 @@ mod tests {
             seg("src", src, "b", t(60.0)),
             seg("src", src, "c", t(120.0)),
         ];
-        let plans = plan(&reqs);
+        let plans = plan(&reqs, &[]);
 
         assert!(
             plans.iter().all(|p| (p.port_a.0 - 40.0).abs() < 1e-9),
@@ -433,7 +471,7 @@ mod tests {
         let low = rect(200.0, 100.0, 240.0, 140.0); // larger y
         let high = rect(200.0, 0.0, 240.0, 40.0); // smaller y
         let reqs = vec![seg("src", src, "low", low), seg("src", src, "high", high)];
-        let plans = plan(&reqs);
+        let plans = plan(&reqs, &[]);
         assert!(
             plans[1].port_a.1 < plans[0].port_a.1,
             "the wire aiming higher (smaller y) takes the higher slot"
@@ -451,10 +489,71 @@ mod tests {
         let mut s1 = seg("src", src, "two", t(120.0));
         s0.fan_a = Some(7);
         s1.fan_a = Some(7);
-        let plans = plan(&[s0, s1]);
+        let plans = plan(&[s0, s1], &[]);
         assert_eq!(
             plans[0].port_a, plans[1].port_a,
             "fan siblings share the source port"
+        );
+    }
+
+    #[test]
+    fn a_lead_hint_orders_slots_by_where_the_wire_actually_goes() {
+        // Two wires leave src's right. By straight-line aim, s0 (target high) takes
+        // the upper slot. But a provisional route shows s0 actually detours DOWN
+        // (its lead is low) and s1 heads UP — the hint must flip the slot order so
+        // they don't cross (the two-pass C4 fix for obstacle detours).
+        let src = rect(0.0, 0.0, 40.0, 160.0);
+        let t = |y: f64| rect(200.0, y, 240.0, y + 40.0);
+        let reqs = [
+            seg("src", src, "hi", t(0.0)),
+            seg("src", src, "lo", t(120.0)),
+        ];
+
+        let aim = plan(&reqs, &[]);
+        assert!(
+            aim[0].port_a.1 < aim[1].port_a.1,
+            "by aim, the high-target wire takes the upper (smaller-y) slot"
+        );
+
+        let hints = [
+            PlanHint {
+                lead_a: Some((40.0, 200.0)), // s0 really heads DOWN
+                ..Default::default()
+            },
+            PlanHint {
+                lead_a: Some((40.0, -40.0)), // s1 really heads UP
+                ..Default::default()
+            },
+        ];
+        let led = plan(&reqs, &hints);
+        assert!(
+            led[0].port_a.1 > led[1].port_a.1,
+            "the lead hint orders by real heading, flipping the slots"
+        );
+    }
+
+    #[test]
+    fn a_reside_hint_re_elects_the_side() {
+        // A level a→b wire takes b's facing side by geometry; a reside hint (its
+        // provisional route skimmed an endpoint) moves it to the named side (C1
+        // obstacle-aware re-election). Forced sides still win over a hint.
+        let a = rect(0.0, 0.0, 40.0, 40.0);
+        let b = rect(160.0, 0.0, 200.0, 40.0);
+        let reqs = [seg("a", a, "bb", b)];
+        assert_eq!(
+            plan(&reqs, &[])[0].side_a,
+            Side::Right,
+            "geometry picks right"
+        );
+
+        let hints = [PlanHint {
+            reside_a: Some(Side::Bottom),
+            ..Default::default()
+        }];
+        assert_eq!(
+            plan(&reqs, &hints)[0].side_a,
+            Side::Bottom,
+            "a reside hint re-elects the side"
         );
     }
 
@@ -469,7 +568,7 @@ mod tests {
         let plain = seg("src", src, "three", t(120.0));
         s0.fan_a = Some(3);
         s1.fan_a = Some(3);
-        let plans = plan(&[s0, s1, plain]);
+        let plans = plan(&[s0, s1, plain], &[]);
         assert_eq!(plans[0].port_a, plans[1].port_a, "siblings coincide");
         assert_ne!(
             plans[0].port_a, plans[2].port_a,
@@ -481,7 +580,7 @@ mod tests {
     fn lone_wire_keeps_the_side_midpoint() {
         let a = rect(0.0, 0.0, 40.0, 40.0);
         let b = rect(120.0, 0.0, 160.0, 40.0);
-        let plans = plan(&[seg("a", a, "b", b)]);
+        let plans = plan(&[seg("a", a, "b", b)], &[]);
         assert_eq!(plans[0].port_a, (40.0, 20.0));
         assert_eq!(plans[0].port_b, (120.0, 20.0));
     }
@@ -492,7 +591,7 @@ mod tests {
         // overlap, so C3 slides both ports to one y → a straight, bend-free wire.
         let cat = rect(0.0, 0.0, 40.0, 80.0);
         let dog = rect(120.0, 40.0, 160.0, 120.0);
-        let plans = plan(&[seg("cat", cat, "dog", dog)]);
+        let plans = plan(&[seg("cat", cat, "dog", dog)], &[]);
         assert!(
             (plans[0].port_a.1 - plans[0].port_b.1).abs() < 1e-9,
             "ports aligned to one y → straight, got {:?} / {:?}",
@@ -513,7 +612,7 @@ mod tests {
             seg("hub", hub, "east", east),
             seg("hub", hub, "dr", down_right),
         ];
-        let plans = plan(&reqs);
+        let plans = plan(&reqs, &[]);
         assert_eq!(
             plans[0].side_a,
             Side::Right,
