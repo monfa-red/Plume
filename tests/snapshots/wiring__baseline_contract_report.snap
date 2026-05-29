@@ -26,7 +26,7 @@ wires_chain.plume      A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:1
 wires_dense.plume      A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 wires_fan.plume        A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 wires_labels.plume     A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:9  X:0
-wires_realistic.plume  A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:4
+wires_realistic.plume  A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 wires_selfloop.plume   A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 
-TOTAL                  A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:9  X:5
+TOTAL                  A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:9  X:1

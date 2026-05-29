@@ -169,6 +169,33 @@ fn baseline_contract_report() {
 }
 
 #[test]
+fn realistic_convergence_crossings_are_minimised() {
+    // The two independent bundles converging on `roof` (bird→roof, water→roof) used
+    // to pick different sides and cross (X:4). Crossing-aware convergence unifies
+    // them onto one side so they nest — strictly fewer crossings, no regression to a
+    // hard guarantee or wire-node clearance.
+    let src = std::fs::read_to_string("samples/wires_realistic.plume").unwrap();
+    let crossings = count_rule(&src, plume::Rule::Crossing);
+    assert!(
+        crossings < 4,
+        "convergence crossings must drop below the pre-fix 4, got {crossings}"
+    );
+    let v = plume::validate_str(&src).expect("validate");
+    let hard = v
+        .iter()
+        .filter(|x| {
+            x.rule.severity() == plume::Severity::Invariant || x.rule == plume::Rule::NodeOverlap
+        })
+        .count();
+    assert_eq!(hard, 0, "no hard-guarantee regression: {v:?}");
+    assert_eq!(
+        count_rule(&src, plume::Rule::Clearance),
+        0,
+        "B2n stays clean"
+    );
+}
+
+#[test]
 fn router_threads_around_a_blocking_box() {
     // via sits between src and dst; with gap (48) > 2·clearance (32) there is room
     // to detour around it AND keep clearance from src/dst, so the route is fully

@@ -328,56 +328,63 @@ bottom and run under the row); `wires_realistic` crossings **6 → 4** (the
 
 ---
 
-## NEXT STEP — crossing-aware convergence (predictable, no oscillation)
+## Crossing-aware convergence — DONE (`mod::converge_resides`)
 
-**State at handoff:** HEAD `f1e9ba8`, tree clean, `cargo test` green (11 suites),
-clippy/fmt clean. Scorecard: all hard guarantees 0, B2n 0, B2w = `wires_labels:9`,
-`wires_realistic` X:4, `wires_chain` X:1 (geometry-forced), rest 0.
+**Done.** The remaining 4 crossings on `wires_realistic` were all
+`bird→roof`×`water→roof` — two *independent* bundles (different sources, same target
+`roof`) that picked *different sides* of the shared target (`bird→roof` into the
+bottom, `water→roof` rising on the left) and so couldn't nest.
 
-**The remaining 4 crossings** on `wires_realistic` are all `bird→roof`×`water→roof`
-— two *independent* bundles (different sources, same target `roof`) converging from
-the same lower-left quadrant. `bird→roof` enters roof's **bottom** (via a leftward
-run under it); `water→roof` wraps under `garden` and rises on roof's **left**, so
-its rising rail crosses bird→roof's run. They cross because they pick *different
-sides* of the shared target and so can't nest.
+The router now routes **two candidates** and keeps the better:
 
-**Fix (do this next):** crossing-aware side unification, folded into the **existing
-two-pass** so it stays deterministic and cannot oscillate (there is no new
-iteration — still exactly two routing passes, plus an optional keep-the-better
-compare). In `mod::derive_hints`, before emitting `reside`:
+- **Candidate A** is the established informed second pass (lead/reside hints from the
+  pass-1 provisional routes).
+- **Candidate B** adds *crossing-aware convergence*: `converge_resides` finds pairs
+  of wires that **share an endpoint node** and whose pass-1 routes
+  perpendicular-cross, groups their ends by that shared node, and unifies every
+  non-anchor member's end onto the **earliest-declared** member's side (`BTreeSet`
+  order = declaration order → deterministic; forced sides outrank it). Excluded:
+  fan siblings (E2 — a permitted coincident run) and two segments of *one* chain
+  (`chains[i]==chains[j]` — that's the wire passing through the node, not two
+  bundles meeting). `overlay_resides` lays these as `reside` hints over the base;
+  the existing `lead`-based C4 order then nests them.
 
-1. Compute pass-1 crossings (reuse `geometry::perp_crossing` over the provisional
-   paths, sorted deterministically).
-2. Keep only pairs whose wires **share a target endpoint node** (`seg_to` equal, or
-   any shared endpoint) and are **not fan siblings** — these are converging bundles.
-3. For each such pair, unify both ends onto **one** side of the shared node: the
-   side of the **earliest-declared** wire in the group (declaration order is stable
-   → deterministic). Emit `reside` hints moving the other end(s) to that side.
-   The existing `lead`-based C4 ordering then nests them along that side.
-4. **Safety (predictability, no regression):** route the second pass *both* ways —
-   with and without the unification hints — and keep whichever has fewer total
-   crossings; tie → the non-unified (current) result, so a unification that doesn't
-   help is a guaranteed no-op. This makes X monotonically non-increasing and the
-   output a deterministic function of the input. (Routing is cheap; a third pass is
-   fine.)
+`route_wires` adopts B **only when `quality(B) < quality(A)`** — `quality` is the
+lexicographic scorecard tuple `(invariants, B1, B2n, B2w, crossings, bends, length)`,
+the first five read straight from the independent `validate_routing` and the last two
+(B4/B5, which the validator doesn't flag) summed from the polylines (length in whole
+px, a determinism-safe B6 tidiness proxy). Crossings rank above bends, so B may still
+spend a bend to dodge a crossing (WIRING B3 ≈ a few bends) but can **never** add a
+bend/length at equal crossings. So the convergence pass is **monotone over the whole
+tracked contract**: it only keeps A or adopts a strictly-better B — no sample regresses
+on any tracked metric — and the output stays a **deterministic function of the input**
+(tie → A, a guaranteed no-op when it can't help). No new iteration, no oscillation, no
+per-wire greedy penalty.
 
-**Acceptance:** `wires_realistic` X strictly drops below 4 (ideally 0 for the
-bird/water→roof convergence) with **B2n still 0 and all hard guarantees 0
-suite-wide**; `wires_chain` X:1 unchanged (geometry-forced); byte-identical across
-two runs; clippy/fmt clean. Add a `ports`/`mod` unit test that two wires converging
-on one node from the same side get nested (non-crossing) slot order, and an
-integration assertion that `wires_realistic` X < 4.
+**Result:** `wires_realistic` X **4 → 0** (the bird/water→roof convergence is gone,
+the bundles nest into `roof`); every other sample byte-identical (only candidate A
+runs, or B isn't better); B2n 0 and all hard guarantees 0 suite-wide; `wires_chain`
+X:1 unchanged (geometry-forced); `wires_labels` B2w:9 unchanged (C5 overflow).
+Byte-identical across two compiles; clippy/fmt clean. Tests: `converge_resides`
+unit tests in `mod.rs` (unify-on-cross; left-alone for no-cross, fan-sibling,
+non-converging, and same-chain segments) +
+`tests/wiring.rs::realistic_convergence_crossings_are_minimised`.
 
-**Verify on a fresh machine:** `git pull`; re-orient per `CLAUDE.md` (read this
-file + `WIRING.md`); `cargo test` (must be green at `f1e9ba8`); render
-`wires_realistic` to PNG (`./target/debug/plume samples/wires_realistic.plume
---bake-vars -o /tmp/x.svg && resvg /tmp/x.svg /tmp/x.png`) to see the 4 crossings;
-then implement the above. The `baseline_contract_report` snapshot and
-`no_sample_breaks_a_hard_guarantee` are the gates.
+Adversarially reviewed (5 independent lenses + verification): determinism, panic
+safety, and router interaction came back clean; the bends/length guard and the
+same-chain exclusion above closed the two findings worth acting on.
 
-**Do NOT:** add a per-wire greedy crossing penalty (fails — see the locked lesson
-below), or an iterative re-elect/re-route loop (can oscillate). Keep it to the
-fixed two-pass + a deterministic, monotone keep-better compare.
+**Residual / possible next steps (none blocking):**
+- `wires_labels` B2w:9 is the only flagged relaxation left — a genuine C5 overflow
+  (5 wires on one tiny shared edge). Density is the user's lever; not a bug.
+- `wires_chain` X:1 is topological (two under-row wires must cross). Accepted by B3.
+- The convergence keep-better compares **pre-nudge** candidates via the full
+  validator after nudge (`finish` nudges, then `quality` validates the nudged
+  result), so it already reflects the final geometry.
+
+**Do NOT (locked):** add a per-wire greedy crossing penalty (fails — see below), or
+an iterative re-elect/re-route loop (can oscillate). Convergence stays a fixed set
+of candidates + the deterministic, monotone keep-better compare.
 
 ### Locked lessons (don't relearn the hard way)
 
