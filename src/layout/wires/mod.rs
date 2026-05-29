@@ -92,6 +92,7 @@ pub fn route_wires(program: &Program, nodes: &[PlacedNode]) -> Result<Vec<Routed
                 plan.side_b,
                 &obstacles,
                 req.clearance,
+                [req.a, req.b],
             )
             .unwrap_or_else(|| dumb_route(plan.port_a, plan.side_a, plan.port_b, plan.side_b))
         };

@@ -27,8 +27,14 @@ so **"perfect" means "obeys every rule and looks clean,"** not "provably minimal
   ancestor containers, and *except* text nodes. A container group that is not such
   an ancestor is one **solid** obstacle (its whole bbox — the router won't thread
   between its children). (R2, R3, R12)
-- **passable** — a wire's endpoints and their ancestors; the wire may cross their
-  boundaries (not obstacles *for it*), but their non-endpoint children still are. (R3)
+- **passable** — a wire's endpoint nodes and their ancestor containers are not
+  obstacles *for it*; it may cross their boundaries (their non-endpoint children
+  still are obstacles). Ancestor containers stay **fully** passable — a wire must
+  cross them to reach its endpoint. An **endpoint node**, though, is passable only
+  to the wire's **attaching stub** (the single segment that lands on its port);
+  every *other* segment of that wire keeps `clearance` from the endpoint, exactly
+  as from any obstacle (B2). Self-loops (E3) and fan-trunk siblings (E2) are
+  exempt. (R3)
 - **text node / wire label** — never obstacles, never connectable; a label rides
   on its wire (the renderer haloes it). (R12)
 - **clearance(w)** — the minimum distance wire `w` keeps from obstacle nodes *and*
@@ -70,7 +76,8 @@ first, always flagged):**
 
 1. **B1 No node overlap** — never enter an obstacle's interior. *(relax: only a
    trapped endpoint → error)* (R2)
-2. **B2 Clearance** — ≥ `clearance` from obstacle nodes and ≥ `separation` from
+2. **B2 Clearance** — ≥ `clearance` from obstacle nodes, ≥ `clearance` from the
+   wire's own endpoint nodes (except its attaching stub), and ≥ `separation` from
    other wires, except exactly at a perpendicular crossing. *(relax: sub-clearance,
    only when nothing else routes → warning)* (R6, R7)
 

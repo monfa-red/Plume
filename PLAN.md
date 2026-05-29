@@ -280,3 +280,36 @@ geometrically-best sides rather than forcing one slot (which would force ugly
 detours). This follows WIRING's meta-rule ("perfect" = obeys every rule *and looks
 clean*) over the literal "one slot." If strict one-slot-always is wanted, C1 would
 need a fan-hub side election — deferred as it degrades the common straddling case.
+
+---
+
+## Post-Phase-5 hardening — endpoint-clearance blind spot
+
+Review of `wires_realistic` surfaced a wire running parallel ~4px under `roof`'s
+own bottom edge — a clearance breach the validator passed because a wire's
+endpoints were excluded from its obstacle set entirely (the one
+`scene::obstacles_for` feeds the validator, the router grid, and the nudge — so all
+three were blind). WIRING said an endpoint is "passable"; that's now scoped to the
+wire's perpendicular **attaching stub** only (every other segment keeps `clearance`
+from its own endpoints; ancestors stay fully passable so a wire can still exit its
+container).
+
+- **Validator** (`validate::check_endpoint_clearance`): non-stub segments are now
+  measured against the wire's own endpoint rects → the skim is a flagged B2.
+- **Router** (`route::route`): two-tier — route from the ports first and keep it if
+  it already clears its endpoints; else route the interior between two approach
+  points (`clearance` out) with the endpoints as obstacles and re-add the stubs;
+  else (a node within `clearance` of the port makes it geometrically impossible)
+  keep the relaxed route with a flagged skim — never the node-piercing dumb route.
+- **Nudge** (`nudge::is_safe`): endpoint clearance checked *relatively* — a move may
+  preserve an unavoidable skim but must never deepen one or create a new one.
+- **Gate:** `tests/wiring.rs::no_sample_breaks_a_hard_guarantee` pins A1–A5/B1/A3 = 0
+  on every sample; the scorecard snapshot pins the B2 counts.
+
+Result: `wires_realistic` bird→roof is clean (B2n:0); the systemic skim is closed.
+**Remaining (next):** `wires_chain`/`mermaid_fast`/`wires_fan` still show B2n on
+wires forced through sub-`2·clearance` gaps *because of the side they leave from* —
+the same root as the avoidable crossings: **side/slot selection is not
+obstacle-aware**. The fix is the libavoid two-pass (route → re-side/re-slot from
+real exit headings → re-route), which also removes the avoidable crossings on
+`wires_realistic`. Tracked as the next work item.

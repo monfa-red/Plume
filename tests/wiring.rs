@@ -61,6 +61,32 @@ fn dumb_router_holds_per_wire_invariants() {
     }
 }
 
+#[test]
+fn no_sample_breaks_a_hard_guarantee() {
+    // The absolute guarantees that hold on every sample regardless of density: the
+    // hard invariants A1–A5 (incl. A3, no shared parallel run) and B1 (no node
+    // overlap). B2 clearance/separation may relax — flagged — on an overcrowded
+    // sample, but a hard guarantee never may. This is the gate that keeps the
+    // endpoint-clearance work (and any future routing change) from ever shipping a
+    // pierced node or a broken invariant.
+    for path in sample_paths() {
+        let src = std::fs::read_to_string(&path).unwrap();
+        let hard: Vec<plume::Violation> = plume::validate_str(&src)
+            .expect("validate")
+            .into_iter()
+            .filter(|v| {
+                v.rule.severity() == plume::Severity::Invariant
+                    || v.rule == plume::Rule::NodeOverlap
+            })
+            .collect();
+        assert!(
+            hard.is_empty(),
+            "{}: hard-guarantee violations: {hard:?}",
+            path.display()
+        );
+    }
+}
+
 fn count_rule(src: &str, rule: plume::Rule) -> usize {
     plume::validate_str(src)
         .expect("validate")
@@ -90,18 +116,25 @@ fn rule_counts(src: &str) -> [usize; 9] {
     c
 }
 
-/// The router's contract scorecard across the whole sample suite. Invariants
-/// (A1–A5) and B1/B2n hold everywhere; A3 shared runs are gone; the only B2w left
-/// is `wires_labels`, where five wires are crammed onto one tiny edge — genuine
-/// C5 overflow that WIRING flags rather than removes. X counts perpendicular
-/// crossings, which are normal output.
+/// The router's contract scorecard across the whole sample suite. Hard guarantees
+/// (A1–A5 invariants, B1 node overlap, A3 shared runs) are 0 everywhere. B2n now
+/// counts wire↔node clearance *including a wire's own endpoints* (the attaching
+/// stub excepted) — closing a blind spot that silently passed wires skimming the
+/// node they connect to. The remaining B2n live on three over-dense samples
+/// (`wires_chain`, `mermaid_fast`, `wires_fan`: ~20px gaps at clearance 16), where
+/// a wire leaving the wrong side is forced through a sub-clearance gap; they're
+/// flagged relaxations to be cleared by obstacle-aware side selection. B2w is
+/// `wires_labels` (C5 overflow) plus one forced separation in the same dense
+/// `wires_chain` region. X counts perpendicular crossings — normal output.
 #[test]
 fn baseline_contract_report() {
     use std::fmt::Write;
     let mut report = String::new();
     report.push_str("Router contract scorecard — validator counts per sample.\n");
     report.push_str("A1–A5 invariants; A3 = shared parallel runs; B1 = node overlap;\n");
-    report.push_str("B2n = wire-node clearance; B2w = wire-wire separation; X = B3 crossings.\n\n");
+    report.push_str(
+        "B2n = wire-node clearance (incl. own endpoints); B2w = wire-wire separation; X = B3 crossings.\n\n",
+    );
 
     let mut totals = [0usize; 9];
     for path in sample_paths() {
@@ -139,9 +172,10 @@ fn baseline_contract_report() {
 
 #[test]
 fn router_threads_around_a_blocking_box() {
-    // via sits between src and dst; with gap (30) > clearance (16) the A* router
-    // must detour around it — neither piercing it (B1) nor grazing it (B2n).
-    let source = "{ |scene| layout:row gap:30 }\n\
+    // via sits between src and dst; with gap (48) > 2·clearance (32) there is room
+    // to detour around it AND keep clearance from src/dst, so the route is fully
+    // clean — neither piercing via (B1) nor grazing any node (B2n).
+    let source = "{ |scene| layout:row gap:48 }\n\
                   src |rect| size:(40,40)\n\
                   via |rect| size:(40,40)\n\
                   dst |rect| size:(40,40)\n\

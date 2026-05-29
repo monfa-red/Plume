@@ -92,6 +92,7 @@ pub fn validate_routing(
         check_sides_only(w, &index, &mut out); // A4
         check_self_cross(w, &mut out); // A5
         check_node_clearance(w, nodes, &mut out); // B1, B2 (wire ↔ node)
+        check_endpoint_clearance(w, &index, &mut out); // B2 (wire ↔ own endpoint)
     }
     check_shared_runs(wires, &mut out); // A3
     check_separation(wires, &mut out); // B2 (wire ↔ wire), B3
@@ -300,6 +301,46 @@ fn check_node_clearance(w: &RoutedWire, nodes: &[PlacedNode], out: &mut Vec<Viol
     }
 }
 
+// B2 (wire ↔ own endpoint) — every segment EXCEPT the attaching stub (the first
+// and last segments, which land on the ports) keeps `clearance` from the wire's
+// own endpoint nodes; a closer run is the endpoint-skim the obstacle set hides.
+// Self-loops (E3) are exempt — their loop deliberately hugs the node at clearance.
+fn check_endpoint_clearance(w: &RoutedWire, index: &SceneIndex, out: &mut Vec<Violation>) {
+    if w.seg_from == w.seg_to {
+        return; // self-loop
+    }
+    let segs = segments(w);
+    if segs.len() < 3 {
+        return; // straight / single-L: every segment is an attaching stub
+    }
+    let interior = &segs[1..segs.len() - 1];
+    let clearance = oracle::clearance(&w.attrs);
+    for path in [&w.seg_from, &w.seg_to] {
+        let Some(r) = index.rect(path) else { continue };
+        if interior.iter().any(|s| rect_penetrated_by(r, *s)) {
+            push(
+                out,
+                Rule::NodeOverlap,
+                w,
+                &format!("wire crosses its endpoint '{path}' interior"),
+            );
+            continue;
+        }
+        let gap = interior
+            .iter()
+            .map(|s| seg_rect_distance(r, *s))
+            .fold(f64::INFINITY, f64::min);
+        if gap + EPS < clearance {
+            push(
+                out,
+                Rule::Clearance,
+                w,
+                &format!("{gap:.1} from its endpoint '{path}' (< clearance {clearance:.0})"),
+            );
+        }
+    }
+}
+
 // B2 (wire ↔ wire) and B3 — wires keep `separation` apart, except where they
 // cross perpendicularly. A crossing is exempt from B2 and merely counted (B3);
 // shared parallel runs are A3's business, not double-counted here.
@@ -403,6 +444,50 @@ mod tests {
         assert!(
             plain.iter().any(|x| x.rule == Rule::PerpCrossing),
             "unrelated wires sharing a run still violate A3"
+        );
+    }
+
+    // Two boxes far apart so a wire can loop around one without nearing the other.
+    const SKIM_SCENE: &str = "{ |scene| layout:row gap:300 }\n\
+                              aa |rect| size:(40,40)\n\
+                              bb |rect| size:(40,40)\n";
+
+    #[test]
+    fn flags_a_wire_skimming_its_own_endpoint() {
+        // A wire that attaches to bb but whose middle segments run 4px from bb's
+        // edges (< default clearance 16) before the stub lands — the endpoint-skim
+        // blind spot. WIRING: only the attaching stub may approach the endpoint.
+        let ns = nodes(SKIM_SCENE);
+        let idx = SceneIndex::build(&ns);
+        let bb = idx.rect("bb").unwrap();
+        let cy = (bb.min_y + bb.max_y) / 2.0;
+        let (a, v) = (AttrMap::new(), VarTable::new());
+
+        let skim = vec![
+            (bb.max_x + 60.0, cy),             // start, right of bb
+            (bb.max_x + 60.0, bb.min_y - 4.0), // up
+            (bb.min_x - 4.0, bb.min_y - 4.0),  // left across bb's top, 4px above — SKIM
+            (bb.min_x - 4.0, cy),              // down, 4px left of bb — SKIM
+            (bb.min_x, cy),                    // into bb's left edge — stub (exempt)
+        ];
+        let vs = validate_routing(&ns, &a, &[wire(skim, "aa", "bb")], &v);
+        assert!(
+            vs.iter().any(|x| x.rule == Rule::Clearance),
+            "a wire skimming its own endpoint must fire B2 clearance: {vs:?}"
+        );
+
+        // Clean: same attachment, but the detour keeps >= clearance from bb.
+        let clean = vec![
+            (bb.max_x + 60.0, cy),
+            (bb.max_x + 60.0, bb.min_y - 20.0),
+            (bb.min_x - 20.0, bb.min_y - 20.0), // 20 >= clearance 16
+            (bb.min_x - 20.0, cy),
+            (bb.min_x, cy),
+        ];
+        let vs2 = validate_routing(&ns, &a, &[wire(clean, "aa", "bb")], &v);
+        assert!(
+            !vs2.iter().any(|x| x.rule == Rule::Clearance),
+            "a wire keeping >= clearance from its endpoint must not fire: {vs2:?}"
         );
     }
 

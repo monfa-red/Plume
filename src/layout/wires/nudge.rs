@@ -20,7 +20,7 @@
 
 use super::geometry::{clean, range_overlap, rect_penetrated_by, seg_rect_distance, Pt, EPS};
 use super::oracle;
-use super::scene::obstacles_for;
+use super::scene::{obstacles_for, SceneIndex};
 use crate::layout::ir::{PlacedNode, RoutedWire};
 use std::collections::BTreeMap;
 
@@ -30,6 +30,7 @@ type Placement = Vec<((usize, usize), f64)>;
 /// Spread shared / near-parallel runs onto clean tracks, committing only the
 /// separations that keep every wire clear of nodes. Mutates each wire's polyline.
 pub fn nudge(wires: &mut [RoutedWire], nodes: &[PlacedNode]) {
+    let index = SceneIndex::build(nodes);
     let segs = collect_interior(wires);
     let originals: Vec<Vec<Pt>> = wires.iter().map(|w| w.path.clone()).collect();
     let mut moved: BTreeMap<(usize, usize), f64> = BTreeMap::new();
@@ -55,6 +56,7 @@ pub fn nudge(wires: &mut [RoutedWire], nodes: &[PlacedNode]) {
                         &originals[wi],
                         &wires[wi],
                         nodes,
+                        &index,
                     )
                 });
                 if !safe {
@@ -329,23 +331,66 @@ fn rebuild(original: &[Pt], wire: usize, moved: &BTreeMap<(usize, usize), f64>) 
 }
 
 /// A nudged wire is safe when it pierces or grazes no non-endpoint node (B1/B2
-/// wire↔node), still attaches perpendicularly at both ports (A2 — the port stubs
-/// kept their orientation), and doesn't cross itself (A5).
-fn is_safe(path: &[Pt], original: &[Pt], w: &RoutedWire, nodes: &[PlacedNode]) -> bool {
+/// wire↔node), keeps `clearance` from its own endpoint nodes except its attaching
+/// stubs (B2), still attaches perpendicularly at both ports (A2), and doesn't
+/// cross itself (A5). The endpoint check is *relative*: some skims are
+/// geometrically forced (a node within `clearance` of a port), so the nudge may
+/// preserve one but must never deepen it or create a new one.
+fn is_safe(
+    path: &[Pt],
+    original: &[Pt],
+    w: &RoutedWire,
+    nodes: &[PlacedNode],
+    index: &SceneIndex,
+) -> bool {
     if !is_orthogonal(path) || !attachment_preserved(path, original) {
         return false;
     }
     let clearance = oracle::clearance(&w.attrs);
-    let obstacles = obstacles_for(nodes, [&w.seg_from, &w.seg_to]);
     let segs: Vec<(Pt, Pt)> = path.windows(2).map(|s| (s[0], s[1])).collect();
-    for obs in &obstacles {
-        for s in &segs {
-            if rect_penetrated_by(*obs, *s) || seg_rect_distance(*obs, *s) + EPS < clearance {
-                return false;
-            }
+
+    for obs in &obstacles_for(nodes, [&w.seg_from, &w.seg_to]) {
+        let bad = |s: &(Pt, Pt)| {
+            rect_penetrated_by(*obs, *s) || seg_rect_distance(*obs, *s) + EPS < clearance
+        };
+        if segs.iter().any(bad) {
+            return false;
+        }
+    }
+
+    if w.seg_from != w.seg_to {
+        let after = endpoint_gap(path, w, index);
+        if after < 0.0 {
+            return false; // pierced its own endpoint
+        }
+        let floor = clearance.min(endpoint_gap(original, w, index));
+        if after + EPS < floor {
+            return false; // would deepen / create an endpoint skim
         }
     }
     !self_crosses(&segs)
+}
+
+/// Smallest distance from a wire's non-stub (interior) segments to either of its
+/// endpoint rects — `∞` when there are no interior segments, negative when one
+/// pierces an endpoint's interior. The attaching stubs (first/last) are exempt.
+fn endpoint_gap(path: &[Pt], w: &RoutedWire, index: &SceneIndex) -> f64 {
+    let segs: Vec<(Pt, Pt)> = path.windows(2).map(|s| (s[0], s[1])).collect();
+    if segs.len() < 3 {
+        return f64::INFINITY;
+    }
+    let interior = &segs[1..segs.len() - 1];
+    let mut gap = f64::INFINITY;
+    for id in [&w.seg_from, &w.seg_to] {
+        let Some(r) = index.rect(id) else { continue };
+        for s in interior {
+            if rect_penetrated_by(r, *s) {
+                return f64::NEG_INFINITY;
+            }
+            gap = gap.min(seg_rect_distance(r, *s));
+        }
+    }
+    gap
 }
 
 /// Every segment is axis-aligned, non-zero, and turns 90° from the last (A1) — a

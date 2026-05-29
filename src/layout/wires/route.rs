@@ -7,7 +7,7 @@
 //! wire-node-B2-clean by construction. Returns `None` only when the ports are
 //! boxed in — the caller falls back so a wire still draws.
 
-use super::geometry::{clean, Pt, Rect};
+use super::geometry::{clean, rect_penetrated_by, seg_rect_distance, Pt, Rect, EPS};
 use super::graph::Grid;
 use crate::ast::Side;
 use std::cmp::{Ordering, Reverse};
@@ -18,13 +18,94 @@ use std::collections::BinaryHeap;
 const BEND: f64 = 100_000.0;
 
 /// Route one wire from port `pa` (leaving `side_a`) to port `pb` (entering
-/// `side_b`), around `obstacles`, keeping ≥ `clearance`. Ports are supplied by
-/// `ports` (slot-assigned), not derived here, so a wire attaches wherever its
-/// slot sits — not always the side midpoint. Other wires are not consulted: a
-/// crossing penalty belongs in the global nudge pass (Phase 4), since a greedy
-/// per-wire dodge only shuffles crossings onto later wires or folds a wire onto
-/// itself (A5).
+/// `side_b`), around `obstacles`, keeping ≥ `clearance`. `ends` are the two
+/// endpoint rects: the wire must keep `clearance` from them too (B2) — only its
+/// perpendicular **attaching stub** may approach. We enforce that by routing the
+/// interior between two **approach points** (each `clearance` out from its port,
+/// perpendicular to the side) with the endpoints added as obstacles, then
+/// prepending/appending the stubs. The stub is the sole sub-clearance approach,
+/// so a wire can never skim the node it connects to. Other wires aren't consulted
+/// here — crossing minimisation is the global ports/nudge passes' job.
 pub fn route(
+    pa: Pt,
+    side_a: Side,
+    pb: Pt,
+    side_b: Side,
+    obstacles: &[Rect],
+    clearance: f64,
+    ends: [Rect; 2],
+) -> Option<Vec<Pt>> {
+    // Route straight from the ports first (the simplest, lowest-disruption path).
+    // If it already keeps `clearance` from its own endpoints, keep it — most wires
+    // do, so their geometry is untouched. Only a wire that would skim an endpoint
+    // pays for the stricter, endpoint-avoiding route. If neither can avoid the skim
+    // (an obstacle sits within `clearance` of the port — geometrically impossible),
+    // keep the relaxed route: the skim is a flagged B2 relaxation, far better than
+    // the node-piercing dumb fallback.
+    let relaxed_path = relaxed(pa, side_a, pb, side_b, obstacles, clearance);
+    if relaxed_path
+        .as_ref()
+        .is_some_and(|p| !skims_endpoint(p, &ends, clearance))
+    {
+        return relaxed_path;
+    }
+    if let Some(p) = keeping_endpoint_clearance(pa, side_a, pb, side_b, obstacles, clearance, ends)
+    {
+        if !skims_endpoint(&p, &ends, clearance) {
+            return Some(p);
+        }
+    }
+    relaxed_path
+}
+
+/// Does any non-stub segment run within `clearance` of an endpoint rect (B2)? The
+/// first and last segments are the attaching stubs and are exempt.
+fn skims_endpoint(path: &[Pt], ends: &[Rect; 2], clearance: f64) -> bool {
+    let segs: Vec<(Pt, Pt)> = path.windows(2).map(|s| (s[0], s[1])).collect();
+    if segs.len() < 3 {
+        return false; // straight / single-L: every segment is a stub
+    }
+    let interior = &segs[1..segs.len() - 1];
+    ends.iter().any(|r| {
+        interior
+            .iter()
+            .any(|s| rect_penetrated_by(*r, *s) || seg_rect_distance(*r, *s) + EPS < clearance)
+    })
+}
+
+/// Strict pass: route the interior between two **approach points** (each
+/// `clearance` out from its port) with the endpoints added as obstacles, then
+/// prepend/append the perpendicular stubs. The stub is the only segment allowed
+/// within `clearance` of an endpoint, so the wire can't skim the node it joins.
+fn keeping_endpoint_clearance(
+    pa: Pt,
+    side_a: Side,
+    pb: Pt,
+    side_b: Side,
+    obstacles: &[Rect],
+    clearance: f64,
+    ends: [Rect; 2],
+) -> Option<Vec<Pt>> {
+    let appr_a = step_out(pa, side_a, clearance);
+    let appr_b = step_out(pb, side_b, clearance);
+    let mut obs = obstacles.to_vec();
+    obs.extend_from_slice(&ends);
+    let grid = Grid::build(&obs, clearance, &[appr_a, appr_b]);
+    let a = grid.index_of(appr_a)?;
+    let b = grid.index_of(appr_b)?;
+    let inner = astar(&grid, a, None, b, None, appr_a)?;
+
+    let mut path = Vec::with_capacity(inner.len() + 2);
+    path.push(pa);
+    path.extend(inner);
+    path.push(pb);
+    Some(clean(path))
+}
+
+/// Relaxed pass: route straight from the ports with a forced perpendicular launch
+/// and arrival, endpoints *not* treated as obstacles. Used only when the strict
+/// pass can't keep endpoint clearance; the resulting endpoint skim is flagged B2.
+fn relaxed(
     pa: Pt,
     side_a: Side,
     pb: Pt,
@@ -33,16 +114,19 @@ pub fn route(
     clearance: f64,
 ) -> Option<Vec<Pt>> {
     let grid = Grid::build(obstacles, clearance, &[pa, pb]);
-    let (ai, aj) = grid.index_of(pa)?;
-    let (bi, bj) = grid.index_of(pb)?;
-    astar(
-        &grid,
-        (ai, aj),
-        outward(side_a),
-        (bi, bj),
-        inward(side_b),
-        pa,
-    )
+    let a = grid.index_of(pa)?;
+    let b = grid.index_of(pb)?;
+    astar(&grid, a, Some(outward(side_a)), b, Some(inward(side_b)), pa)
+}
+
+/// A port's approach point: `d` out from the port, perpendicular to its side.
+fn step_out(p: Pt, side: Side, d: f64) -> Pt {
+    match side {
+        Side::Right => (p.0 + d, p.1),
+        Side::Left => (p.0 - d, p.1),
+        Side::Top => (p.0, p.1 - d), // SVG +y is down, so Top is −y
+        Side::Bottom => (p.0, p.1 + d),
+    }
 }
 
 /// Route a wire from a node back to itself (E3): an orthogonal loop that leaves
@@ -153,19 +237,23 @@ fn outward(side: Side) -> Dir {
     }
 }
 
-/// A wire arrives at its target travelling *into* the side — the opposite of its
-/// outward normal — which keeps the final segment perpendicular (A2).
+/// A wire arrives at its target travelling *into* the side (the opposite of its
+/// outward normal), which keeps the final segment perpendicular (A2).
 fn inward(side: Side) -> Dir {
     outward(side).opposite()
 }
 
+/// A\* from `start` to `goal` over the grid. `launch`/`arrive` pin the first/last
+/// direction when `Some` (the relaxed pass, so the stubs are perpendicular from
+/// the ports); `None` leaves them free (the strict pass, whose stubs are added
+/// separately). State is (cell, arrival direction) so bends are penalised.
 fn astar(
     grid: &Grid,
     start: (usize, usize),
-    start_dir: Dir,
+    launch: Option<Dir>,
     goal: (usize, usize),
-    goal_dir: Dir,
-    pa: Pt,
+    arrive: Option<Dir>,
+    start_pt: Pt,
 ) -> Option<Vec<Pt>> {
     let (nx, ny) = (grid.nx(), grid.ny());
     let sid = |i: usize, j: usize, d: Dir| (j * nx + i) * 4 + d.idx();
@@ -178,16 +266,28 @@ fn astar(
     let mut closed = vec![false; nstates];
     let mut open: BinaryHeap<Reverse<(OrdF, usize)>> = BinaryHeap::new();
 
-    // The forced first step launches perpendicular to the source side (A2).
-    let (qi, qj) = step(start.0, start.1, start_dir, grid)?;
-    let q = grid.point(qi, qj);
-    if !grid.edge_free(pa, q) {
-        return None; // boxed in at the port
+    // Seed the launch direction(s): one forced, or all four when free. The first
+    // segment carries no turn cost. DIRS order is fixed, so search is deterministic.
+    let seeds: &[Dir] = match &launch {
+        Some(d) => std::slice::from_ref(d),
+        None => &DIRS,
+    };
+    for &d0 in seeds {
+        let Some((qi, qj)) = step(start.0, start.1, d0, grid) else {
+            continue;
+        };
+        let q = grid.point(qi, qj);
+        if !grid.edge_free(start_pt, q) {
+            continue;
+        }
+        let s0 = sid(qi, qj, d0);
+        let g0 = dist(start_pt, q);
+        if g0 + 1e-9 < g[s0] {
+            g[s0] = g0;
+            came[s0] = START;
+            open.push(Reverse((OrdF(g0 + heuristic(grid, qi, qj, goal)), s0)));
+        }
     }
-    let s0 = sid(qi, qj, start_dir);
-    g[s0] = dist(pa, q);
-    came[s0] = START;
-    open.push(Reverse((OrdF(g[s0] + heuristic(grid, qi, qj, goal)), s0)));
 
     while let Some(Reverse((_, cur))) = open.pop() {
         if closed[cur] {
@@ -195,8 +295,8 @@ fn astar(
         }
         closed[cur] = true;
         let (i, j, dir) = decode(cur, nx);
-        if (i, j) == goal && dir == goal_dir {
-            return Some(reconstruct(grid, &came, cur, nx, pa, START));
+        if (i, j) == goal && arrive.map_or(true, |a| dir == a) {
+            return Some(reconstruct(grid, &came, cur, nx, start_pt, START));
         }
         let p = grid.point(i, j);
         for d in DIRS {
@@ -352,6 +452,7 @@ mod tests {
             Side::Left,
             &[],
             16.0,
+            [a, b],
         )
         .unwrap();
         assert_eq!(path, vec![(40.0, 20.0), (100.0, 20.0)]);
@@ -369,6 +470,7 @@ mod tests {
             Side::Left,
             &[blocker],
             16.0,
+            [a, b],
         )
         .unwrap();
 
