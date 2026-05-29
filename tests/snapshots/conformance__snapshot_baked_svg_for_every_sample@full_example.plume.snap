@@ -71,7 +71,7 @@ input_file: samples/full_example.plume
   </g>
   <g class="plume-wires">
     <g class="plume-wire" data-from="browser" data-to="edge.lb">
-      <path d="M 0 -111.1 L 0 -80.6 L -48.675 -80.6 L -48.675 -70.6" fill="none" stroke="#666" stroke-width="1"/>
+      <path d="M -32.025 -111.1 L -32.025 -70.6" fill="none" stroke="#666" stroke-width="1"/>
     </g>
     <g class="plume-wire" data-from="browser" data-to="edge.lb">
       <path d="M -20.95 -45.8 L -0.95 -45.8" fill="none" stroke="#666" stroke-width="1"/>
@@ -79,24 +79,24 @@ input_file: samples/full_example.plume
       <text x="-8.95" y="-45.8" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">https</text>
     </g>
     <g class="plume-wire" data-from="edge.lb" data-to="services.api">
-      <path d="M 66.525 -21 L 66.525 10 L -2.2 10 L -2.2 16" fill="none" stroke="#666" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-2.2,20 -4.7,15 0.3,15" fill="#666"/>
+      <path d="M 61.525 -21 L 61.525 10 L 15.525 10 L 15.525 16" fill="none" stroke="#666" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="15.525,20 13.025,15 18.025,15" fill="#666"/>
     </g>
     <g class="plume-wire" data-from="edge.lb" data-to="services.auth">
-      <path d="M 66.525 -21 L 66.525 10 L 80.825 10 L 80.825 16" fill="none" stroke="#666" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="80.825,20 78.325,15 83.325,15" fill="#666"/>
+      <path d="M 71.525 -21 L 71.525 16" fill="none" stroke="#666" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="71.525,20 69.025,15 74.025,15" fill="#666"/>
     </g>
     <g class="plume-wire" data-from="services.api" data-to="data.cache">
-      <path d="M -2.2 69.6 L -2.2 100.6 L -30.8 100.6 L -30.8 106.6" fill="none" stroke="#666" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-30.8,110.6 -33.3,105.6 -28.3,105.6" fill="#666"/>
-      <text x="-6" y="100.6" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">cache</text>
+      <path d="M -19.925 69.6 L -19.925 106.6" fill="none" stroke="#666" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-19.925,110.6 -22.425,105.6 -17.425,105.6" fill="#666"/>
+      <text x="-19.925" y="90.1" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">cache</text>
     </g>
     <g class="plume-wire" data-from="services.api" data-to="data.db">
-      <path d="M -2.2 69.6 L -2.2 100.6 L 73.675 100.6 L 73.675 106.6" fill="none" stroke="#666" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="73.675,110.6 71.175,105.6 76.175,105.6" fill="#666"/>
+      <path d="M 25.525 59.6 L 26.8 59.6 L 26.8 120.6 L 28.075 120.6" fill="none" stroke="#666" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="28.075,120.6 23.075,123.1 23.075,118.1" fill="#666"/>
     </g>
     <g class="plume-wire" data-from="services.auth" data-to="data.db">
-      <path d="M 80.825 69.6 L 80.825 100.6 L 73.675 100.6 L 73.675 106.6" fill="none" stroke="#666" stroke-width="1"/>
+      <path d="M 73.675 69.6 L 73.675 106.6" fill="none" stroke="#666" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="73.675,110.6 71.175,105.6 76.175,105.6" fill="#666"/>
     </g>
   </g>

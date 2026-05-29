@@ -1,21 +1,448 @@
-//! Port selection — which side of each endpoint a wire leaves and enters.
+//! Port planning — which side of each endpoint a wire leaves/enters, and *where*
+//! on that side it attaches (WIRING section C).
 //!
-//! Phase 2 is minimal (WIRING C1, first clause): take the geometry-preferred
-//! side unless the wire forces one (`a.r`), attaching at the side's midpoint.
-//! Uniform slots and crossing-aware ordering for many wires on a side arrive in
-//! Phase 3.
+//! A wire no longer just meets the side midpoint: wires sharing a side are spread
+//! across uniform **slots** (C2), ordered so they don't needlessly cross (C4); a
+//! side with a single wire may slide its port to kill a bend (C3). Side choice is
+//! the forced side, else geometry, with a least-loaded tie-break (C1).
 
-use super::geometry::{pick_edges, Rect};
+use super::geometry::{pick_edges, Pt, Rect};
 use crate::ast::Side;
+use std::collections::BTreeMap;
 
-/// The (source, target) sides for a wire between two rects: the forced side if
-/// the endpoint named one, else the side geometry prefers.
-pub fn pick_sides(
-    a: Rect,
-    forced_a: Option<Side>,
-    b: Rect,
-    forced_b: Option<Side>,
-) -> (Side, Side) {
-    let (geo_a, geo_b) = pick_edges(a, b);
-    (forced_a.unwrap_or(geo_a), forced_b.unwrap_or(geo_b))
+/// One wire-segment's port request: the two node boxes, any forced sides, and the
+/// wire's clearance (which sets slot spacing on a shared side).
+pub struct SegReq {
+    pub a_node: String,
+    pub a: Rect,
+    pub forced_a: Option<Side>,
+    pub b_node: String,
+    pub b: Rect,
+    pub forced_b: Option<Side>,
+    pub clearance: f64,
+}
+
+/// The planned attachment for one segment: a side and a concrete port point at
+/// each end.
+#[derive(Clone, Copy)]
+pub struct Plan {
+    pub side_a: Side,
+    pub side_b: Side,
+    pub port_a: Pt,
+    pub port_b: Pt,
+}
+
+/// Plan every segment's ports together, so wires sharing a side can be spread
+/// into uniform slots. `reqs` is in routing order (declaration, then chain); that
+/// order is the deterministic tie-break for slot ordering.
+pub fn plan(reqs: &[SegReq]) -> Vec<Plan> {
+    let sides = pick_all_sides(reqs);
+    let mut plans: Vec<Plan> = reqs
+        .iter()
+        .zip(&sides)
+        .map(|(r, &(sa, sb))| Plan {
+            side_a: sa,
+            side_b: sb,
+            port_a: r.a.port(sa), // a lone wire keeps the midpoint; slots overwrite below
+            port_b: r.b.port(sb),
+        })
+        .collect();
+
+    let groups = group_by_side(reqs, &sides);
+    for ends in groups.values() {
+        assign_slots(reqs, ends, &mut plans);
+    }
+
+    // C3 — a lone wire on a facing pair of sides slides its port(s) to line up
+    // with the far end, trading a two-bend jog for a straight shot. Multi-wire
+    // sides keep their slots untouched.
+    let count = |node: &str, side: Side| groups.get(&(node, side_ord(side))).map_or(0, Vec::len);
+    for (s, r) in reqs.iter().enumerate() {
+        let (sa, sb) = sides[s];
+        if !facing(sa, sb) {
+            continue;
+        }
+        if count(&r.a_node, sa) == 1 {
+            plans[s].port_a = slide(r.a, sa, axis_coord(plans[s].port_b, sa), r.clearance);
+        }
+        if count(&r.b_node, sb) == 1 {
+            plans[s].port_b = slide(r.b, sb, axis_coord(plans[s].port_a, sb), r.clearance);
+        }
+    }
+    plans
+}
+
+/// Are these two sides a facing pair (opposite, same varying axis)? Only then can
+/// sliding a port turn a jog into a straight wire.
+fn facing(a: Side, b: Side) -> bool {
+    use Side::*;
+    matches!(
+        (a, b),
+        (Right, Left) | (Left, Right) | (Top, Bottom) | (Bottom, Top)
+    )
+}
+
+/// A port's coordinate along `side`'s varying axis.
+fn axis_coord(p: Pt, side: Side) -> f64 {
+    if varies_in_y(side) {
+        p.1
+    } else {
+        p.0
+    }
+}
+
+/// Slide a lone port toward `target`, clamped to the side's usable span (≥ corner
+/// inset from each corner); degenerate spans collapse to the centre.
+fn slide(r: Rect, side: Side, target: f64, clearance: f64) -> Pt {
+    let (lo, hi) = side_span(r, side);
+    let c = if lo + clearance <= hi - clearance {
+        target.clamp(lo + clearance, hi - clearance)
+    } else {
+        (lo + hi) / 2.0
+    };
+    port_at(r, side, c)
+}
+
+/// One wire-end attached to some side: which segment, and which of its two ends.
+struct End {
+    seg: usize,
+    is_a: bool,
+}
+
+impl End {
+    fn side(&self, plans: &[Plan]) -> Side {
+        if self.is_a {
+            plans[self.seg].side_a
+        } else {
+            plans[self.seg].side_b
+        }
+    }
+
+    fn rect(&self, reqs: &[SegReq]) -> Rect {
+        if self.is_a {
+            reqs[self.seg].a
+        } else {
+            reqs[self.seg].b
+        }
+    }
+
+    /// The opposite end's node centre, projected onto this side's varying axis —
+    /// the key that orders wires so they fan out without crossing (C4).
+    fn aim(&self, reqs: &[SegReq], side: Side) -> f64 {
+        let other = if self.is_a {
+            reqs[self.seg].b
+        } else {
+            reqs[self.seg].a
+        };
+        let (cx, cy) = other.center();
+        if varies_in_y(side) {
+            cy
+        } else {
+            cx
+        }
+    }
+}
+
+/// Bucket every end by the `(node, side)` it lands on, deterministically (sorted
+/// keys), so wires meeting on one side are planned as a group.
+fn group_by_side<'a>(
+    reqs: &'a [SegReq],
+    sides: &[(Side, Side)],
+) -> BTreeMap<(&'a str, u8), Vec<End>> {
+    let mut groups: BTreeMap<(&str, u8), Vec<End>> = BTreeMap::new();
+    for (s, (r, &(sa, sb))) in reqs.iter().zip(sides).enumerate() {
+        groups
+            .entry((&r.a_node, side_ord(sa)))
+            .or_default()
+            .push(End { seg: s, is_a: true });
+        groups
+            .entry((&r.b_node, side_ord(sb)))
+            .or_default()
+            .push(End {
+                seg: s,
+                is_a: false,
+            });
+    }
+    groups
+}
+
+/// C2/C4 — place a side's wires on uniform slots, symmetric about its centre and
+/// `separation` apart (compacting to fit, C5), ordered so they don't cross (C4).
+/// A side with a single wire is left at its midpoint (C3 may move it later).
+fn assign_slots(reqs: &[SegReq], ends: &[End], plans: &mut [Plan]) {
+    if ends.len() < 2 {
+        return;
+    }
+    let side = ends[0].side(plans);
+    let (lo, hi) = side_span(ends[0].rect(reqs), side);
+    let centre = (lo + hi) / 2.0;
+
+    // C4 — order by where each wire is headed, breaking ties by routing order.
+    let mut order: Vec<&End> = ends.iter().collect();
+    order.sort_by(|x, y| {
+        x.aim(reqs, side)
+            .total_cmp(&y.aim(reqs, side))
+            .then(x.seg.cmp(&y.seg))
+    });
+
+    // Uniform spacing = the largest separation that fits; corner inset = sep.
+    let k = order.len();
+    let sep = order
+        .iter()
+        .map(|e| reqs[e.seg].clearance)
+        .fold(0.0_f64, f64::max);
+    let room = (hi - lo - 2.0 * sep).max(0.0);
+    let spacing = sep.min(room / (k as f64 - 1.0));
+
+    for (rank, e) in order.iter().enumerate() {
+        let offset = (rank as f64 - (k as f64 - 1.0) / 2.0) * spacing;
+        let port = port_at(e.rect(reqs), side, centre + offset);
+        if e.is_a {
+            plans[e.seg].port_a = port;
+        } else {
+            plans[e.seg].port_b = port;
+        }
+    }
+}
+
+/// Does a wire on this side vary its port along the y axis (left/right sides) or
+/// the x axis (top/bottom)?
+fn varies_in_y(side: Side) -> bool {
+    matches!(side, Side::Left | Side::Right)
+}
+
+/// The `(lo, hi)` extent of the coordinate a port slides along on this side.
+fn side_span(r: Rect, side: Side) -> (f64, f64) {
+    if varies_in_y(side) {
+        (r.min_y, r.max_y)
+    } else {
+        (r.min_x, r.max_x)
+    }
+}
+
+/// The port point on `side` of `r` at varying-axis coordinate `c`.
+fn port_at(r: Rect, side: Side, c: f64) -> Pt {
+    match side {
+        Side::Left => (r.min_x, c),
+        Side::Right => (r.max_x, c),
+        Side::Top => (c, r.min_y),
+        Side::Bottom => (c, r.max_y),
+    }
+}
+
+fn side_ord(side: Side) -> u8 {
+    match side {
+        Side::Top => 0,
+        Side::Right => 1,
+        Side::Bottom => 2,
+        Side::Left => 3,
+    }
+}
+
+/// WIRING C1 tie-break order when sides are equally good: right → bottom → left → top.
+fn side_pref(side: Side) -> u8 {
+    match side {
+        Side::Right => 0,
+        Side::Bottom => 1,
+        Side::Left => 2,
+        Side::Top => 3,
+    }
+}
+
+/// C1 — the side each end attaches to: a forced side wins; else the geometric
+/// pick, with a least-loaded tie-break for diagonal hops that could leave off
+/// either of two sides.
+fn pick_all_sides(reqs: &[SegReq]) -> Vec<(Side, Side)> {
+    // Pass 1 — forced side, else the geometric pick (dominant axis).
+    let mut sides: Vec<(Side, Side)> = reqs
+        .iter()
+        .map(|r| {
+            let (ga, gb) = pick_edges(r.a, r.b);
+            (r.forced_a.unwrap_or(ga), r.forced_b.unwrap_or(gb))
+        })
+        .collect();
+
+    let mut load: BTreeMap<(&str, u8), usize> = BTreeMap::new();
+    for (r, &(sa, sb)) in reqs.iter().zip(&sides) {
+        *load.entry((&r.a_node, side_ord(sa))).or_default() += 1;
+        *load.entry((&r.b_node, side_ord(sb))).or_default() += 1;
+    }
+
+    // Pass 2 — rebalance only the genuinely ambiguous (diagonal) ends.
+    for (s, r) in reqs.iter().enumerate() {
+        if r.forced_a.is_none() {
+            sides[s].0 = least_loaded(&r.a_node, r.a, r.b, sides[s].0, &mut load);
+        }
+        if r.forced_b.is_none() {
+            sides[s].1 = least_loaded(&r.b_node, r.b, r.a, sides[s].1, &mut load);
+        }
+    }
+    sides
+}
+
+/// A diagonal hop (boxes sharing neither an x- nor a y-overlap) can leave off
+/// either the horizontal or the vertical side for one bend; pick the less-loaded
+/// (ties: right→bottom→left→top), updating `load`. Non-diagonal ends keep their
+/// clear facing side.
+fn least_loaded<'a>(
+    node: &'a str,
+    from: Rect,
+    to: Rect,
+    current: Side,
+    load: &mut BTreeMap<(&'a str, u8), usize>,
+) -> Side {
+    let (fc, tc) = (from.center(), to.center());
+    let y_overlap = from.min_y < to.max_y && to.min_y < from.max_y;
+    let x_overlap = from.min_x < to.max_x && to.min_x < from.max_x;
+    if y_overlap || x_overlap {
+        return current; // a clear facing side, not a corner choice
+    }
+    let horizontal = if tc.0 >= fc.0 {
+        Side::Right
+    } else {
+        Side::Left
+    };
+    let vertical = if tc.1 >= fc.1 {
+        Side::Bottom
+    } else {
+        Side::Top
+    };
+    let load_of = |s: Side| {
+        let base = load.get(&(node, side_ord(s))).copied().unwrap_or(0);
+        base - usize::from(s == current) // discount this end from its own side
+    };
+    let pick = [horizontal, vertical]
+        .into_iter()
+        .min_by_key(|&s| (load_of(s), side_pref(s)))
+        .unwrap();
+    if pick != current {
+        *load.get_mut(&(node, side_ord(current))).unwrap() -= 1;
+        *load.entry((node, side_ord(pick))).or_default() += 1;
+    }
+    pick
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rect(min_x: f64, min_y: f64, max_x: f64, max_y: f64) -> Rect {
+        Rect {
+            min_x,
+            min_y,
+            max_x,
+            max_y,
+        }
+    }
+
+    fn seg(a_node: &str, a: Rect, b_node: &str, b: Rect) -> SegReq {
+        SegReq {
+            a_node: a_node.into(),
+            a,
+            forced_a: None,
+            b_node: b_node.into(),
+            b,
+            forced_b: None,
+            clearance: 16.0,
+        }
+    }
+
+    #[test]
+    fn shared_side_spreads_into_even_centred_slots() {
+        // Three wires leave src's right side for three stacked targets — they must
+        // take three distinct, evenly-spaced slots centred on the side, not all
+        // pile onto the midpoint.
+        let src = rect(0.0, 0.0, 40.0, 160.0); // tall; centre y = 80
+        let t = |y: f64| rect(200.0, y, 240.0, y + 40.0);
+        let reqs = vec![
+            seg("src", src, "a", t(0.0)),
+            seg("src", src, "b", t(60.0)),
+            seg("src", src, "c", t(120.0)),
+        ];
+        let plans = plan(&reqs);
+
+        assert!(
+            plans.iter().all(|p| (p.port_a.0 - 40.0).abs() < 1e-9),
+            "all leave src's right edge"
+        );
+        let mut ys: Vec<f64> = plans.iter().map(|p| p.port_a.1).collect();
+        ys.sort_by(f64::total_cmp);
+        assert!(
+            ys[0] < ys[1] && ys[1] < ys[2],
+            "three distinct slots, got {ys:?}"
+        );
+        assert!(
+            ((ys[0] + ys[2]) / 2.0 - 80.0).abs() < 1e-9,
+            "centred on the side"
+        );
+        assert!(
+            ((ys[1] - ys[0]) - (ys[2] - ys[1])).abs() < 1e-9,
+            "uniform spacing"
+        );
+    }
+
+    #[test]
+    fn slots_are_ordered_by_target_so_wires_do_not_cross() {
+        // Two wires leave src's right side, declared in "crossing" order: the
+        // first aims low, the second high. C4 must give the higher-aimed wire the
+        // higher slot, so they don't cross on the way out.
+        let src = rect(0.0, 0.0, 40.0, 120.0);
+        let low = rect(200.0, 100.0, 240.0, 140.0); // larger y
+        let high = rect(200.0, 0.0, 240.0, 40.0); // smaller y
+        let reqs = vec![seg("src", src, "low", low), seg("src", src, "high", high)];
+        let plans = plan(&reqs);
+        assert!(
+            plans[1].port_a.1 < plans[0].port_a.1,
+            "the wire aiming higher (smaller y) takes the higher slot"
+        );
+    }
+
+    #[test]
+    fn lone_wire_keeps_the_side_midpoint() {
+        let a = rect(0.0, 0.0, 40.0, 40.0);
+        let b = rect(120.0, 0.0, 160.0, 40.0);
+        let plans = plan(&[seg("a", a, "b", b)]);
+        assert_eq!(plans[0].port_a, (40.0, 20.0));
+        assert_eq!(plans[0].port_b, (120.0, 20.0));
+    }
+
+    #[test]
+    fn lone_facing_wire_slides_to_a_straight_shot() {
+        // cat's right faces dog's left; dog sits lower but their usable spans
+        // overlap, so C3 slides both ports to one y → a straight, bend-free wire.
+        let cat = rect(0.0, 0.0, 40.0, 80.0);
+        let dog = rect(120.0, 40.0, 160.0, 120.0);
+        let plans = plan(&[seg("cat", cat, "dog", dog)]);
+        assert!(
+            (plans[0].port_a.1 - plans[0].port_b.1).abs() < 1e-9,
+            "ports aligned to one y → straight, got {:?} / {:?}",
+            plans[0].port_a,
+            plans[0].port_b
+        );
+    }
+
+    #[test]
+    fn diagonal_wire_leaves_the_least_loaded_side() {
+        // hub feeds a node straight right (loads its Right side) and a second node
+        // diagonally down-right. The diagonal one is reachable off Right or Bottom
+        // equally well (C1), so it should pick the less-loaded Bottom.
+        let hub = rect(0.0, 0.0, 40.0, 40.0);
+        let east = rect(200.0, 10.0, 240.0, 30.0); // level → straight off Right
+        let down_right = rect(200.0, 200.0, 240.0, 240.0); // diagonal
+        let reqs = vec![
+            seg("hub", hub, "east", east),
+            seg("hub", hub, "dr", down_right),
+        ];
+        let plans = plan(&reqs);
+        assert_eq!(
+            plans[0].side_a,
+            Side::Right,
+            "level target → straight right"
+        );
+        assert_eq!(
+            plans[1].side_a,
+            Side::Bottom,
+            "diagonal target dodges the loaded Right side"
+        );
+    }
 }

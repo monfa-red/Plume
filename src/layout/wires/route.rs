@@ -17,16 +17,21 @@ use std::collections::BinaryHeap;
 /// turn for shorter length — fewest bends first, length only to break ties.
 const BEND: f64 = 100_000.0;
 
+/// Route one wire from port `pa` (leaving `side_a`) to port `pb` (entering
+/// `side_b`), around `obstacles`, keeping ≥ `clearance`. Ports are supplied by
+/// `ports` (slot-assigned), not derived here, so a wire attaches wherever its
+/// slot sits — not always the side midpoint. Other wires are not consulted: a
+/// crossing penalty belongs in the global nudge pass (Phase 4), since a greedy
+/// per-wire dodge only shuffles crossings onto later wires or folds a wire onto
+/// itself (A5).
 pub fn route(
-    a: Rect,
+    pa: Pt,
     side_a: Side,
-    b: Rect,
+    pb: Pt,
     side_b: Side,
     obstacles: &[Rect],
     clearance: f64,
 ) -> Option<Vec<Pt>> {
-    let pa = a.port(side_a);
-    let pb = b.port(side_b);
     let grid = Grid::build(obstacles, clearance, &[pa, pb]);
     let (ai, aj) = grid.index_of(pa)?;
     let (bi, bj) = grid.index_of(pb)?;
@@ -239,7 +244,15 @@ mod tests {
     fn clear_shot_is_a_straight_segment() {
         let a = rect(0.0, 0.0, 40.0, 40.0);
         let b = rect(100.0, 0.0, 140.0, 40.0);
-        let path = route(a, Side::Right, b, Side::Left, &[], 16.0).unwrap();
+        let path = route(
+            a.port(Side::Right),
+            Side::Right,
+            b.port(Side::Left),
+            Side::Left,
+            &[],
+            16.0,
+        )
+        .unwrap();
         assert_eq!(path, vec![(40.0, 20.0), (100.0, 20.0)]);
     }
 
@@ -248,7 +261,15 @@ mod tests {
         let a = rect(0.0, 0.0, 40.0, 40.0);
         let blocker = rect(70.0, 0.0, 110.0, 40.0);
         let b = rect(140.0, 0.0, 180.0, 40.0);
-        let path = route(a, Side::Right, b, Side::Left, &[blocker], 16.0).unwrap();
+        let path = route(
+            a.port(Side::Right),
+            Side::Right,
+            b.port(Side::Left),
+            Side::Left,
+            &[blocker],
+            16.0,
+        )
+        .unwrap();
 
         assert!(path.len() > 2, "a straight line would pierce the blocker");
         let infl = blocker.inflate(16.0);

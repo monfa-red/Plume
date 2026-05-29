@@ -198,8 +198,13 @@ router will share.
 - `ports.rs` full: side selection with least-loaded tie-break (C1), uniform slot
   assignment (C2), single-wire bend-avoidance (C3), ordering to minimise
   crossings (C4).
-- `route.rs`: add the crossing penalty (B3 — a crossing ≈ a few bends, tunable
-  constant) so committed wires influence later ones.
+- ~~`route.rs`: add the crossing penalty (B3).~~ **Moved to Phase 4.** A greedy
+  per-wire penalty (committed wires charge later ones) was tried and removed: at
+  any weight that dodges a crossing it either shuffles the crossing onto a
+  not-yet-routed wire (total crossings *rose* on the suite) or, when strong
+  enough to force a multi-bend detour, folds a wire onto itself (A5). Crossing
+  minimisation is global; it belongs with the nudge pass, which can reroute
+  without breaking A5.
 
 **Acceptance.**
 - Wire crossings minimised; any that remain are perpendicular (validator A3).
@@ -216,6 +221,9 @@ router will share.
 - `nudge.rs`: group co-linear segments into channels, assign tracks so parallels
   sit exactly `separation` apart (B2), snap near-parallels onto a shared lane
   within the tidiness tolerance (B6). Bundles (E1) as parallel rails.
+- Crossing penalty (B3, moved here from Phase 3): minimise crossings globally
+  during nudge/track assignment — order channels and push crossings to channel
+  ends — never per-wire greedily (which raises crossings or self-crosses).
 
 **Acceptance.**
 - B2 wire-vs-wire clean on `wires_dense`, `wires_realistic` (validator).
@@ -248,7 +256,7 @@ router will share.
 - [x] **Phase 0** — pipeline + invariant validator (A1/A2/A5 gated; A3 reported, gated from the multi-wire phases; A4 deferred to Phase 1)
 - [x] **Phase 1** — oracle + obstacles + full validator (A1–A5 all checked, incl. A4; B1/B2 measured, B3 crossings counted; baseline report snapshotted)
 - [x] **Phase 2** — visibility graph + A\* per wire (B1 + wire-node B2 clean on every sample; cost = bends-then-length; minimal geometry ports; `wires_realistic` clearance 10→6 to fit its gap:8)
-- [ ] **Phase 3** — multi-wire: ports, ordering, crossings
+- [x] **Phase 3** — multi-wire ports C1–C4 (least-loaded side, uniform centred slots, lone-wire bend-avoidance, crossing-free ordering). A3 61→5, B2w 40→15; A5/B1/B2n stay 0; even spacing verified on `wires_dense`/`wires_fan`. Grid gained a mid-channel turning line so slot-offset facing ports route cleanly (no self-cross). B3 crossing penalty moved to Phase 4 (greedy per-wire is counter-productive); residual A3/B2w are co-linear runs for the nudge pass. Fan-trunk consolidation (E2, incl. the duplicate-label) stays Phase 5; siblings spread as bundle members for now.
 - [ ] **Phase 4** — nudge / separate
 - [ ] **Phase 5** — special cases + transparency
 

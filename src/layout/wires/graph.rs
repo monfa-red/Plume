@@ -32,6 +32,15 @@ impl Grid {
             xs.push(p.0);
             ys.push(p.1);
         }
+        // A turning line halfway between every pair of ports. Two endpoints on
+        // facing sides at different slots need a jog line *in the gap between
+        // them* to make a clean two-bend route; obstacle edges never fall there.
+        for (i, p) in ports.iter().enumerate() {
+            for q in &ports[i + 1..] {
+                xs.push((p.0 + q.0) / 2.0);
+                ys.push((p.1 + q.1) / 2.0);
+            }
+        }
         Self {
             xs: sorted_unique(xs),
             ys: sorted_unique(ys),
