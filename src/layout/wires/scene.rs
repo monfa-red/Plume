@@ -131,6 +131,22 @@ impl SceneIndex {
         passable
     }
 
+    /// The un-inflated bbox of endpoint `id`, to block the trunk from tunnelling
+    /// back through it — used only for an endpoint whose side the user *forced*
+    /// (`.side`), so the wire leaves that edge cleanly instead of looping in
+    /// through the body. `None` if `id` contains `other` (a container→child wire
+    /// must stay able to enter). Routing-only; the validator keeps endpoints
+    /// R2-exempt.
+    pub fn endpoint_block(&self, id: &str, other: &str) -> Option<AbsBbox> {
+        let i = *self.by_path.get(id)?;
+        if let Some(&o) = self.by_path.get(other) {
+            if self.nodes[o].ancestors.contains(&i) {
+                return None;
+            }
+        }
+        Some(self.nodes[i].bbox)
+    }
+
     /// Like `obstacles_for` but returns each obstacle's *path* and its
     /// *un-inflated* bbox. The validator inflates by the oracle clearance
     /// itself, so this stays free of any clearance policy.

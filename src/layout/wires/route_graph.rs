@@ -90,13 +90,23 @@ pub fn route_all(
 
     // Per-wire obstacles: every shape except this wire's endpoints and their
     // ancestors, each grown by its own clearance (the oracle).
-    let obstacles: Vec<Vec<AbsBbox>> = (0..specs.len())
-        .map(|i| {
-            scene
-                .raw_obstacles(&specs[i].src_id, &specs[i].tgt_id)
+    let obstacles: Vec<Vec<AbsBbox>> = specs
+        .iter()
+        .map(|s| {
+            let mut obs: Vec<AbsBbox> = scene
+                .raw_obstacles(&s.src_id, &s.tgt_id)
                 .into_iter()
                 .map(|(path, b)| b.inflate(oracle::shape_clearance(scene, &path)))
-                .collect()
+                .collect();
+            // A wire whose side is forced must exit *that* edge — block its body
+            // so the trunk can't loop back through it (e.g. `dog.b -> bird.t`).
+            if s.src_forced.is_some() {
+                obs.extend(scene.endpoint_block(&s.src_id, &s.tgt_id));
+            }
+            if s.tgt_forced.is_some() {
+                obs.extend(scene.endpoint_block(&s.tgt_id, &s.src_id));
+            }
+            obs
         })
         .collect();
 
