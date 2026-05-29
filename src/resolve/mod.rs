@@ -42,7 +42,7 @@ pub fn resolve_with_theme(file: File, theme: &[(String, String)]) -> Result<Prog
     let (root_nodes, root_wires) = partition_stmts(&file.stmts);
 
     // ─── Phase 2.3 — collect referenced endpoint ids, auto-create unknown ones ───
-    // SPEC §5: a wire endpoint referencing an undeclared id auto-creates an
+    // SPEC section 5: a wire endpoint referencing an undeclared id auto-creates an
     // empty |rect| at scene root with `label = id`.
     let declared_ids = collect_declared_ids(&root_nodes);
     let mut auto_created: Vec<ShapeInst> = Vec::new();
@@ -171,7 +171,7 @@ fn split_defs(defs: &Option<DefsBlock>) -> SplitDefs<'_> {
 }
 
 fn default_scene_attrs(vars: &VarTable) -> AttrMap {
-    // SPEC §6 default when |scene| is omitted: `layout:row gap:--gap padding:--canvas-pad`.
+    // SPEC section 6 default when |scene| is omitted: `layout:row gap:--gap padding:--canvas-pad`.
     let mut m = AttrMap::new();
     m.insert("layout", ResolvedValue::Ident("row".into()));
     if let Some(e) = vars.get("gap") {
@@ -570,7 +570,7 @@ impl PathIndex {
         self.paths.iter().any(|p| p == path)
     }
 
-    /// SPEC §10 suffix-match: find the unique scene-tree path whose tail
+    /// SPEC section 10 suffix-match: find the unique scene-tree path whose tail
     /// segments equal `query`'s segments. Returns the full canonical path.
     fn resolve(&self, query: &[String]) -> Result<String, EndpointMatch> {
         let qjoined = query.join(".");
@@ -640,7 +640,7 @@ fn resolve_wire(
     wires_defaults: &[ResolvedAttr],
 ) -> Result<Vec<ResolvedWire>, Error> {
     let inline = resolve_attrs(&w.items, styles_table, vars)?;
-    // SPEC §13 application order: `|wire|` defaults are lowest specificity,
+    // SPEC section 13 application order: `|wire|` defaults are lowest specificity,
     // styles and per-wire attrs override (the latter are already merged into
     // `inline` left-to-right by `resolve_attrs`).
     let mut ordered: Vec<ResolvedAttr> = Vec::with_capacity(wires_defaults.len() + inline.len());
@@ -651,7 +651,7 @@ fn resolve_wire(
     let markers = resolve_markers(&ordered, op_marks.start, op_marks.end)?;
     let mut attrs = collapse(&ordered);
 
-    // Synthesize stroke-style for line variants per SPEC §10.
+    // Synthesize stroke-style for line variants per SPEC section 10.
     inject_line_style(&mut attrs, w.op.line);
 
     // Text children: label sugar + explicit body texts.
@@ -697,7 +697,7 @@ fn resolve_wire(
 
     // Cartesian fan expansion: each group's endpoints fan out independently.
     // For chain [{a}, {b,c}, {d}] with op `->`, we get a→b→d, a→c→d (each as
-    // its own wire). Per spec §10 wire fan grammar.
+    // its own wire). Per spec section 10 wire fan grammar.
     let expanded = expand_chain(&w.chain);
 
     let mut out = Vec::with_capacity(expanded.len());

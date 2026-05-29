@@ -1,9 +1,0 @@
-{
-  --gap:24
-  --padding:16
-  --fill:white
-  --font:"Inter, system-ui, sans-serif"
-  --accent:#0a84ff
-}
-
-|rect| "hello"

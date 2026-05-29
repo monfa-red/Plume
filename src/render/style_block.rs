@@ -1,6 +1,6 @@
 //! Emit the `<style>` block that ships default CSS variables alongside the SVG.
 //!
-//! Wrapped in `@layer plume.defaults` per SPEC §11.3 so any unlayered host CSS
+//! Wrapped in `@layer plume.defaults` per SPEC section 11.3 so any unlayered host CSS
 //! (a runtime theme switcher, an embedding page) wins automatically.
 
 use super::values::format_value;

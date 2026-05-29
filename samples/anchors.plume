@@ -1,12 +1,12 @@
-// All 9 inner anchors + offset, attached to a base rect.
-// Per SPEC §7, `at:anchor` positions the child against the parent's bbox;
-// out-* anchors place outside the parent.
+// Anchors: inner anchors sit against the parent's bbox; out-* anchors sit just
+// outside it (computed against the bbox that excludes the out-* children, so
+// they don't push each other further out).
 
 {
-  |scene| padding:40
+  |scene| layout:column gap:90 padding:60
 }
 
-base |rect| size:(200, 120) fill:#eee {
+inner |rect| size:(200, 120) fill:#eee {
   |rect| "C"  size:(18, 14) fill:red   at:center
   |rect| "T"  size:(18, 14) fill:red   at:top
   |rect| "B"  size:(18, 14) fill:red   at:bottom
@@ -17,4 +17,15 @@ base |rect| size:(200, 120) fill:#eee {
   |rect| "BL" size:(20, 14) fill:blue  at:bottom-left
   |rect| "BR" size:(20, 14) fill:blue  at:bottom-right
   |rect| "Co" size:(18, 14) fill:green at:center offset:(40, 20)
+}
+
+outer |rect| size:(160, 100) fill:#eee {
+  |rect| "T"  size:(20, 14) fill:orange at:out-top
+  |rect| "B"  size:(20, 14) fill:orange at:out-bottom
+  |rect| "L"  size:(20, 14) fill:orange at:out-left
+  |rect| "R"  size:(20, 14) fill:orange at:out-right
+  |rect| "TL" size:(18, 14) fill:purple at:out-top-left
+  |rect| "TR" size:(18, 14) fill:purple at:out-top-right
+  |rect| "BL" size:(18, 14) fill:purple at:out-bottom-left
+  |rect| "BR" size:(18, 14) fill:purple at:out-bottom-right
 }

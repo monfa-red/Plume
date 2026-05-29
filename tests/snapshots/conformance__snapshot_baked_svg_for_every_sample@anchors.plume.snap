@@ -3,10 +3,10 @@ source: tests/conformance.rs
 expression: svg
 input_file: samples/anchors.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-120.5 -80.5 241 161" width="241" height="161" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-120.5 -176 241 352" width="241" height="352" class="plume">
   <defs/>
   <g class="plume-scene" color="black">
-    <g class="plume-node plume-shape-rect" data-id="base" transform="translate(0,0)">
+    <g class="plume-node plume-shape-rect" data-id="inner" transform="translate(0,-95.5)">
       <rect x="-100" y="-60" width="200" height="120" rx="0" ry="0" fill="#eee" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-rect" transform="translate(0,0)">
         <rect x="-9" y="-7" width="18" height="14" rx="0" ry="0" fill="red" stroke="#444" stroke-width="1"/>
@@ -66,6 +66,57 @@ input_file: samples/anchors.plume
         <rect x="-9" y="-7" width="18" height="14" rx="0" ry="0" fill="green" stroke="#444" stroke-width="1"/>
         <g class="plume-node plume-shape-text" transform="translate(0,0)">
           <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Co</text>
+        </g>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" data-id="outer" transform="translate(0,105.5)">
+      <rect x="-80" y="-50" width="160" height="100" rx="0" ry="0" fill="#eee" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-rect" transform="translate(0,-57.5)">
+        <rect x="-10" y="-7" width="20" height="14" rx="0" ry="0" fill="orange" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">T</text>
+        </g>
+      </g>
+      <g class="plume-node plume-shape-rect" transform="translate(0,57.5)">
+        <rect x="-10" y="-7" width="20" height="14" rx="0" ry="0" fill="orange" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">B</text>
+        </g>
+      </g>
+      <g class="plume-node plume-shape-rect" transform="translate(-90.5,0)">
+        <rect x="-10" y="-7" width="20" height="14" rx="0" ry="0" fill="orange" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">L</text>
+        </g>
+      </g>
+      <g class="plume-node plume-shape-rect" transform="translate(90.5,0)">
+        <rect x="-10" y="-7" width="20" height="14" rx="0" ry="0" fill="orange" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">R</text>
+        </g>
+      </g>
+      <g class="plume-node plume-shape-rect" transform="translate(-89.5,-57.5)">
+        <rect x="-9" y="-7" width="18" height="14" rx="0" ry="0" fill="purple" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">TL</text>
+        </g>
+      </g>
+      <g class="plume-node plume-shape-rect" transform="translate(89.5,-57.5)">
+        <rect x="-9" y="-7" width="18" height="14" rx="0" ry="0" fill="purple" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">TR</text>
+        </g>
+      </g>
+      <g class="plume-node plume-shape-rect" transform="translate(-89.5,57.5)">
+        <rect x="-9" y="-7" width="18" height="14" rx="0" ry="0" fill="purple" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">BL</text>
+        </g>
+      </g>
+      <g class="plume-node plume-shape-rect" transform="translate(89.5,57.5)">
+        <rect x="-9" y="-7" width="18" height="14" rx="0" ry="0" fill="purple" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">BR</text>
         </g>
       </g>
     </g>

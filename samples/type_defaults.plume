@@ -1,4 +1,4 @@
-// SPEC §4: `|name|` in the defs block sets defaults for every instance of
+// SPEC section 4: `|name|` in the defs block sets defaults for every instance of
 // that type. Lowest-specificity layer — anything more specific wins.
 
 {

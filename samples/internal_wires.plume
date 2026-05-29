@@ -1,4 +1,4 @@
-// SPEC §10 internal wires in shape defs — each instance materialises its own.
+// SPEC section 10 internal wires in shape defs — each instance materialises its own.
 
 {
   |room:group| layout:column gap:10 padding:12 {

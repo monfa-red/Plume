@@ -116,7 +116,7 @@ pub struct ShapeInst {
 }
 
 /// Items legal inside a shape/group body: child nodes/primitives, and
-/// internal wires (per SPEC §10 internal wires in shape definitions).
+/// internal wires (per SPEC section 10 internal wires in shape definitions).
 #[derive(Debug, Clone)]
 pub enum BodyItem {
     Inst(ShapeInst),

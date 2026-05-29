@@ -3,37 +3,31 @@ source: tests/conformance.rs
 expression: svg
 input_file: samples/wires_chain.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-209.35 -44.8 418.7 89.6" width="418.7" height="89.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-168.05 -44.8 336.1 89.6" width="336.1" height="89.6" class="plume">
   <defs/>
   <g class="plume-scene" color="black">
-    <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-161.625,0)">
+    <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-120.325,0)">
       <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Cat</text>
       </g>
     </g>
-    <g class="plume-node plume-shape-rect" data-id="dog" transform="translate(-86.175,0)">
+    <g class="plume-node plume-shape-rect" data-id="dog" transform="translate(-44.875,0)">
       <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Dog</text>
       </g>
     </g>
-    <g class="plume-node plume-shape-rect" data-id="bird" transform="translate(-7.15,0)">
+    <g class="plume-node plume-shape-rect" data-id="bird" transform="translate(34.15,0)">
       <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Bird</text>
       </g>
     </g>
-    <g class="plume-node plume-shape-rect" data-id="fish" transform="translate(75.45,0)">
+    <g class="plume-node plume-shape-rect" data-id="fish" transform="translate(116.75,0)">
       <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Fish</text>
-      </g>
-    </g>
-    <g class="plume-node plume-shape-rect" data-id="frog" transform="translate(158.05,0)">
-      <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-      <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Frog</text>
       </g>
     </g>
   </g>

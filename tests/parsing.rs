@@ -71,7 +71,7 @@ fn err_wire_body_non_text() {
 
 #[test]
 fn plume_var_value_parses_anywhere() {
-    // SPEC §11.2: `--name` is a first-class value form, not function-scoped.
+    // SPEC section 11.2: `--name` is a first-class value form, not function-scoped.
     plume::check_parse("{ --gap:--my-gap }\ncat |rect|\n").expect("--gap parses");
     plume::check_parse("cat |rect| fill:--accent\n").expect("--accent parses");
 }

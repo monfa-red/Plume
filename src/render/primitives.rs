@@ -102,7 +102,7 @@ fn emit_hex(
     thickness: f64,
 ) {
     let (w, h) = dim_excluding_stroke(n, thickness);
-    // Flat-top hex per SPEC §7. Two horizontal edges, four slanted edges.
+    // Flat-top hex per SPEC section 7. Two horizontal edges, four slanted edges.
     let pts = [
         (-w / 2.0, 0.0),
         (-w / 4.0, -h / 2.0),

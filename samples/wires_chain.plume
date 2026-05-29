@@ -1,3 +1,5 @@
+// Wire operators: a chain, plus a couple of line/marker styles.
+
 {
   .loud stroke:red thickness:2
 }
@@ -6,14 +8,7 @@ cat  |rect| "Cat"
 dog  |rect| "Dog"
 bird |rect| "Bird"
 fish |rect| "Fish"
-frog |rect| "Frog"
 
-cat -> dog -> bird -> fish -> frog .loud
-cat --> dog
-cat -.-> dog
-cat <- dog
-cat <-- dog
-cat <-.- dog
-cat <-> dog
-cat <--> dog
-cat <-.-> dog
+cat -> dog -> bird -> fish .loud   // chain → 3 wires
+cat <-> bird                       // bidirectional
+dog --> fish                       // dashed arrow

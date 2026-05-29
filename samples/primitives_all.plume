@@ -1,4 +1,4 @@
-// Exercises every built-in primitive (SPEC §8) at known dimensions.
+// Exercises every built-in primitive (SPEC section 8) at known dimensions.
 
 {
   |scene| layout:(4, 4) gap:20 padding:20

@@ -310,7 +310,7 @@ impl<'a> Parser<'a> {
         loop {
             match self.peek_kind() {
                 Some(TokKind::Dot) => {
-                    // SPEC §2: style refs require whitespace before `.`. A no-WS
+                    // SPEC section 2: style refs require whitespace before `.`. A no-WS
                     // dot would mean an endpoint side, which is wire-only — stop
                     // and let the caller decide.
                     if self.current_glued_to_prev() {
@@ -336,7 +336,7 @@ impl<'a> Parser<'a> {
 
     fn parse_attr(&mut self) -> Result<Attr, Error> {
         let (name, name_span) = self.expect_ident()?;
-        // SPEC §2: `name:value` — binding `:` has no whitespace on either side.
+        // SPEC section 2: `name:value` — binding `:` has no whitespace on either side.
         let next_is_colon = matches!(self.peek_kind(), Some(TokKind::Colon));
         if !next_is_colon {
             return Err(Error::at(
@@ -643,7 +643,7 @@ impl<'a> Parser<'a> {
         let ty = if matches!(self.peek_kind(), Some(TokKind::Pipe)) {
             self.parse_type_use()?
         } else {
-            // SPEC §1 default: omitted type → |rect|.
+            // SPEC section 1 default: omitted type → |rect|.
             TypeRef {
                 name: "rect".to_string(),
                 span: id_span,
@@ -758,7 +758,7 @@ impl<'a> Parser<'a> {
             end_span = seg_span;
         }
 
-        // Per SPEC §10: if the LAST segment matches a side name, peel it off.
+        // Per SPEC section 10: if the LAST segment matches a side name, peel it off.
         let side = if path.len() > 1 {
             if let Some(s) = Side::parse(path.last().unwrap()) {
                 path.pop();

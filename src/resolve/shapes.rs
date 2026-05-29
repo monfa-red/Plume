@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 const MAX_INHERITANCE_DEPTH: usize = 16;
 
-/// Built-in templates per SPEC §9. Each maps to a base primitive.
+/// Built-in templates per SPEC section 9. Each maps to a base primitive.
 const TEMPLATES: &[(&str, &str)] = &[
     ("group", "rect"),
     ("badge", "rect"),
@@ -84,7 +84,7 @@ impl ShapesTable {
     ///
     ///   primitive < defs-block-type-defaults < template attrs < user-shape attrs
     ///
-    /// so per [SPEC §13] the most-specific type's own attrs win against the
+    /// so per [SPEC section 13] the most-specific type's own attrs win against the
     /// less-specific layers below it.
     fn walk_chain(
         &self,

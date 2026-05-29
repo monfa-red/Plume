@@ -1,66 +1,30 @@
-// Full SPEC §21 example — a morning around the house.
+// A small web service — a realistic architecture, top to bottom.
 
 {
-  |scene| layout:(3, 2) gap:40 padding:20 background:--bg
-
+  |scene| layout:column gap:40 padding:24
+  |wire|  stroke:#666 clearance:10
   --accent:#0a84ff
-
-  .thin stroke:#444 thickness:1
-  .bold weight:bold
-  .loud stroke:red thickness:2
-  .quiet stroke:blue stroke-style:dashed
-  .ghost opacity:0.3
-
-  |treat:rect| radius:5
-  |nest:slant| fill:gray
-  |alert:oval| stroke:red size:36
-  // circle = oval with scalar size
-
-  |widget:group| layout:column gap:8 padding:8 {
-    |rect| size:(100, 40) fill:lightblue radius:4
-    |line| points:[(-50, 0), (50, 0)] .thin
-    |line| points:[(0, 0), (50, 20)] marker-end:arrow
-    |text| "Den" at:top size:12
-  }
 }
 
-cat |oval| "Cat — patient hunter" cell:(1, 1)
+browser |rect| "Browser"
 
-kitchen |group| "Kitchen" cell:(2, 1) layout:column gap:20 {
-  counter |group| "Counter" layout:row gap:10 {
-    bowl  |treat| "Bowl of oats"
-    water |nest|  "Water"
-  }
-  shelf   |group| "Shelf" layout:row gap:10 {
-    apple |treat| "Apple"
-    mug   |nest|  "Mug"
-  }
+edge |group| "Edge" layout:row gap:24 {
+  cdn |rect| "CDN"
+  lb  |rect| "Load balancer"
 }
 
-garden |group| "Garden" cell:(3, 1) layout:column gap:40 {
-  den  |group| "Den" layout:row gap:15 {
-    rabbit |alert| "Rabbit" {
-      |badge| "FAST"
-    }
-    carrot |rect|  "Carrot patch" double:4 size:(80, 40) fill:white
-  }
-  pond |group| "Pond" layout:row gap:15 {
-    frog |rect| "Frog" double:4 size:(60, 40)
-    fish |rect| "Goldfish" double:4 size:(80, 40)
-  }
+services |group| "Services" layout:row gap:24 {
+  api  |rect| "API"
+  auth |rect| "Auth"
 }
 
-treehouse |group| "Treehouse" cell:(1, 2) layout:column gap:10 padding:10 {
-  owl |icon| name:visibility size:32
+data |group| "Data" layout:row gap:24 {
+  cache |cyl| "Redis"
+  db    |cyl| "Postgres"
 }
 
-diagram1 |widget| at:(300, 200)
-
-// wires
-cat -> bowl -> water -> rabbit -> carrot .loud
-cat -> apple -> mug
-water -> frog -> fish
-
-treehouse <-> kitchen "watches"
-
-owl --> rabbit .loud stroke:orange marker-end:dot
+browser -> cdn -> lb "https"
+lb -> api & auth
+api -> cache "cache"
+api -> db
+auth -> db

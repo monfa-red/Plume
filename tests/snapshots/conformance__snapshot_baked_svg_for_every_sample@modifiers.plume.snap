@@ -1,33 +1,39 @@
 ---
 source: tests/conformance.rs
 expression: svg
-input_file: samples/bare_attrs.plume
+input_file: samples/modifiers.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-212 -40.5 424 81" width="424" height="81" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-270.5 -40.5 541 81" width="541" height="81" class="plume">
   <defs/>
   <g class="plume-scene" color="black">
-    <g class="plume-node plume-shape-rect" transform="translate(-151.5,0)">
+    <g class="plume-node plume-shape-rect" transform="translate(-210,0)">
       <rect x="-40" y="-20" width="80" height="40" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">dashed</text>
       </g>
     </g>
-    <g class="plume-node plume-shape-rect" transform="translate(-50.5,0)">
+    <g class="plume-node plume-shape-rect" transform="translate(-105,0)">
       <rect x="-40" y="-20" width="80" height="40" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1" stroke-dasharray="1,3"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">dotted</text>
       </g>
     </g>
-    <g class="plume-node plume-shape-rect" transform="translate(50.5,0)">
+    <g class="plume-node plume-shape-rect" transform="translate(0,0)">
       <rect x="-40" y="-20" width="80" height="40" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">double</text>
       </g>
     </g>
-    <g class="plume-node plume-shape-rect" transform="translate(151.5,0)">
+    <g class="plume-node plume-shape-rect" transform="translate(105,0)">
       <rect x="-40" y="-20" width="80" height="40" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">shadow</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" transform="translate(210,0) rotate(15)">
+      <rect x="-40" y="-20" width="80" height="40" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">rotate</text>
       </g>
     </g>
   </g>

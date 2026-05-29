@@ -1,4 +1,4 @@
-// Exercises every built-in template (SPEC §9).
+// Exercises every built-in template (SPEC section 9).
 
 {
   |scene| layout:(4, 2) gap:20 padding:20

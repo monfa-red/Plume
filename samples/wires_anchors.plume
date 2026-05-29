@@ -1,4 +1,4 @@
-// SPEC §10: wire endpoints carry an optional `.side` to pin the routing edge.
+// SPEC section 10: wire endpoints carry an optional `.side` to pin the routing edge.
 // Without one, the router picks edges by relative geometry.
 
 {

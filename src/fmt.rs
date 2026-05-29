@@ -1,6 +1,6 @@
 //! Canonical source formatter. Parses to AST, emits a normalized form.
 //!
-//! Rules (SPEC §15 `plume fmt`):
+//! Rules (SPEC section 15 `plume fmt`):
 //! - 2-space indent.
 //! - One declaration per line; sibling declarations inside the same block get
 //!   their id / type / label / attr columns aligned.

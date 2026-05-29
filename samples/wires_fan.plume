@@ -1,4 +1,4 @@
-// SPEC §10 fan-out / fan-in with `&` — cartesian expansion.
+// SPEC section 10 fan-out / fan-in with `&` — cartesian expansion.
 
 {
   |scene| layout:column gap:30 padding:20

@@ -1,5 +1,0 @@
-// A dimension line — `|line|` with both-end arrows.
-
-dim1 |line| points:[(0, 200), (300, 200)] marker:arrow color:#666 {
-  |text| "300 mm" at:center size:11
-}

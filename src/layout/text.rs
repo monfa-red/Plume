@@ -1,6 +1,6 @@
 //! Text width approximation for bbox math.
 //!
-//! Sprint 3 uses a coarse linear approximation per char. SPEC §6 calls for an
+//! Sprint 3 uses a coarse linear approximation per char. SPEC section 6 calls for an
 //! embedded font-metrics table for reproducibility — that lands in a follow-up
 //! once Sprint 5 picks a default font.
 
@@ -17,7 +17,7 @@ pub fn approx_width(text: &str, font_size: f64) -> f64 {
 }
 
 /// Height of a (possibly multi-line) text block: line_count × size × 1.2 per
-/// SPEC §4.
+/// SPEC section 4.
 pub fn approx_height(text: &str, font_size: f64) -> f64 {
     let line_count = text.split('\n').count().max(1) as f64;
     line_count * font_size * 1.2

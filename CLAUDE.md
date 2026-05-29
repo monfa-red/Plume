@@ -35,7 +35,9 @@
 Re-orient by reading, in order:
 
 1. `SPEC.md` — source of truth for the language.
-2. `IMPLEMENTATION.md` — current plan, locked decisions, open questions.
-3. `git log --oneline -20` — recent progress.
+2. `WIRING.md` — the wire-routing contract (what a correct routing must satisfy).
+3. `PLAN.md` — wiring implementation plan: phases, acceptance gates, current status.
+4. `IMPLEMENTATION.md` — overall implementation status and locked decisions.
+5. `git log --oneline -20` — recent progress.
 
-Then continue from the most recent sprint.
+Then run `cargo test` to see exactly where things stand, and continue from the first unfinished phase in `PLAN.md`.

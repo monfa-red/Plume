@@ -79,7 +79,7 @@ The pipeline is on v2 syntax end-to-end and snapshot-tested against 25 samples i
 | Lexer / parser | v2 syntax: `\|type\|` for refs, `key:value` attrs (no whitespace around `:`), single defs block led by sigil (`\|scene\|`, `\|name:base\|`, `.style`, `--name:value`), composable wire operators (5 line styles × 5 markers each side), `&` fan, dot-path endpoints with optional `.side`. |
 | Resolve | Defs walker (vars / scene config / styles / shapes). Auto-create root rects for unknown wire endpoints. Suffix-match endpoint dot-paths against the scene tree. Cartesian fan expansion. Internal wires in shape defs materialise per-instance with prefixed paths. Visual vs. Layout var-kind split. Cycle / depth-16 inheritance detection. |
 | Layout | All 14 primitives. Auto-size to text + `--text-pad`. Per-shape defaults. `layout:row\|column\|(cols,rows)`. `cell:(c,r)`, `span:(c,r)`, `at:`, `offset:`. All 9 inner + 8 `out-*` anchors. Multi-value `padding`/`gap`/`radius`. Rotation. Embedded char-width table. |
-| Wire routing | **Removed — to be rebuilt.** Wires still parse and resolve (endpoint suffix-match, `.side`, fan expansion, auto-created nodes, internal wires) but are not routed or drawn; render emits an empty `plume-wires` group. The rebuild targets the contract in `docs/superpowers/specs/2026-05-28-wire-routing-rules-design.md`. |
+| Wire routing | **Removed — to be rebuilt.** Wires still parse and resolve (endpoint suffix-match, `.side`, fan expansion, auto-created nodes, internal wires) but are not routed or drawn; render emits an empty `plume-wires` group. The rebuild follows the contract in `WIRING.md` and the phased plan in `PLAN.md`. |
 | Render | Document shell with `@layer plume.defaults`. Per-shape SVG emitters. Shadow filters de-duped in `<defs>`. Auto-classes (`plume-node plume-shape-{type} plume-shape-{parent} plume-style-{name}`). `--bake-vars` for non-CSS renderers. Markers sized `max(--arrow-head=6, thickness × 5)`, tip inset 1 px from shape edge, line shortened 4 px so stroke never pokes past marker. Wire labels with `paint-order=stroke` halo in `--bg` (visually clips the wire under the label). `stroke-style=dashed\|dotted` works on both primitives and wires. |
 | CLI | `plume FILE`, `plume fmt`, `plume serve`, `--watch`, `--check`, `--theme`, `--bake-vars`, `--no-warn`, `--strict`, stdin via `-`. Exit codes per SPEC. |
 | Linter | One rule shipped: `visual-attr-inline` (fill/stroke/weight/… inline outside a style → warning). Default-on; `--no-warn` silences; `--strict` promotes to error. |
@@ -209,7 +209,7 @@ Steps 1–3 are the bulk. 4 is small. 5 is moderate. 6–7 are independent follo
 ## Locked decisions
 
 - Single crate (split later only if WASM/LSP demand it).
-- Hand-written recursive-descent parser. LL(1) per SPEC §17.
+- Hand-written recursive-descent parser. LL(1) per SPEC section 17.
 - Hand-written SVG output via typed builder helpers. Zero deps for output.
 - No `unsafe` anywhere.
 - `clap` (derive) for CLI args.
@@ -301,5 +301,5 @@ cargo insta review                                        # accept snapshot chan
 - LSP server. Parser emits spans; `lint_str` returns structured diagnostics — most of the work is a `tower-lsp` shell.
 - WASM target. Needs the workspace split (`plume-core` + `plume-cli`).
 - mdbook docs site under `docs/`.
-- Auto-layout via a graph library (force-directed, Sugiyama). Currently in SPEC §20 non-goals.
+- Auto-layout via a graph library (force-directed, Sugiyama). Currently in SPEC section 20 non-goals.
 - Real Material Symbols icon embedding (build.rs scanning `assets/icons/`). Currently a placeholder.

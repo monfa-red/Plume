@@ -1,4 +1,4 @@
-// All marker types on |line| (SPEC §8).
+// All marker types on |line| (SPEC section 8).
 // Wires use the same attr names; see wires_labels.plume for the wire side.
 
 {

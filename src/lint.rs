@@ -1,6 +1,6 @@
 //! AST-level lint pass. Emits warnings for stylistic smells that aren't
 //! parse/resolve errors — most notably inline visual attrs that belong in a
-//! `.style` def (SPEC §16 visual-attr lint category).
+//! `.style` def (SPEC section 16 visual-attr lint category).
 
 use crate::ast::{AttrItem, BodyItem, DefsEntry, File, ShapeInst, Stmt, TypeRef, WireDecl};
 use crate::error::Diagnostic;

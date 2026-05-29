@@ -2,7 +2,7 @@ use super::ir::{ResolvedCall, ResolvedValue, VarEntry, VarKind, VarTable};
 use crate::ast::{FnCall, Value, VarOverride};
 use crate::error::Error;
 
-/// Built-in CSS variable defaults per SPEC §11.1. Names are stored without the
+/// Built-in CSS variable defaults per SPEC section 11.1. Names are stored without the
 /// `--plume-` prefix.
 pub fn built_in_defaults() -> VarTable {
     let mut t = VarTable::new();
@@ -43,7 +43,7 @@ pub fn built_in_defaults() -> VarTable {
         }),
     );
 
-    // Layout vars — baked at compile time. SPEC §11.1.
+    // Layout vars — baked at compile time. SPEC section 11.1.
     set_layout_n(&mut t, "text-size", 13.0);
     set_layout_n(&mut t, "text-pad", 16.0);
     set_layout_n(&mut t, "gap", 20.0);
@@ -193,7 +193,7 @@ pub fn resolve_value(value: &Value, table: &VarTable) -> Result<ResolvedValue, E
         }
         Value::Call(call) => resolve_call(call, table)?,
         Value::RawCssVar(name) => {
-            // SPEC §11.2: `--name` refers to `--plume-name`. Layout vars bake
+            // SPEC section 11.2: `--name` refers to `--plume-name`. Layout vars bake
             // their value; visual vars stay live for runtime CSS.
             let baked = match table.get(name) {
                 Some(VarEntry {

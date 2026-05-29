@@ -153,7 +153,7 @@ fn geom_bbox(inst: &ResolvedInst, vars: &VarTable) -> Result<Bbox, Error> {
             Ok(bounding_box(&points))
         }
         ShapeKind::Path => {
-            // Native top-left coords (§6 rule 5). Real bbox needs SVG path
+            // Native top-left coords (section 6 rule 5). Real bbox needs SVG path
             // parsing; v1 returns a zero bbox.
             Ok(Bbox::empty())
         }

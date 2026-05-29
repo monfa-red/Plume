@@ -3,129 +3,69 @@ source: tests/conformance.rs
 expression: svg
 input_file: samples/full_example.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-381.6 -171.1 763.2 442.95" width="763.2" height="442.95" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-150.5 -180.7 301 361.4" width="301" height="361.4" class="plume">
   <defs/>
   <g class="plume-scene" color="black">
-    <g class="plume-node plume-shape-oval" data-id="cat" transform="translate(-273.1,-60.3)">
-      <ellipse cx="0" cy="0" rx="88" ry="24.3" fill="white" stroke="#444" stroke-width="1"/>
+    <g class="plume-node plume-shape-rect" data-id="browser" transform="translate(0,-135.9)">
+      <rect x="-41.525" y="-24.3" width="83.05" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Cat — patient hunter</text>
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Browser</text>
       </g>
     </g>
-    <g class="plume-node plume-shape-group plume-shape-rect" data-id="kitchen" transform="translate(-13.3,-60.3)">
-      <rect x="-130.8" y="-78.9" width="261.6" height="157.8" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-      <g class="plume-node plume-shape-text" transform="translate(0,-70.6)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Kitchen</text>
+    <g class="plume-node plume-shape-group plume-shape-rect" data-id="edge" transform="translate(0,-45.8)">
+      <rect x="-130" y="-24.8" width="260" height="49.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(-115.2,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Edge</text>
       </g>
-      <g class="plume-node plume-shape-group plume-shape-rect" data-id="counter" transform="translate(0,-17)">
-        <rect x="-130.3" y="-24.8" width="260.6" height="49.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-        <g class="plume-node plume-shape-text" transform="translate(-104.775,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Counter</text>
-        </g>
-        <g class="plume-node plume-shape-treat plume-shape-rect" data-id="bowl" transform="translate(-9.35,0)">
-          <rect x="-59.4" y="-24.3" width="118.8" height="48.6" rx="5" ry="5" fill="white" stroke="#444" stroke-width="1"/>
-          <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Bowl of oats</text>
-          </g>
-        </g>
-        <g class="plume-node plume-shape-nest plume-shape-slant" data-id="water" transform="translate(95.425,0)">
-          <polygon points="-27.8638,-24.3 40.8862,-24.3 27.8638,24.3 -40.8862,24.3" fill="gray" stroke="#444" stroke-width="1"/>
-          <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Water</text>
-          </g>
+      <g class="plume-node plume-shape-rect" data-id="cdn" transform="translate(-48.675,0)">
+        <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">CDN</text>
         </g>
       </g>
-      <g class="plume-node plume-shape-group plume-shape-rect" data-id="shelf" transform="translate(0,53.6)">
-        <rect x="-90.975" y="-24.8" width="181.95" height="49.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-        <g class="plume-node plume-shape-text" transform="translate(-72.6,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Shelf</text>
-        </g>
-        <g class="plume-node plume-shape-treat plume-shape-rect" data-id="apple" transform="translate(-9.35,0)">
-          <rect x="-34.375" y="-24.3" width="68.75" height="48.6" rx="5" ry="5" fill="white" stroke="#444" stroke-width="1"/>
-          <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Apple</text>
-          </g>
-        </g>
-        <g class="plume-node plume-shape-nest plume-shape-slant" data-id="mug" transform="translate(63.25,0)">
-          <polygon points="-20.7138,-24.3 33.7362,-24.3 20.7138,24.3 -33.7362,24.3" fill="gray" stroke="#444" stroke-width="1"/>
-          <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Mug</text>
-          </g>
+      <g class="plume-node plume-shape-rect" data-id="lb" transform="translate(66.525,0)">
+        <rect x="-62.975" y="-24.3" width="125.95" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Load balancer</text>
         </g>
       </g>
     </g>
-    <g class="plume-node plume-shape-group plume-shape-rect" data-id="garden" transform="translate(259.8,-60.3)">
-      <rect x="-101.3" y="-90.3" width="202.6" height="180.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-      <g class="plume-node plume-shape-text" transform="translate(0,-82)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Garden</text>
+    <g class="plume-node plume-shape-group plume-shape-rect" data-id="services" transform="translate(0,44.8)">
+      <rect x="-112.125" y="-24.8" width="224.25" height="49.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(-83.025,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Services</text>
       </g>
-      <g class="plume-node plume-shape-group plume-shape-rect" data-id="den" transform="translate(0,-12.7)">
-        <rect x="-85.225" y="-20.5" width="170.45" height="41" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-        <g class="plume-node plume-shape-text" transform="translate(-74,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Den</text>
-        </g>
-        <g class="plume-node plume-shape-alert plume-shape-oval" data-id="rabbit" transform="translate(-29.275,0)">
-          <ellipse cx="0" cy="0" rx="18" ry="18" fill="white" stroke="red" stroke-width="1"/>
-          <g class="plume-node plume-shape-text" transform="translate(0,-34.8)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Rabbit</text>
-          </g>
-          <g class="plume-node plume-shape-badge plume-shape-rect" transform="translate(0,18.3)">
-            <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-            <g class="plume-node plume-shape-text" transform="translate(0,0)">
-              <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">FAST</text>
-            </g>
-          </g>
-        </g>
-        <g class="plume-node plume-shape-rect" data-id="carrot" transform="translate(44.725,0)">
-          <rect x="-40" y="-20" width="80" height="40" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-          <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Carrot patch</text>
-          </g>
+      <g class="plume-node plume-shape-rect" data-id="api" transform="translate(-2.2,0)">
+        <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">API</text>
         </g>
       </g>
-      <g class="plume-node plume-shape-group plume-shape-rect" data-id="pond" transform="translate(0,69.3)">
-        <rect x="-100.8" y="-20.5" width="201.6" height="41" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-        <g class="plume-node plume-shape-text" transform="translate(-86,0)">
-          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Pond</text>
-        </g>
-        <g class="plume-node plume-shape-rect" data-id="frog" transform="translate(-25.7,0)">
-          <rect x="-30" y="-20" width="60" height="40" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-          <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Frog</text>
-          </g>
-        </g>
-        <g class="plume-node plume-shape-rect" data-id="fish" transform="translate(60.3,0)">
-          <rect x="-40" y="-20" width="80" height="40" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-          <g class="plume-node plume-shape-text" transform="translate(0,0)">
-            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Goldfish</text>
-          </g>
+      <g class="plume-node plume-shape-rect" data-id="auth" transform="translate(80.825,0)">
+        <rect x="-30.8" y="-24.3" width="61.6" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Auth</text>
         </g>
       </g>
     </g>
-    <g class="plume-node plume-shape-group plume-shape-rect" data-id="treehouse" transform="translate(-273.1,110.8)">
-      <rect x="-42.675" y="-39.8" width="85.35" height="79.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-      <g class="plume-node plume-shape-text" transform="translate(0,-21.5)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Treehouse</text>
+    <g class="plume-node plume-shape-group plume-shape-rect" data-id="data" transform="translate(0,135.4)">
+      <rect x="-119.275" y="-24.8" width="238.55" height="49.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(-104.475,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Data</text>
       </g>
-      <g class="plume-node plume-shape-icon" data-id="owl" transform="translate(0,13.3)">
-        <rect x="-16" y="-16" width="32" height="32" fill="none" stroke="#444" stroke-width="1"/>
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="12.8" fill="#444">visibility</text>
+      <g class="plume-node plume-shape-cyl" data-id="cache" transform="translate(-30.8,0)">
+        <path d="M -34.375 -19.44 L -34.375 19.44 A 34.375 4.86 0 0 0 34.375 19.44 L 34.375 -19.44 A 34.375 4.86 0 0 0 -34.375 -19.44 Z" fill="white" stroke="#444" stroke-width="1"/>
+        <ellipse cx="0" cy="-19.44" rx="34.375" ry="4.86" fill="white" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Redis</text>
+        </g>
       </g>
-    </g>
-    <g class="plume-node plume-shape-widget plume-shape-group plume-shape-rect" data-id="diagram1" transform="translate(300,200)">
-      <rect x="-58.5" y="-51.35" width="117" height="102.7" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
-      <g class="plume-node plume-shape-rect" transform="translate(0,-19)">
-        <rect x="-50" y="-20" width="100" height="40" rx="4" ry="4" fill="lightblue" stroke="#444" stroke-width="1"/>
-      </g>
-      <g class="plume-node plume-shape-line plume-style-thin" transform="translate(0,10)">
-        <line x1="-50" y1="0" x2="50" y2="0" stroke="#444" stroke-width="1"/>
-      </g>
-      <g class="plume-node plume-shape-line" transform="translate(-25,19)">
-        <line x1="0" y1="0" x2="50" y2="20" stroke="#444" stroke-width="1"/>
-        <polygon class="plume-marker plume-marker-arrow" points="49.0715,19.6286 42.3865,20.1857 44.6148,14.6148" fill="#444"/>
-      </g>
-      <g class="plume-node plume-shape-text" transform="translate(0,-39.5)">
-        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="12" font-family="sans-serif" fill="currentColor">Den</text>
+      <g class="plume-node plume-shape-cyl" data-id="db" transform="translate(73.675,0)">
+        <path d="M -45.1 -19.44 L -45.1 19.44 A 45.1 4.86 0 0 0 45.1 19.44 L 45.1 -19.44 A 45.1 4.86 0 0 0 -45.1 -19.44 Z" fill="white" stroke="#444" stroke-width="1"/>
+        <ellipse cx="0" cy="-19.44" rx="45.1" ry="4.86" fill="white" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Postgres</text>
+        </g>
       </g>
     </g>
   </g>

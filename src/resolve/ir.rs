@@ -100,7 +100,7 @@ impl ShapeKind {
 }
 
 /// One ordered attr from a style or inline merge — `value` is `None` for bare
-/// attrs. Used as intermediate storage before §13 specificity collapse.
+/// attrs. Used as intermediate storage before section 13 specificity collapse.
 #[derive(Clone, Debug)]
 pub struct ResolvedAttr {
     pub name: String,
@@ -108,7 +108,7 @@ pub struct ResolvedAttr {
     pub span: Span,
 }
 
-/// Final attribute values after §13 specificity merging. Marker attrs are
+/// Final attribute values after section 13 specificity merging. Marker attrs are
 /// extracted into `Markers` and not stored here.
 #[derive(Default, Clone, Debug)]
 pub struct AttrMap {

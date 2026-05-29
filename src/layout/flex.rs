@@ -3,7 +3,7 @@
 //! Stacks children along the main axis with `gap` between them; centers them
 //! on the cross axis by default. Sprint 3 ships with a minimal subset of
 //! `h=` / `v=` alignment — `start`, `center`, `end`. The `between` / `around`
-//! / `evenly` distributions and `stretch` are deferred (no §20 sample exercises
+//! / `evenly` distributions and `stretch` are deferred (no section 20 sample exercises
 //! them).
 
 use super::ir::{Bbox, PlacedNode};
