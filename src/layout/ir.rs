@@ -34,6 +34,11 @@ pub struct RoutedWire {
     /// Span of the wire declaration this segment came from; segments sharing it
     /// are siblings of one statement (a chain or a fan).
     pub decl_span: Span,
+    /// Fan-trunk group ids, one per end (source, target). A fan group's shared
+    /// end carries an id common to its siblings; two wires sharing any id are fan
+    /// siblings, exempt from A3/B2 where their trunk coincides (E2).
+    pub fan_from: Option<u32>,
+    pub fan_to: Option<u32>,
 }
 
 #[derive(Clone)]

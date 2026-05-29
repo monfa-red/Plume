@@ -15,6 +15,7 @@ use super::oracle;
 use super::scene::{obstacles_for, SceneIndex};
 use crate::layout::ir::{PlacedNode, RoutedWire};
 use crate::resolve::{AttrMap, ShapeKind, VarTable};
+use crate::span::Span;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Rule {
@@ -44,6 +45,9 @@ pub struct Violation {
     pub rule: Rule,
     pub wires: Vec<String>,
     pub detail: String,
+    /// The declaration this violation points back to — for surfacing a flagged
+    /// B1/B2 relaxation as a source diagnostic.
+    pub span: Span,
 }
 
 impl Rule {
@@ -103,6 +107,7 @@ fn push(out: &mut Vec<Violation>, rule: Rule, w: &RoutedWire, detail: &str) {
         rule,
         wires: vec![label(w)],
         detail: detail.to_string(),
+        span: w.decl_span,
     });
 }
 
@@ -111,12 +116,21 @@ fn pair(out: &mut Vec<Violation>, rule: Rule, a: &RoutedWire, b: &RoutedWire, de
         rule,
         wires: vec![label(a), label(b)],
         detail,
+        span: a.decl_span,
     });
 }
 
 /// A wire's polyline as its list of axis-aligned segments.
 fn segments(w: &RoutedWire) -> Vec<Seg> {
     w.path.windows(2).map(|s| (s[0], s[1])).collect()
+}
+
+/// Two wires are fan siblings when they share a fan-trunk id on any end (E2):
+/// they're one declaration's fan splitting, so they may coincide on their trunk —
+/// exempt from A3 (shared run) and B2 (separation) with each other.
+fn fan_siblings(a: &RoutedWire, b: &RoutedWire) -> bool {
+    let shares = |x: Option<u32>| x.is_some() && (x == b.fan_from || x == b.fan_to);
+    shares(a.fan_from) || shares(a.fan_to)
 }
 
 // ───────────────────────────── A — invariants ─────────────────────────────
@@ -240,6 +254,9 @@ fn check_shared_runs(wires: &[RoutedWire], out: &mut Vec<Violation>) {
     let segs: Vec<Vec<Seg>> = wires.iter().map(segments).collect();
     for i in 0..wires.len() {
         for j in (i + 1)..wires.len() {
+            if fan_siblings(&wires[i], &wires[j]) {
+                continue; // a fan trunk is a permitted coincident run (A3)
+            }
             let shares = segs[i]
                 .iter()
                 .any(|a| segs[j].iter().any(|b| collinear_overlap(*a, *b)));
@@ -290,6 +307,9 @@ fn check_separation(wires: &[RoutedWire], out: &mut Vec<Violation>) {
     let segs: Vec<Vec<Seg>> = wires.iter().map(segments).collect();
     for i in 0..wires.len() {
         for j in (i + 1)..wires.len() {
+            if fan_siblings(&wires[i], &wires[j]) {
+                continue; // siblings coincide on their trunk — exempt from B2/B3
+            }
             let separation = oracle::separation(&wires[i].attrs, &wires[j].attrs);
             let mut gap = f64::INFINITY;
             for a in &segs[i] {
@@ -345,6 +365,8 @@ mod tests {
             seg_from: from.to_string(),
             seg_to: to.to_string(),
             decl_span: Span::empty(),
+            fan_from: None,
+            fan_to: None,
         }
     }
 
@@ -353,6 +375,36 @@ mod tests {
                          src |rect| size:(40,40)\n\
                          via |rect| size:(40,40)\n\
                          dst |rect| size:(40,40)\n";
+
+    #[test]
+    fn fan_siblings_may_share_a_trunk() {
+        // Two wires of one fan group share a coincident run (the trunk) then
+        // split. With a common fan id, A3 (shared run) and B2 (separation) are
+        // exempt; without it, A3 fires — proving the exemption does the work.
+        let trunk = |to: &str, dy: f64| wire(vec![(0.0, 0.0), (50.0, 0.0), (50.0, dy)], "src", to);
+        let ns = nodes(SCENE);
+        let (a, v) = (AttrMap::new(), VarTable::new());
+
+        let (mut s0, mut s1) = (trunk("one", -20.0), trunk("two", 20.0));
+        s0.fan_from = Some(1);
+        s1.fan_from = Some(1);
+        let vs = validate_routing(&ns, &a, &[s0, s1], &v);
+        assert!(
+            !vs.iter().any(|x| x.rule == Rule::PerpCrossing),
+            "a fan trunk is not a shared-run violation: {vs:?}"
+        );
+        assert!(
+            !vs.iter().any(|x| x.rule == Rule::Separation),
+            "fan siblings are exempt from separation on their trunk"
+        );
+
+        // Same geometry, no shared fan id → the coincident run is a real A3.
+        let plain = validate_routing(&ns, &a, &[trunk("one", -20.0), trunk("two", 20.0)], &v);
+        assert!(
+            plain.iter().any(|x| x.rule == Rule::PerpCrossing),
+            "unrelated wires sharing a run still violate A3"
+        );
+    }
 
     #[test]
     fn flags_a_wire_through_a_node_as_overlap() {

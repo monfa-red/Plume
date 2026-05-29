@@ -170,7 +170,15 @@ fn main() -> ExitCode {
             for d in &diags {
                 eprintln!("{}", d.display_with_source(&source, &filename));
             }
-            warnings_were_emitted = !diags.is_empty();
+            warnings_were_emitted |= !diags.is_empty();
+        }
+        // Flag any last-resort routing relaxation (B1/B2) — WIRING requires these
+        // never be silent.
+        if let Ok(diags) = plume::routing_diagnostics(&source) {
+            for d in &diags {
+                eprintln!("{}", d.display_with_source(&source, &filename));
+            }
+            warnings_were_emitted |= !diags.is_empty();
         }
     }
 

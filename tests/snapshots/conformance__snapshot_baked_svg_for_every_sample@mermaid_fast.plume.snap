@@ -3,7 +3,7 @@ source: tests/conformance.rs
 expression: svg
 input_file: samples/mermaid_fast.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-412.275 -60.8 824.55 105.6" width="824.55" height="105.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-412.275 -44.8 824.55 105.6" width="824.55" height="105.6" class="plume">
   <defs/>
   <g class="plume-scene" color="black">
     <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-364.55,0)">
@@ -76,12 +76,12 @@ input_file: samples/mermaid_fast.plume
       <polygon class="plume-marker plume-marker-arrow" points="-241.375,0 -246.375,2.5 -246.375,-2.5" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="fox" data-to="mouse">
-      <path d="M -103.325 -8 L -99.325 -8 L -99.325 -40.8 L -11.875 -40.8 L -11.875 -8 L -7.875 -8" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-7.875,-8 -12.875,-5.5 -12.875,-10.5" fill="#444"/>
+      <path d="M -103.325 0 L -99.325 0 L -99.325 40.8 L -11.875 40.8 L -11.875 0 L -7.875 0" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-7.875,0 -12.875,2.5 -12.875,-2.5" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="owl" data-to="mouse">
-      <path d="M -27.875 8 L -11.875 8" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-7.875,8 -12.875,10.5 -12.875,5.5" fill="#444"/>
+      <path d="M -27.875 0 L -11.875 0" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-7.875,0 -12.875,2.5 -12.875,-2.5" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="frog" data-to="pond">
       <path d="M 144.475 0 L 160.475 0" fill="none" stroke="#444" stroke-width="1"/>

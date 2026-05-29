@@ -16,6 +16,28 @@ fn sample_paths() -> Vec<PathBuf> {
 }
 
 #[test]
+fn routing_relaxations_are_surfaced_as_diagnostics() {
+    // wires_labels packs 5 wires onto one short edge — a genuine C5 overflow whose
+    // sub-separation is a flagged B2 relaxation. It must reach the user as a
+    // diagnostic, never silently.
+    let src = std::fs::read_to_string("samples/wires_labels.plume").unwrap();
+    let diags = plume::routing_diagnostics(&src).expect("routing diagnostics");
+    assert!(
+        diags.iter().any(|d| d.message.contains("separation")),
+        "the C5 overflow must be flagged: {diags:?}"
+    );
+}
+
+#[test]
+fn a_rule_clean_sample_has_no_routing_diagnostics() {
+    let src = std::fs::read_to_string("samples/wires_basic.plume").unwrap();
+    assert!(
+        plume::routing_diagnostics(&src).expect("diags").is_empty(),
+        "a clean routing emits nothing"
+    );
+}
+
+#[test]
 fn dumb_router_holds_per_wire_invariants() {
     for path in sample_paths() {
         let src = std::fs::read_to_string(&path).unwrap();

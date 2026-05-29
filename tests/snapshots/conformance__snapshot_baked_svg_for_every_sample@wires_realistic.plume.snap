@@ -98,11 +98,11 @@ input_file: samples/wires_realistic.plume
       <polygon class="plume-marker plume-marker-arrow" points="35.5,93.1 30.5,95.6 30.5,90.6" fill="blue"/>
     </g>
     <g class="plume-wire" data-from="kitchen.water" data-to="roof">
-      <path d="M -43.5 77.1 L -7.0312 77.1 L -7.0312 150.25 L 140.475 150.25 L 140.475 -4 L 156.6 -4" fill="none" stroke="green" stroke-width="1"/>
+      <path d="M -43.5 77.1 L 0.9688 77.1 L 0.9688 150.25 L 140.475 150.25 L 140.475 -4 L 156.6 -4" fill="none" stroke="green" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="160.6,-4 155.6,-1.5 155.6,-6.5" fill="green"/>
     </g>
     <g class="plume-wire" data-from="kitchen.water" data-to="roof">
-      <path d="M -43.5 85.1 L 0.9688 85.1 L 0.9688 158.25 L 148.475 158.25 L 148.475 4 L 156.6 4" fill="none" stroke="green" stroke-width="1"/>
+      <path d="M -43.5 85.1 L -7.0312 85.1 L -7.0312 158.25 L 148.475 158.25 L 148.475 4 L 156.6 4" fill="none" stroke="green" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="160.6,4 155.6,6.5 155.6,1.5" fill="green"/>
     </g>
   </g>

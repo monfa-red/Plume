@@ -20,6 +20,10 @@ pub struct SegReq {
     pub b: Rect,
     pub forced_b: Option<Side>,
     pub clearance: f64,
+    /// Fan-trunk group id per end (source, target): siblings sharing an id share
+    /// one slot at that end (E2 / C2). `None` for an ordinary end.
+    pub fan_a: Option<u32>,
+    pub fan_b: Option<u32>,
 }
 
 /// The planned attachment for one segment: a side and a concrete port point at
@@ -126,6 +130,15 @@ impl End {
         }
     }
 
+    /// This end's fan-trunk id, if it shares a trunk with siblings (E2).
+    fn fan(&self, reqs: &[SegReq]) -> Option<u32> {
+        if self.is_a {
+            reqs[self.seg].fan_a
+        } else {
+            reqs[self.seg].fan_b
+        }
+    }
+
     /// The opposite end's node centre, projected onto this side's varying axis —
     /// the key that orders wires so they fan out without crossing (C4).
     fn aim(&self, reqs: &[SegReq], side: Side) -> f64 {
@@ -170,37 +183,57 @@ fn group_by_side<'a>(
 /// `separation` apart (compacting to fit, C5), ordered so they don't cross (C4).
 /// A side with a single wire is left at its midpoint (C3 may move it later).
 fn assign_slots(reqs: &[SegReq], ends: &[End], plans: &mut [Plan]) {
-    if ends.len() < 2 {
-        return;
+    // Collapse fan siblings into one occupant: a fan group's shared end is a
+    // single slot (C2 / E2). Every other end is its own occupant.
+    let mut occupants: Vec<Vec<&End>> = Vec::new();
+    let mut by_fan: BTreeMap<u32, usize> = BTreeMap::new();
+    for e in ends {
+        match e.fan(reqs) {
+            Some(f) if by_fan.contains_key(&f) => occupants[by_fan[&f]].push(e),
+            Some(f) => {
+                by_fan.insert(f, occupants.len());
+                occupants.push(vec![e]);
+            }
+            None => occupants.push(vec![e]),
+        }
     }
+    if occupants.len() < 2 {
+        return; // one occupant (a lone wire or a single fan trunk) keeps the midpoint
+    }
+
     let side = ends[0].side(plans);
     let (lo, hi) = side_span(ends[0].rect(reqs), side);
     let centre = (lo + hi) / 2.0;
 
-    // C4 — order by where each wire is headed, breaking ties by routing order.
-    let mut order: Vec<&End> = ends.iter().collect();
+    // C4 — order occupants by where they head (a fan trunk by its members' mean
+    // aim), breaking ties by routing order.
+    let aim = |occ: &[&End]| occ.iter().map(|e| e.aim(reqs, side)).sum::<f64>() / occ.len() as f64;
+    let first_seg = |occ: &[&End]| occ.iter().map(|e| e.seg).min().unwrap();
+    let mut order: Vec<&Vec<&End>> = occupants.iter().collect();
     order.sort_by(|x, y| {
-        x.aim(reqs, side)
-            .total_cmp(&y.aim(reqs, side))
-            .then(x.seg.cmp(&y.seg))
+        aim(x)
+            .total_cmp(&aim(y))
+            .then(first_seg(x).cmp(&first_seg(y)))
     });
 
     // Uniform spacing = the largest separation that fits; corner inset = sep.
     let k = order.len();
-    let sep = order
+    let sep = ends
         .iter()
         .map(|e| reqs[e.seg].clearance)
         .fold(0.0_f64, f64::max);
     let room = (hi - lo - 2.0 * sep).max(0.0);
     let spacing = sep.min(room / (k as f64 - 1.0));
 
-    for (rank, e) in order.iter().enumerate() {
+    for (rank, occ) in order.iter().enumerate() {
         let offset = (rank as f64 - (k as f64 - 1.0) / 2.0) * spacing;
-        let port = port_at(e.rect(reqs), side, centre + offset);
-        if e.is_a {
-            plans[e.seg].port_a = port;
-        } else {
-            plans[e.seg].port_b = port;
+        for e in occ.iter() {
+            let port = port_at(e.rect(reqs), side, centre + offset);
+            if e.is_a {
+                plans[e.seg].port_a = port;
+            } else {
+                plans[e.seg].port_b = port;
+            }
         }
     }
 }
@@ -253,10 +286,18 @@ fn side_pref(side: Side) -> u8 {
 /// pick, with a least-loaded tie-break for diagonal hops that could leave off
 /// either of two sides.
 fn pick_all_sides(reqs: &[SegReq]) -> Vec<(Side, Side)> {
-    // Pass 1 — forced side, else the geometric pick (dominant axis).
+    // Pass 1 — forced side, else the geometric pick (dominant axis). A self-loop
+    // (same node both ends) has no geometry to pick from: it defaults to exiting
+    // right and returning to the top (E3), honouring any forced sides.
     let mut sides: Vec<(Side, Side)> = reqs
         .iter()
         .map(|r| {
+            if r.a_node == r.b_node {
+                return (
+                    r.forced_a.unwrap_or(Side::Right),
+                    r.forced_b.unwrap_or(Side::Top),
+                );
+            }
             let (ga, gb) = pick_edges(r.a, r.b);
             (r.forced_a.unwrap_or(ga), r.forced_b.unwrap_or(gb))
         })
@@ -344,6 +385,8 @@ mod tests {
             b,
             forced_b: None,
             clearance: 16.0,
+            fan_a: None,
+            fan_b: None,
         }
     }
 
@@ -394,6 +437,43 @@ mod tests {
         assert!(
             plans[1].port_a.1 < plans[0].port_a.1,
             "the wire aiming higher (smaller y) takes the higher slot"
+        );
+    }
+
+    #[test]
+    fn fan_siblings_share_one_slot() {
+        // Two wires leave src's right side as a fan group (same fan id) for two
+        // stacked targets. C2: a fan group's shared end is ONE slot — both ports
+        // land on the same point, not two spread slots.
+        let src = rect(0.0, 0.0, 40.0, 160.0);
+        let t = |y: f64| rect(200.0, y, 240.0, y + 40.0);
+        let mut s0 = seg("src", src, "one", t(0.0));
+        let mut s1 = seg("src", src, "two", t(120.0));
+        s0.fan_a = Some(7);
+        s1.fan_a = Some(7);
+        let plans = plan(&[s0, s1]);
+        assert_eq!(
+            plans[0].port_a, plans[1].port_a,
+            "fan siblings share the source port"
+        );
+    }
+
+    #[test]
+    fn a_fan_trunk_and_a_plain_wire_take_separate_slots() {
+        // src's right hosts a 2-sibling fan (one slot) plus an unrelated wire.
+        // That's two occupants → two distinct slots; the siblings still coincide.
+        let src = rect(0.0, 0.0, 40.0, 160.0);
+        let t = |y: f64| rect(200.0, y, 240.0, y + 40.0);
+        let mut s0 = seg("src", src, "one", t(0.0));
+        let mut s1 = seg("src", src, "two", t(60.0));
+        let plain = seg("src", src, "three", t(120.0));
+        s0.fan_a = Some(3);
+        s1.fan_a = Some(3);
+        let plans = plan(&[s0, s1, plain]);
+        assert_eq!(plans[0].port_a, plans[1].port_a, "siblings coincide");
+        assert_ne!(
+            plans[0].port_a, plans[2].port_a,
+            "the plain wire gets its own slot"
         );
     }
 

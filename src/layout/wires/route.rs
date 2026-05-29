@@ -45,6 +45,74 @@ pub fn route(
     )
 }
 
+/// Route a wire from a node back to itself (E3): an orthogonal loop that leaves
+/// the `exit` side, steps ≥ `clearance` clear, and returns to the adjacent `ret`
+/// side. Both ports sit a corner inset (= clearance) from the shared corner, so
+/// the loop wraps that corner without touching the node. A `ret` side parallel to
+/// `exit` is normalised to an adjacent one (the loop can only wrap a corner).
+pub fn self_loop(r: Rect, exit: Side, ret: Side, clearance: f64) -> Vec<Pt> {
+    let ret = adjacent_to(exit, ret);
+    let d = clearance.max(1.0);
+    let inset = clearance
+        .min((r.max_x - r.min_x) / 2.0)
+        .min((r.max_y - r.min_y) / 2.0)
+        .max(0.0);
+
+    let n = |s: Side| -> Pt {
+        match s {
+            Side::Right => (1.0, 0.0),
+            Side::Left => (-1.0, 0.0),
+            Side::Top => (0.0, -1.0),
+            Side::Bottom => (0.0, 1.0),
+        }
+    };
+    let vertical = |s: Side| matches!(s, Side::Left | Side::Right);
+    let side_x = |s: Side| {
+        if matches!(s, Side::Right) {
+            r.max_x
+        } else {
+            r.min_x
+        }
+    };
+    let side_y = |s: Side| {
+        if matches!(s, Side::Bottom) {
+            r.max_y
+        } else {
+            r.min_y
+        }
+    };
+
+    // The corner where the exit and return sides meet, then both ports inset
+    // along their sides from it, stepped out by `d`, joined past the corner.
+    let k = if vertical(exit) {
+        (side_x(exit), side_y(ret))
+    } else {
+        (side_x(ret), side_y(exit))
+    };
+    let (nex, ney) = n(exit);
+    let (nrx, nry) = n(ret);
+    let p_e = (k.0 - nrx * inset, k.1 - nry * inset);
+    let p_r = (k.0 - nex * inset, k.1 - ney * inset);
+    let a = (p_e.0 + nex * d, p_e.1 + ney * d);
+    let c = (p_r.0 + nrx * d, p_r.1 + nry * d);
+    let b = (k.0 + nex * d + nrx * d, k.1 + ney * d + nry * d);
+    clean(vec![p_e, a, b, c, p_r])
+}
+
+/// A return side must be perpendicular to the exit side (a loop wraps a corner);
+/// a parallel one is replaced by the default adjacent side.
+fn adjacent_to(exit: Side, ret: Side) -> Side {
+    let parallel =
+        matches!(exit, Side::Left | Side::Right) == matches!(ret, Side::Left | Side::Right);
+    if !parallel {
+        ret
+    } else if matches!(exit, Side::Left | Side::Right) {
+        Side::Top
+    } else {
+        Side::Right
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Dir {
     E,
@@ -237,6 +305,39 @@ mod tests {
             min_y,
             max_x,
             max_y,
+        }
+    }
+
+    #[test]
+    fn self_loop_wraps_the_corner_orthogonally() {
+        // A wire from a node back to itself loops out the right side and back to
+        // the top (E3 defaults): orthogonal, perpendicular at both ports, and
+        // never inside the node.
+        let r = rect(0.0, 0.0, 40.0, 40.0);
+        let path = self_loop(r, Side::Right, Side::Top, 16.0);
+        assert!(path.len() >= 4, "a loop needs several bends, got {path:?}");
+        assert!(
+            (path.first().unwrap().0 - 40.0).abs() < 1e-9,
+            "exits the right edge"
+        );
+        assert!(
+            (path.last().unwrap().1 - 0.0).abs() < 1e-9,
+            "returns to the top edge"
+        );
+        for &(x, y) in &path {
+            assert!(
+                x >= 40.0 - 1e-9 || y <= 0.0 + 1e-9,
+                "vertex ({x},{y}) is inside the node"
+            );
+        }
+        // orthogonal: each segment axis-aligned, alternating with the last
+        let mut prev_h: Option<bool> = None;
+        for w in path.windows(2) {
+            let h = (w[0].1 - w[1].1).abs() < 1e-9;
+            let v = (w[0].0 - w[1].0).abs() < 1e-9;
+            assert!(h ^ v, "segment {:?}->{:?} not axis-aligned", w[0], w[1]);
+            assert_ne!(prev_h, Some(h), "two same-orientation segments in a row");
+            prev_h = Some(h);
         }
     }
 

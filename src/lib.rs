@@ -110,6 +110,30 @@ pub fn validate_str(src: &str) -> Result<Vec<Violation>, Error> {
     Ok(layout::validate_routing(&laid_out))
 }
 
+/// Surface the routing validator's B1/B2 relaxations (node overlap, and
+/// sub-clearance / sub-separation) as user-facing diagnostics — WIRING requires
+/// these be flagged, never silent. Hard invariants are guaranteed and B3
+/// crossings are normal output, so neither appears here. The CLI prints these as
+/// warnings; `--strict` makes them fail the build.
+pub fn routing_diagnostics(src: &str) -> Result<Vec<Diagnostic>, Error> {
+    let relaxed = |r: Rule| matches!(r, Rule::NodeOverlap | Rule::Clearance | Rule::Separation);
+    Ok(validate_str(src)?
+        .into_iter()
+        .filter(|v| relaxed(v.rule))
+        .map(|v| {
+            Diagnostic::warn(
+                v.span,
+                format!(
+                    "{} relaxed ({}): {}",
+                    v.rule.id(),
+                    v.wires.join(", "),
+                    v.detail
+                ),
+            )
+        })
+        .collect())
+}
+
 fn resolve_pipeline(src: &str, opts: &Options) -> Result<resolve::Program, Error> {
     let tokens = lexer::lex(src)?;
     let file = parser::parse(&tokens)?;

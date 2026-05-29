@@ -1,0 +1,13 @@
+// SPEC section 10 / WIRING E3 — self-loops: a wire from a node back to itself
+// loops out one side and returns to an adjacent one (default: right → top).
+
+{
+  |scene| layout:row gap:80 padding:24
+  |treat:rect| radius:4 fill:#eee padding:18
+}
+
+api   |treat| "API"
+cache |treat| "Cache"
+
+api -> cache
+cache -> cache "retry"

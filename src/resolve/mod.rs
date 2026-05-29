@@ -701,7 +701,7 @@ fn resolve_wire(
     let expanded = expand_chain(&w.chain);
 
     let mut out = Vec::with_capacity(expanded.len());
-    for chain_path in expanded {
+    for (fan_index, chain_path) in expanded.into_iter().enumerate() {
         let mut endpoints = Vec::with_capacity(chain_path.len());
         for ep in chain_path {
             let qualified: Vec<String> = if path_prefix.is_empty() {
@@ -743,7 +743,13 @@ fn resolve_wire(
             line: w.op.line,
             attrs: attrs.clone(),
             markers: markers.clone(),
-            texts: texts.iter().map(clone_text).collect(),
+            // A fan declaration's label is written once; cartesian expansion would
+            // otherwise copy it onto every sibling. Keep it on the first only (E2).
+            texts: if fan_index == 0 {
+                texts.iter().map(clone_text).collect()
+            } else {
+                Vec::new()
+            },
             span: w.span,
         });
     }
@@ -892,5 +898,20 @@ mod tests {
     fn wire_fan_expands_cartesian() {
         let p = resolve_str("cat & fox -> bird & mouse\n");
         assert_eq!(p.wires.len(), 4);
+    }
+
+    #[test]
+    fn fan_label_is_not_duplicated_across_siblings() {
+        // `a -> b & c "shared"` expands to two wires; the one declared label
+        // rides a single sibling (E2 — drawn once), not each of them.
+        let p = resolve_str(
+            "src |rect|\n\
+             one |rect|\n\
+             two |rect|\n\
+             src -> one & two \"shared\"\n",
+        );
+        assert_eq!(p.wires.len(), 2);
+        let labelled = p.wires.iter().filter(|w| !w.texts.is_empty()).count();
+        assert_eq!(labelled, 1, "the fan label rides one sibling, not each");
     }
 }

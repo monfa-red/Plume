@@ -3,7 +3,7 @@ source: tests/conformance.rs
 expression: svg
 input_file: samples/wires_fan.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-63.725 -243.8 134.6 487.6" width="134.6" height="487.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-70.875 -243.8 134.6 487.6" width="134.6" height="487.6" class="plume">
   <defs/>
   <g class="plume-scene" color="black">
     <g class="plume-node plume-shape-rect" data-id="mouse" transform="translate(0,-199)">
@@ -45,26 +45,25 @@ input_file: samples/wires_fan.plume
   </g>
   <g class="plume-wires">
     <g class="plume-wire" data-from="fox" data-to="mouse">
-      <path d="M -11.725 -144.2 L -11.725 -151.95 L -16 -151.95 L -16 -170.2" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-16,-174.2 -13.5,-169.2 -18.5,-169.2" fill="#444"/>
-      <text x="-13.8625" y="-159.2" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">hunts</text>
+      <path d="M -8 -144.2 L -8 -170.2" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-8,-174.2 -5.5,-169.2 -10.5,-169.2" fill="#444"/>
+      <text x="-8" y="-159.2" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">hunts</text>
     </g>
     <g class="plume-wire" data-from="owl" data-to="mouse">
-      <path d="M 0 -64.6 L 0 -78.6 L -43.725 -78.6 L -43.725 -167.95 L 0 -167.95 L 0 -170.2" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="0,-174.2 2.5,-169.2 -2.5,-169.2" fill="#444"/>
-      <text x="-43.725" y="-119.4" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">hunts</text>
+      <path d="M -8 -64.6 L -8 -78.6 L -43.725 -78.6 L -43.725 -160.2 L -8 -160.2 L -8 -170.2" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-8,-174.2 -5.5,-169.2 -10.5,-169.2" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="bowl" data-to="apple">
-      <path d="M -8 64.6 L -8 90.6" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-8,94.6 -10.5,89.6 -5.5,89.6" fill="#444"/>
+      <path d="M 0 64.6 L 0 90.6" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="0,94.6 -2.5,89.6 2.5,89.6" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="bowl" data-to="mug">
-      <path d="M 8 64.6 L 8 78.6 L 50.875 78.6 L 50.875 160.2 L 8 160.2 L 8 170.2" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="8,174.2 5.5,169.2 10.5,169.2" fill="#444"/>
+      <path d="M 0 64.6 L 0 78.6 L -50.875 78.6 L -50.875 160.2 L 0 160.2 L 0 170.2" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="0,174.2 -2.5,169.2 2.5,169.2" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="bowl" data-to="mouse">
-      <path d="M 15.3 15 L 15.3 1 L 43.725 1 L 43.725 -160.2 L 16 -160.2 L 16 -170.2" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="16,-174.2 18.5,-169.2 13.5,-169.2" fill="#444"/>
+      <path d="M 8 15 L 8 1 L 43.725 1 L 43.725 -160.2 L 8 -160.2 L 8 -170.2" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="8,-174.2 10.5,-169.2 5.5,-169.2" fill="#444"/>
     </g>
   </g>
 </svg>

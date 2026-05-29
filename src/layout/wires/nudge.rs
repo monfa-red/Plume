@@ -24,6 +24,9 @@ use super::scene::obstacles_for;
 use crate::layout::ir::{PlacedNode, RoutedWire};
 use std::collections::BTreeMap;
 
+/// One candidate track placement: where each `(wire, segment)` should sit.
+type Placement = Vec<((usize, usize), f64)>;
+
 /// Spread shared / near-parallel runs onto clean tracks, committing only the
 /// separations that keep every wire clear of nodes. Mutates each wire's polyline.
 pub fn nudge(wires: &mut [RoutedWire], nodes: &[PlacedNode]) {
@@ -32,25 +35,42 @@ pub fn nudge(wires: &mut [RoutedWire], nodes: &[PlacedNode]) {
     let mut moved: BTreeMap<(usize, usize), f64> = BTreeMap::new();
 
     for group in cluster(&segs) {
-        let affected: Vec<usize> = group.iter().map(|&i| segs[i].wire).collect();
-        // Widest separation first, then narrower (C5 overflow), at a few band
-        // positions; commit the first placement that keeps every affected wire
-        // clear of nodes. A run with no safe placement is left as it was.
-        for trial in candidate_placements(&segs, &group) {
-            let mut merged = moved.clone();
-            merged.extend(trial.iter().copied());
-            let safe = affected.iter().all(|&wi| {
-                is_safe(
-                    &rebuild(&originals[wi], wi, &merged),
-                    &originals[wi],
-                    &wires[wi],
-                    nodes,
-                )
-            });
-            if safe {
-                moved = merged;
-                break;
+        let mut affected: Vec<usize> = group.iter().map(|&i| segs[i].wire).collect();
+        affected.sort_unstable();
+        affected.dedup();
+        // Among placements that keep every affected wire clear of nodes, commit the
+        // one introducing the fewest crossings between those wires (B3): a bundle's
+        // rails cross only when ordered against their stubs, so trying the track
+        // orderings (the sorted one first — unchanged clusters stay put) and
+        // scoring by crossings reorders them apart. Widest separation first, then
+        // narrower (C5 overflow). A run with no safe placement is left as it was.
+        let mut best: Option<(usize, Placement)> = None;
+        'search: for order in track_orders(&segs, &group) {
+            for trial in candidate_placements(&segs, &order) {
+                let mut merged = moved.clone();
+                merged.extend(trial.iter().copied());
+                let safe = affected.iter().all(|&wi| {
+                    is_safe(
+                        &rebuild(&originals[wi], wi, &merged),
+                        &originals[wi],
+                        &wires[wi],
+                        nodes,
+                    )
+                });
+                if !safe {
+                    continue;
+                }
+                let crossings = crossings_among(&affected, &originals, &merged);
+                if best.as_ref().map_or(true, |(b, _)| crossings < *b) {
+                    best = Some((crossings, trial));
+                }
+                if crossings == 0 {
+                    break 'search; // sorted order tried first, so this is the tidiest
+                }
             }
+        }
+        if let Some((_, trial)) = best {
+            moved.extend(trial);
         }
     }
 
@@ -146,19 +166,11 @@ fn cluster(segs: &[Segment]) -> Vec<Vec<usize>> {
 /// caller commits the first one that proves node-safe; a single line over a clear
 /// channel separates fully, a crowded one compacts (C5 overflow), and one boxed in
 /// finds nothing and is left alone.
-fn candidate_placements(segs: &[Segment], group: &[usize]) -> Vec<Vec<((usize, usize), f64)>> {
-    if group.len() < 2 {
+fn candidate_placements(segs: &[Segment], order: &[usize]) -> Vec<Placement> {
+    let k = order.len();
+    if k < 2 {
         return Vec::new();
     }
-    let mut order = group.to_vec();
-    order.sort_by(|&a, &b| {
-        segs[a]
-            .pos
-            .total_cmp(&segs[b].pos)
-            .then(segs[a].wire.cmp(&segs[b].wire))
-            .then(segs[a].seg.cmp(&segs[b].seg))
-    });
-    let k = order.len();
     let sep = order.iter().map(|&i| segs[i].clearance).fold(0.0, f64::max);
 
     // The band the tracks must stay within so no neighbour stub collapses, with a
@@ -211,6 +223,72 @@ fn candidate_placements(segs: &[Segment], group: &[usize]) -> Vec<Vec<((usize, u
         }
     }
     out
+}
+
+/// The track orderings to try for a cluster, tidiest first: the position-sorted
+/// order (so a cluster with no crossing keeps its natural layout), then the other
+/// permutations so a crossing can be reordered away. Capped — a wide channel keeps
+/// the sorted order rather than exploring a factorial of layouts.
+fn track_orders(segs: &[Segment], group: &[usize]) -> Vec<Vec<usize>> {
+    let mut sorted = group.to_vec();
+    sorted.sort_by(|&a, &b| {
+        segs[a]
+            .pos
+            .total_cmp(&segs[b].pos)
+            .then(segs[a].wire.cmp(&segs[b].wire))
+            .then(segs[a].seg.cmp(&segs[b].seg))
+    });
+    if sorted.len() > 4 {
+        return vec![sorted];
+    }
+    let mut out = Vec::new();
+    heap_permute(sorted.len(), &mut sorted, &mut out);
+    out
+}
+
+/// Heap's algorithm: every permutation of `a`, with `a` itself emitted first.
+fn heap_permute(k: usize, a: &mut [usize], out: &mut Vec<Vec<usize>>) {
+    if k <= 1 {
+        out.push(a.to_vec());
+        return;
+    }
+    for i in 0..k {
+        heap_permute(k - 1, a, out);
+        if k % 2 == 0 {
+            a.swap(i, k - 1);
+        } else {
+            a.swap(0, k - 1);
+        }
+    }
+}
+
+/// Count perpendicular crossings between the affected wires once rebuilt with
+/// `moved` — the score the nudge minimises when choosing a track order (B3).
+fn crossings_among(
+    affected: &[usize],
+    originals: &[Vec<Pt>],
+    moved: &BTreeMap<(usize, usize), f64>,
+) -> usize {
+    use super::geometry::perp_crossing;
+    let paths: Vec<Vec<Pt>> = affected
+        .iter()
+        .map(|&wi| rebuild(&originals[wi], wi, moved))
+        .collect();
+    let segs = |p: &[Pt]| -> Vec<(Pt, Pt)> { p.windows(2).map(|s| (s[0], s[1])).collect() };
+    let mut count = 0;
+    for i in 0..paths.len() {
+        for j in (i + 1)..paths.len() {
+            let (si, sj) = (segs(&paths[i]), segs(&paths[j]));
+            for a in &si {
+                for b in &sj {
+                    if perp_crossing(*a, *b) {
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    count
 }
 
 /// Rebuild a wire's polyline from its (possibly shifted) segment positions: ports
@@ -379,6 +457,8 @@ mod tests {
             seg_from: from.into(),
             seg_to: to.into(),
             decl_span: Span::empty(),
+            fan_from: None,
+            fan_to: None,
         }
     }
 
@@ -408,6 +488,44 @@ mod tests {
         nudge(&mut wires, &ns);
         let gap = (wires[0].path[1].0 - wires[1].path[1].0).abs();
         assert!((gap - 16.0).abs() < 1e-6, "tracks 16 apart, got {gap}");
+    }
+
+    #[test]
+    fn bundle_rails_are_ordered_to_avoid_a_self_cross() {
+        // Two parallel wires leave aa's right at slightly different heights, share
+        // a down-rail, and drop. Splitting that rail in declaration order would
+        // send the upper wire's descent across the lower wire's stub. The nudge
+        // must pick the track order that avoids the crossing.
+        let ns = nodes(SCENE);
+        let mut wires = vec![
+            wire(
+                vec![(-100.0, -4.0), (0.0, -4.0), (0.0, 100.0), (100.0, 100.0)],
+                "aa",
+                "bb",
+            ),
+            wire(
+                vec![(-100.0, 4.0), (0.0, 4.0), (0.0, 100.0), (100.0, 100.0)],
+                "aa",
+                "bb",
+            ),
+        ];
+        nudge(&mut wires, &ns);
+        let count = perp_crossings(&wires[0], &wires[1]);
+        assert_eq!(
+            count, 0,
+            "the bundle must not cross itself: {count} crossings"
+        );
+    }
+
+    fn perp_crossings(a: &RoutedWire, b: &RoutedWire) -> usize {
+        use super::super::geometry::perp_crossing;
+        let segs =
+            |w: &RoutedWire| -> Vec<(Pt, Pt)> { w.path.windows(2).map(|s| (s[0], s[1])).collect() };
+        let (sa, sb) = (segs(a), segs(b));
+        sa.iter()
+            .flat_map(|x| sb.iter().map(move |y| (x, y)))
+            .filter(|(x, y)| perp_crossing(**x, **y))
+            .count()
     }
 
     #[test]
