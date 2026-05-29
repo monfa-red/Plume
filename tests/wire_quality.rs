@@ -57,6 +57,34 @@ fn detour_ratio(w: &plume::WirePath) -> f64 {
     path_len(&w.points) / ideal
 }
 
+/// True if the wire reaches its target by wrapping to the edge facing *away*
+/// from the source. Detected from the final segment's direction: a wrap enters
+/// the far edge moving *back toward* the source (e.g. source is left of target,
+/// yet the wire comes in from the right, heading left). A perpendicular side
+/// approach (final segment along the other axis) or a near-side entry don't
+/// trip it. This is the exact "canvas-wide detour" defect.
+fn far_side_entry(w: &plume::WirePath) -> bool {
+    let n = w.points.len();
+    if n < 2 {
+        return false;
+    }
+    let (prev, attach) = (w.points[n - 2], w.points[n - 1]);
+    let (seg_dx, seg_dy) = (attach.0 - prev.0, attach.1 - prev.1);
+    let (dx, dy) = (
+        w.to_center.0 - w.from_center.0,
+        w.to_center.1 - w.from_center.1,
+    );
+    // A genuine wrap approaches from the far side over a real distance; a 1–2px
+    // correction at the attachment (e.g. a clearance-tight gap nudging the trunk
+    // a pixel past the edge) is not a wrap.
+    const JOG: f64 = 4.0;
+    if dx.abs() >= dy.abs() {
+        seg_dx < -JOG && dx > 0.0 || seg_dx > JOG && dx < 0.0
+    } else {
+        seg_dy < -JOG && dy > 0.0 || seg_dy > JOG && dy < 0.0
+    }
+}
+
 /// Count distinct points where two segments from *different* wires cross.
 fn crossings(wires: &[plume::WirePath]) -> usize {
     let mut n = 0;
@@ -100,12 +128,14 @@ struct Report {
     text: String,
     worst_detour: f64,
     total_crossings: usize,
+    far_side: usize,
 }
 
 fn measure() -> Report {
     let mut text = String::new();
     let mut worst_detour: f64 = 1.0;
     let mut total_crossings = 0;
+    let mut far_side = 0;
     for p in samples() {
         let src = fs::read_to_string(&p).unwrap();
         let Ok(wires) = plume::route_str(&src) else {
@@ -119,6 +149,8 @@ fn measure() -> Report {
         let total_bends: usize = wires.iter().map(|w| bends(&w.points)).sum();
         let cross = crossings(&wires);
         total_crossings += cross;
+        let wrapped = wires.iter().filter(|w| far_side_entry(w)).count();
+        far_side += wrapped;
         let worst = wires
             .iter()
             .map(|w| (detour_ratio(w), w))
@@ -128,7 +160,7 @@ fn measure() -> Report {
         writeln!(
             text,
             "{name}: len={total_len:.0} bends={total_bends} crossings={cross} \
-             worst_detour={:.2}x ({}->{})",
+             far_side={wrapped} worst_detour={:.2}x ({}->{})",
             worst.0, worst.1.from, worst.1.to
         )
         .unwrap();
@@ -137,6 +169,7 @@ fn measure() -> Report {
         text,
         worst_detour,
         total_crossings,
+        far_side,
     }
 }
 
@@ -146,15 +179,27 @@ fn routing_quality_report() {
     insta::assert_snapshot!(r.text);
 }
 
-/// Hard gate: no wire may wrap the canvas to reach its target. A detour ratio
-/// above this means the route went the long way round when a shorter legal one
-/// almost certainly existed. Tightened as the router improves.
+/// Hard gate: no wire may wrap a shape to enter it from the far side. This is
+/// the exact canvas-wide-detour defect — and unlike the detour ratio it catches
+/// it even when the shape centres are far apart (so the ratio stays modest).
 #[test]
-fn no_canvas_wide_detours() {
+fn no_far_side_entries() {
+    let r = measure();
+    assert_eq!(
+        r.far_side, 0,
+        "a wire enters its target from the far side (wraps around it):\n{}",
+        r.text
+    );
+}
+
+/// Hard gate on detour length — a backstop for gross excursions the far-side
+/// check can't see (e.g. a wire ballooning out and back on the near side).
+#[test]
+fn no_gross_detours() {
     let r = measure();
     assert!(
-        r.worst_detour <= 3.0,
-        "a wire detours {:.2}x its ideal length (canvas-wide wrap):\n{}",
+        r.worst_detour <= 2.0,
+        "a wire detours {:.2}x its ideal length:\n{}",
         r.worst_detour,
         r.text
     );
@@ -166,7 +211,7 @@ fn no_canvas_wide_detours() {
 fn crossings_bounded() {
     let r = measure();
     assert!(
-        r.total_crossings <= 12,
+        r.total_crossings <= 3,
         "too many wire crossings ({}):\n{}",
         r.total_crossings,
         r.text
