@@ -34,6 +34,17 @@ impl Rect {
             Side::Bottom => (cx, self.max_y),
         }
     }
+
+    /// Grow the rectangle by `pad` on every side — an obstacle inflated by
+    /// `clearance` is the region a wire must stay out of.
+    pub fn inflate(self, pad: f64) -> Self {
+        Self {
+            min_x: self.min_x - pad,
+            min_y: self.min_y - pad,
+            max_x: self.max_x + pad,
+            max_y: self.max_y + pad,
+        }
+    }
 }
 
 /// A side is "horizontal" if its outward normal runs along x (left/right), so

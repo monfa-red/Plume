@@ -247,7 +247,7 @@ router will share.
 
 - [x] **Phase 0** — pipeline + invariant validator (A1/A2/A5 gated; A3 reported, gated from the multi-wire phases; A4 deferred to Phase 1)
 - [x] **Phase 1** — oracle + obstacles + full validator (A1–A5 all checked, incl. A4; B1/B2 measured, B3 crossings counted; baseline report snapshotted)
-- [ ] **Phase 2** — visibility graph + A\* (single wire)
+- [x] **Phase 2** — visibility graph + A\* per wire (B1 + wire-node B2 clean on every sample; cost = bends-then-length; minimal geometry ports; `wires_realistic` clearance 10→6 to fit its gap:8)
 - [ ] **Phase 3** — multi-wire: ports, ordering, crossings
 - [ ] **Phase 4** — nudge / separate
 - [ ] **Phase 5** — special cases + transparency

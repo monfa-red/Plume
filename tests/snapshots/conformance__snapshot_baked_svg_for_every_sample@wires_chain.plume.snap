@@ -3,7 +3,7 @@ source: tests/conformance.rs
 expression: svg
 input_file: samples/wires_chain.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-168.05 -44.8 336.1 89.6" width="336.1" height="89.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-168.05 -44.8 336.1 105.6" width="336.1" height="105.6" class="plume">
   <defs/>
   <g class="plume-scene" color="black">
     <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-120.325,0)">
@@ -43,12 +43,12 @@ input_file: samples/wires_chain.plume
       <polygon class="plume-marker plume-marker-arrow" points="84.45,0 74.45,5 74.45,-5" fill="red"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="bird">
-      <path d="M -88.6 0 L -1.15 0" fill="none" stroke="#444" stroke-width="1"/>
+      <path d="M -92.6 0 L -88.6 0 L -88.6 40.8 L -1.15 40.8 L -1.15 0 L 2.85 0" fill="none" stroke="#444" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="-91.6,0 -85.6,-3 -85.6,3" fill="#444"/>
       <polygon class="plume-marker plume-marker-arrow" points="1.85,0 -4.15,3 -4.15,-3" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="dog" data-to="fish">
-      <path d="M -17.15 0 L 81.45 0" fill="none" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+      <path d="M -17.15 0 L -13.15 0 L -13.15 40.8 L 81.45 40.8 L 81.45 0 L 85.45 0" fill="none" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
       <polygon class="plume-marker plume-marker-arrow" points="84.45,0 78.45,3 78.45,-3" fill="#444"/>
     </g>
   </g>

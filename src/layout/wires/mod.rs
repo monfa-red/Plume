@@ -7,7 +7,10 @@
 //! step against the contract in WIRING.md.
 
 mod geometry;
+mod graph;
 mod oracle;
+mod ports;
+mod route;
 mod scene;
 mod text;
 mod validate;
@@ -17,7 +20,7 @@ pub use validate::{validate_routing, Rule, Severity, Violation};
 use crate::error::Error;
 use crate::layout::ir::{PlacedNode, RoutedWire};
 use crate::resolve::{MarkerKind, Markers, Program, ResolvedEndpoint, ResolvedWire};
-use geometry::{dumb_route, pick_edges, Rect};
+use geometry::{dumb_route, Rect};
 use scene::SceneIndex;
 use text::place_texts;
 
@@ -25,7 +28,7 @@ pub fn route_wires(program: &Program, nodes: &[PlacedNode]) -> Result<Vec<Routed
     let index = SceneIndex::build(nodes);
     let mut out = Vec::new();
     for w in &program.wires {
-        route_chain(w, &index, &mut out)?;
+        route_chain(w, &index, nodes, &mut out)?;
     }
     Ok(out)
 }
@@ -36,6 +39,7 @@ pub fn route_wires(program: &Program, nodes: &[PlacedNode]) -> Result<Vec<Routed
 fn route_chain(
     w: &ResolvedWire,
     index: &SceneIndex,
+    nodes: &[PlacedNode],
     out: &mut Vec<RoutedWire>,
 ) -> Result<(), Error> {
     let eps = &w.endpoints;
@@ -46,14 +50,17 @@ fn route_chain(
     let mid = segs / 2;
     let chain_from = eps[0].path.clone();
     let chain_to = eps[segs].path.clone();
+    let clearance = oracle::clearance(&w.attrs);
 
     for i in 0..segs {
         let a = rect_for(index, &eps[i])?;
         let b = rect_for(index, &eps[i + 1])?;
-        let (sa_geo, sb_geo) = pick_edges(a, b);
-        let sa = eps[i].side.unwrap_or(sa_geo);
-        let sb = eps[i + 1].side.unwrap_or(sb_geo);
-        let path = dumb_route(a.port(sa), sa, b.port(sb), sb);
+        let (sa, sb) = ports::pick_sides(a, eps[i].side, b, eps[i + 1].side);
+        // Each chain segment is an independent wire; route it past the obstacles
+        // for its own pair, falling back to the dumb route only if boxed in.
+        let obstacles = scene::obstacles_for(nodes, [&eps[i].path, &eps[i + 1].path]);
+        let path = route::route(a, sa, b, sb, &obstacles, clearance)
+            .unwrap_or_else(|| dumb_route(a.port(sa), sa, b.port(sb), sb));
 
         out.push(RoutedWire {
             markers: Markers {

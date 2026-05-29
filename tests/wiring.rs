@@ -115,8 +115,9 @@ fn baseline_contract_report() {
 }
 
 #[test]
-fn straight_wire_through_a_box_is_a_node_overlap() {
-    // src → dst routes straight across the row, piercing the non-endpoint via.
+fn router_threads_around_a_blocking_box() {
+    // via sits between src and dst; with gap (30) > clearance (16) the A* router
+    // must detour around it — neither piercing it (B1) nor grazing it (B2n).
     let source = "{ |scene| layout:row gap:30 }\n\
                   src |rect| size:(40,40)\n\
                   via |rect| size:(40,40)\n\
@@ -124,8 +125,13 @@ fn straight_wire_through_a_box_is_a_node_overlap() {
                   src -> dst\n";
     assert_eq!(
         count_rule(source, plume::Rule::NodeOverlap),
-        1,
-        "the straight wire pierces exactly one box (via)"
+        0,
+        "must not pierce via"
+    );
+    assert_eq!(
+        count_rule(source, plume::Rule::Clearance),
+        0,
+        "must keep clearance from via"
     );
 }
 
@@ -136,23 +142,6 @@ fn wire_to_a_text_node_violates_sides_only() {
                   txt |text| \"hi\"\n\
                   box -> txt\n";
     assert_eq!(count_rule(source, plume::Rule::SidesOnly), 1);
-}
-
-#[test]
-fn wire_grazing_a_box_breaks_clearance() {
-    // Forcing both ports to the top edge runs the wire flush along `near`'s top
-    // edge — outside its interior (no B1) but with zero gap (a B2 clearance hit).
-    let source = "{ |scene| layout:row gap:6 }\n\
-                  lft  |rect| size:(40,40)\n\
-                  near |rect| size:(40,40)\n\
-                  rgt  |rect| size:(40,40)\n\
-                  lft.t -> rgt.t\n";
-    assert_eq!(
-        count_rule(source, plume::Rule::NodeOverlap),
-        0,
-        "it grazes, not pierces"
-    );
-    assert_eq!(count_rule(source, plume::Rule::Clearance), 1);
 }
 
 #[test]

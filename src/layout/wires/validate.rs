@@ -319,3 +319,73 @@ fn check_separation(wires: &[RoutedWire], out: &mut Vec<Violation>) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::Side;
+    use crate::resolve::Markers;
+    use crate::span::Span;
+
+    fn nodes(src: &str) -> Vec<PlacedNode> {
+        let toks = crate::lexer::lex(src).expect("lex");
+        let file = crate::parser::parse(&toks).expect("parse");
+        let prog = crate::resolve::resolve(file).expect("resolve");
+        crate::layout::layout(&prog).expect("layout").nodes
+    }
+
+    fn wire(path: Vec<Pt>, from: &str, to: &str) -> RoutedWire {
+        RoutedWire {
+            path,
+            markers: Markers::default(),
+            attrs: AttrMap::new(),
+            texts: Vec::new(),
+            data_from: from.to_string(),
+            data_to: to.to_string(),
+            seg_from: from.to_string(),
+            seg_to: to.to_string(),
+            decl_span: Span::empty(),
+        }
+    }
+
+    // src, via, dst in a row; `via` is a non-endpoint obstacle for src→dst.
+    const SCENE: &str = "{ |scene| layout:row gap:40 }\n\
+                         src |rect| size:(40,40)\n\
+                         via |rect| size:(40,40)\n\
+                         dst |rect| size:(40,40)\n";
+
+    #[test]
+    fn flags_a_wire_through_a_node_as_overlap() {
+        let ns = nodes(SCENE);
+        let idx = SceneIndex::build(&ns);
+        let a = idx.rect("src").unwrap().port(Side::Right);
+        let b = idx.rect("dst").unwrap().port(Side::Left);
+        let w = wire(vec![a, b], "src", "dst"); // straight line pierces via
+        let vs = validate_routing(&ns, &AttrMap::new(), &[w], &VarTable::new());
+        assert!(
+            vs.iter().any(|v| v.rule == Rule::NodeOverlap),
+            "B1 must fire: {vs:?}"
+        );
+    }
+
+    #[test]
+    fn flags_a_sub_clearance_pass_without_overlap() {
+        let ns = nodes(SCENE);
+        let idx = SceneIndex::build(&ns);
+        let via = idx.rect("via").unwrap();
+        let a = idx.rect("src").unwrap().port(Side::Right);
+        let b = idx.rect("dst").unwrap().port(Side::Left);
+        // skim 5 px above via — clear of its interior (default clearance is 16)
+        let y = via.min_y - 5.0;
+        let w = wire(vec![(a.0, y), (b.0, y)], "src", "dst");
+        let vs = validate_routing(&ns, &AttrMap::new(), &[w], &VarTable::new());
+        assert!(
+            vs.iter().any(|v| v.rule == Rule::Clearance),
+            "B2n must fire"
+        );
+        assert!(
+            !vs.iter().any(|v| v.rule == Rule::NodeOverlap),
+            "skimming is not overlap"
+        );
+    }
+}

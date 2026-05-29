@@ -3,7 +3,7 @@ source: tests/conformance.rs
 expression: svg
 input_file: samples/wires_anchors.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-186.75 -44.8 373.5 89.6" width="373.5" height="89.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-186.75 -60.8 373.5 121.6" width="373.5" height="121.6" class="plume">
   <defs/>
   <g class="plume-scene" color="black">
     <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-139.025,0)">
@@ -33,8 +33,8 @@ input_file: samples/wires_anchors.plume
       <text x="-71.3" y="0" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">chats</text>
     </g>
     <g class="plume-wire" data-from="dog" data-to="bird">
-      <path d="M -3.575 24.8 L -3.575 0 L 135.45 0 L 135.45 -20.8" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="135.45,-23.8 138.45,-17.8 132.45,-17.8" fill="#444"/>
+      <path d="M -3.575 24.8 L -3.575 40.8 L -95.3 40.8 L -95.3 -40.8 L 135.45 -40.8 L 135.45 -28.8" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="135.45,-25.8 132.45,-31.8 138.45,-31.8" fill="#444"/>
     </g>
   </g>
 </svg>

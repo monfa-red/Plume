@@ -9,7 +9,7 @@
 
 {
   |scene| layout:row gap:8
-  |wire| clearance:10
+  |wire| clearance:6   // < the scene gap:8, so wires can thread between nodes
   |group| stroke:#aaa
 
   .loud stroke:red thickness:2
