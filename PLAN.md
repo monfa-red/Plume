@@ -129,9 +129,12 @@ the rebuild.
   its centre.
 - Render the polyline into the `plume-wires` group, with markers (reuse
   `render::markers`) and labels at `mid`.
-- Implement `validate.rs` for the **invariants only** (WIRING A1–A5: orthogonal,
-  perpendicular attachment, perpendicular crossings, sides-only, no self-cross)
-  and re-expose `plume::validate_str`.
+- Implement `validate.rs` for the per-wire invariants the dumb router can
+  guarantee — **A1** (orthogonal), **A2** (perpendicular attachment), **A5** (no
+  self-cross) — as gating checks, plus **A3** (perpendicular crossings) as a
+  *reported, non-gating* check. **A4** (sides-only / never to text) needs the
+  text-aware scene model from Phase 1, so its check lands there. Re-expose
+  `plume::validate_str`.
 - Add the **determinism** test (compile twice → identical bytes).
 
 **Builds on.** Existing resolve/layout/render.
@@ -139,9 +142,11 @@ the rebuild.
 **Acceptance.**
 - Every sample compiles and the dumb router's wires render (PNG check on
   `wires_basic`, `wires_chain`).
-- `validate_str` reports **zero A-invariant violations** for the dumb router
-  (these straight/L/Z routes are orthogonal and perpendicular-attached by
-  construction).
+- `validate_str` reports **zero A1/A2/A5 violations** for the dumb router (its
+  straight/L/Z routes are orthogonal, perpendicular-attached, and non-self-
+  crossing by construction). **A3** is reported but *not* gated — a per-wire
+  router that ignores other wires inevitably shares parallel runs; those resolve
+  in the multi-wire phases (3–4). **A4** arrives with Phase 1.
 - Determinism test passes.
 - Snapshots regenerated and reviewed.
 
