@@ -445,8 +445,8 @@ A wire op is `[start_marker?][line][end_marker?]`, no spaces:
 | Part | Tokens |
 |---|---|
 | Line | `-` solid · `--` dashed · `-.-` dotted · `~` wavy |
-| Start markers | `<` arrow · `>` crow · `o` dot · `<>` diamond |
-| End markers | `>` arrow · `<` crow · `o` dot · `<>` diamond |
+| Start markers | `<` arrow · `>` crow · `*` dot · `<>` diamond |
+| End markers | `>` arrow · `<` crow · `*` dot · `<>` diamond |
 
 The same glyph differs by position (`<` is arrow at the start, crow at the end).
 
@@ -454,13 +454,13 @@ The same glyph differs by position (`<` is arrow at the start, crow at the end).
 |---|---|---|
 | `->` | none / arrow | solid |
 | `<-` / `<->` | arrow / none, arrow / arrow | solid |
-| `-o` / `o-` / `o-o` | dot combinations | solid |
+| `-*` / `*-` / `*-*` | dot combinations | solid |
 | `-<>` / `<>-<>` | diamond | solid |
 | `-<` / `>-<` | crow | solid |
-| `o->` / `<-o` | mixed | solid |
-| `-->` `--o` `--<` | (same markers) | dashed |
-| `-.->` `-.-o` | (same markers) | dotted |
-| `~>` `~o` `~<>` | (same markers) | wavy |
+| `*->` / `<-*` | mixed | solid |
+| `-->` `--*` `--<` | (same markers) | dashed |
+| `-.->` `-.-*` | (same markers) | dotted |
+| `~>` `~*` `~<>` | (same markers) | wavy |
 | `-` `--` `-.-` `~` | none | (each style) |
 
 If the operator carries no markers, there are none on both ends. Explicit
@@ -839,8 +839,8 @@ text_decl      = "|text|" string [ string ] { attr } end
 
 wire_op        = [ start_marker ] line [ end_marker ]
 line           = "-" | "--" | "-.-" | "~"
-start_marker   = "<" | ">" | "o" | "<>"
-end_marker     = ">" | "<" | "o" | "<>"
+start_marker   = "<" | ">" | "*" | "<>"
+end_marker     = ">" | "<" | "*" | "<>"
 
 attr           = ident ":" value                  # no whitespace around ":"
 style_ref      = "." ident                         # whitespace before required

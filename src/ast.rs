@@ -257,7 +257,7 @@ pub enum WireMarker {
     None,
     Arrow,   // < at start, > at end
     Crow,    // > at start, < at end
-    Dot,     // o on either side
+    Dot,     // * on either side
     Diamond, // <> on either side
 }
 
@@ -268,7 +268,7 @@ impl WireMarker {
             Self::None => "",
             Self::Arrow => "<",
             Self::Crow => ">",
-            Self::Dot => "o",
+            Self::Dot => "*",
             Self::Diamond => "<>",
         }
     }
@@ -278,7 +278,7 @@ impl WireMarker {
             Self::None => "",
             Self::Arrow => ">",
             Self::Crow => "<",
-            Self::Dot => "o",
+            Self::Dot => "*",
             Self::Diamond => "<>",
         }
     }

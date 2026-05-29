@@ -17,7 +17,7 @@ See [SPEC.md](SPEC.md) for the language reference and [IMPLEMENTATION.md](IMPLEM
 - **Five sigils, one syntax.** `|type|`, `:` (bind), `.style`, `id.side`, `--var`.
 - **Sensible defaults.** Omit the type → `|rect|`. Omit the label → the ID. Reference an undeclared ID in a wire → it auto-creates.
 - **13 primitives** (`rect`, `oval`, `hex`, `slant`, `cyl`, `diamond`, `cloud`, `poly`, `path`, `text`, `line`, `icon`, `image`) and **7 templates** (`group`, `badge`, `button`, `card`, `note`, `table`, `cell`).
-- **Composable wire ops.** 5 line styles (`-`, `--`, `-.-`, `=`, `~`) × end markers (`<`, `>`, `o`, `<>`): `->`, `<->`, `~o`, `=<>`, `-.->`, …
+- **Composable wire ops.** 4 line styles (`-`, `--`, `-.-`, `~`) × markers (`<`, `>`, `*`, `<>`): `->`, `<->`, `~*`, `-.->`, …
 - **Fan-in / fan-out** with `&` — `a & b -> c` does the obvious thing.
 - **Flex + grid layout.** `layout:row|column|(cols,rows)`, with `cell:`, `span:`, `at:`, 9 inner + 8 `out-*` anchors.
 - **User-defined shapes** that can carry internal children **and** internal wires that follow you into every instance.

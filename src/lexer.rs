@@ -110,7 +110,7 @@ impl<'a> Lexer<'a> {
                 // Wire-op starts: any of these characters can begin a wire op.
                 b'-' | b'~' | b'<' | b'>' => self.lex_wire_op()?,
                 // `o` is a wire-op start marker only when followed by a line char.
-                b'o' if self.peek(1).is_some_and(is_wire_line_start) => self.lex_wire_op()?,
+                b'*' if self.peek(1).is_some_and(is_wire_line_start) => self.lex_wire_op()?,
                 d if d.is_ascii_digit() => self.lex_number()?,
                 c if is_ident_start(c) => self.lex_ident(),
                 _ => {
@@ -355,7 +355,7 @@ impl<'a> Lexer<'a> {
             (b'<', MarkerSide::End) => WireMarker::Crow,
             (b'>', MarkerSide::Start) => WireMarker::Crow,
             (b'>', MarkerSide::End) => WireMarker::Arrow,
-            (b'o', _) => WireMarker::Dot,
+            (b'*', _) => WireMarker::Dot,
             _ => return WireMarker::None,
         };
         *p += 1;
