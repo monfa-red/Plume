@@ -265,25 +265,30 @@ fn margin(s: &Seg, cand: f64, placed: &[Seg]) -> f64 {
     worst
 }
 
-/// True if sliding segment `k` to `cand` leaves it and any neighbour segments
-/// clear of `obstacles` and non-degenerate.
+/// True if sliding segment `k` to `cand` keeps it (and its neighbours) clear of
+/// `obstacles`. The moved segment must stay non-degenerate; a neighbour is
+/// allowed to shrink to zero/near-zero (it's an attachment stub the wire can
+/// absorb by aligning with its endpoint — `collapse` removes the leftover, or a
+/// tiny perpendicular stub is harmless). That absorption is what lets a wire sit
+/// flush against its target edge instead of being shoved inside it.
 fn clear(s: &Seg, cand: f64, path: &[(f64, f64)], obstacles: &[AbsBbox], axis: Axis) -> bool {
     let nseg = path.len() - 1;
     let (pk, pk1) = match axis {
         Axis::H => ((path[s.k].0, cand), (path[s.k + 1].0, cand)),
         Axis::V => ((cand, path[s.k].1), (cand, path[s.k + 1].1)),
     };
-    let mut affected = vec![(pk, pk1)];
+    let moved_len = (pk.0 - pk1.0).abs() + (pk.1 - pk1.1).abs();
+    if moved_len <= EPS || !edge_clear(pk, pk1, obstacles) {
+        return false;
+    }
+    let mut neighbours = Vec::new();
     if s.k > 0 {
-        affected.push((path[s.k - 1], pk));
+        neighbours.push((path[s.k - 1], pk));
     }
     if s.k + 1 < nseg {
-        affected.push((pk1, path[s.k + 2]));
+        neighbours.push((pk1, path[s.k + 2]));
     }
-    affected.iter().all(|&(a, b)| {
-        let len = (a.0 - b.0).abs() + (a.1 - b.1).abs();
-        len > EPS && edge_clear(a, b, obstacles)
-    })
+    neighbours.iter().all(|&(a, b)| edge_clear(a, b, obstacles))
 }
 
 /// Move segment `k` onto track `pos`, dragging the two shared endpoints.
