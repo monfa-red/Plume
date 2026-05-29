@@ -220,10 +220,12 @@ router will share.
 
 - `nudge.rs`: group co-linear segments into channels, assign tracks so parallels
   sit exactly `separation` apart (B2), snap near-parallels onto a shared lane
-  within the tidiness tolerance (B6). Bundles (E1) as parallel rails.
-- Crossing penalty (B3, moved here from Phase 3): minimise crossings globally
-  during nudge/track assignment — order channels and push crossings to channel
-  ends — never per-wire greedily (which raises crossings or self-crosses).
+  within the tidiness tolerance (B6). Bundles (E1) as parallel rails. **Done** —
+  structure-preserving track assignment, validate-and-keep per cluster, band
+  sweep widest-first.
+- ~~Crossing penalty (B3)~~ — **deferred to Phase 5.** B3 is a *global* minimiser
+  and rides on the same channel/ordering machinery as fan trunks; cleaner to land
+  it there than to bolt it onto the separation pass.
 
 **Acceptance.**
 - B2 wire-vs-wire clean on `wires_dense`, `wires_realistic` (validator).
@@ -235,7 +237,14 @@ router will share.
 
 **Goal.** The remaining contract.
 
-- Fan groups share a trunk, exempt from B2 where they coincide (E2).
+- **B3 crossing penalty (moved from Phase 4):** minimise crossings globally in the
+  nudge/ordering pass — order channels and bundle rails so they don't cross each
+  other, push unavoidable crossings to channel ends. Never per-wire greedy (raises
+  crossings / self-crosses — proven twice). Reduces `wires_realistic`'s X:8,
+  especially the avoidable `water→roof`-vs-itself rail crossings.
+- Fan groups share a trunk, exempt from B2 where they coincide (E2): one slot at
+  the shared end, drawn once, the duplicate label deduped, and the validator's A3
+  check exempts fan-sibling coincident runs.
 - Self-loops: orthogonal loop out one side, back to an adjacent side (E3).
 - Side overflow: even compaction + flag (C5).
 - Last-resort relaxations of B1/B2 emitted as diagnostics (WIRING section B /
@@ -245,7 +254,7 @@ router will share.
 - `wires_fan`, `internal_wires`, and a self-loop sample (add a small `a -> a`
   one) validate clean.
 - `full_example` and `wires_realistic` are visually clean — no piercing, no
-  canvas detours, no bunching.
+  canvas detours, no bunching; crossings minimised (no bundle crossing itself).
 - The whole sample suite: zero invariant violations; B-relaxations only where
   WIRING permits, and each one flagged.
 

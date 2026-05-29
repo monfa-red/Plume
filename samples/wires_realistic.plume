@@ -8,15 +8,15 @@
 //   - a wire that has to detour around an unrelated group
 
 {
-  |scene| layout:row gap:48
-  |wire| clearance:6   // « the channel widths, so parallel bundles fan cleanly
+  |scene| layout:row gap:30
+  |wire| clearance:8   // « the channel widths, so parallel bundles fan cleanly
   |group| stroke:#aaa
 
   .loud stroke:red thickness:2
   .quiet stroke:blue
   .happy stroke:green
 
-  |treat:rect| radius:4 fill:#eee size:(90,64)
+  |treat:rect| radius:4 fill:#eee padding:20
 }
 
 cat |oval| "Cat"
