@@ -1,0 +1,44 @@
+---
+source: tests/conformance.rs
+expression: svg
+input_file: samples/wires_dense.plume
+---
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-141 -100.5 282 201" width="282" height="201" class="plume">
+  <defs/>
+  <g class="plume-scene" color="#222">
+    <g class="plume-node plume-shape-rect" data-id="src" transform="translate(-90.5,0)">
+      <rect x="-30" y="-80" width="60" height="160" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Src</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-rect" data-id="dst" transform="translate(90.5,0)">
+      <rect x="-30" y="-80" width="60" height="160" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="system-ui, -apple-system, sans-serif" fill="currentColor">Dst</text>
+      </g>
+    </g>
+  </g>
+  <g class="plume-wires">
+    <g class="plume-wire" data-from="src" data-to="dst">
+      <path d="M -60 -24 L 56 -24" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="59,-24 53,-21 53,-27" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="src" data-to="dst">
+      <path d="M -60 -12 L 56 -12" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="59,-12 53,-9 53,-15" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="src" data-to="dst">
+      <path d="M -60 0 L 56 0" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="59,0 53,3 53,-3" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="src" data-to="dst">
+      <path d="M -60 12 L 56 12" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="59,12 53,15 53,9" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="src" data-to="dst">
+      <path d="M -60 24 L 56 24" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="59,24 53,27 53,21" fill="#444"/>
+    </g>
+  </g>
+</svg>

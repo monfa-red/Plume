@@ -10,6 +10,7 @@ wires_anchors.plume: len=301 bends=4 crossings=0 far_side=0 worst_detour=1.59x (
 wires_basic.plume: len=20 bends=0 crossings=0 far_side=0 worst_detour=0.27x (cat->dog)
 wires_bus.plume: len=689 bends=8 crossings=0 far_side=0 worst_detour=1.58x (cat->bird)
 wires_chain.plume: len=240 bends=0 crossings=0 far_side=0 worst_detour=0.27x (cat->dog)
+wires_dense.plume: len=600 bends=0 crossings=0 far_side=0 worst_detour=0.66x (src->dst)
 wires_fan.plume: len=838 bends=6 crossings=0 far_side=0 worst_detour=1.44x (bowl->mug)
 wires_labels.plume: len=100 bends=0 crossings=0 far_side=0 worst_detour=0.27x (cat->dog)
-wires_realistic.plume: len=1192 bends=18 crossings=1 far_side=0 worst_detour=1.11x (kitchen.water->roof)
+wires_realistic.plume: len=1206 bends=18 crossings=2 far_side=0 worst_detour=1.11x (kitchen.water->roof)

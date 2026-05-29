@@ -1,0 +1,15 @@
+// Stress: 5 parallel wires between two tall, well-separated shapes — must fan
+// into clean evenly-spaced rails (room exists, so zero R3).
+{
+  |scene| layout:row gap:120
+  |wire| gap:12
+}
+
+src |rect| "Src" size:(60,160)
+dst |rect| "Dst" size:(60,160)
+
+src -> dst
+src -> dst
+src -> dst
+src -> dst
+src -> dst

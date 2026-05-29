@@ -71,6 +71,11 @@ struct Seg {
     gap: f64,
     clamp_lo: f64,
     clamp_hi: f64,
+    /// A straight, single-segment wire is already placed optimally by endpoint
+    /// allocation (evenly spread along its edge, even when overflowing). Such
+    /// segments are fixed constraints here — re-tracking them would only undo
+    /// that even spread and cram one wire. Multi-segment wires stay movable.
+    movable: bool,
 }
 
 /// Fan every wire's segments onto separated, shape-clear tracks. `decl`/`gaps`/
@@ -103,9 +108,13 @@ fn assign_axis(
 ) {
     let segs = collect(paths, decl, gaps, ends, axis);
 
-    // Sort by interval start so overlapping segments are coloured in sweep
-    // order; ties by current track then wire keep it deterministic.
-    let mut order: Vec<usize> = (0..segs.len()).collect();
+    // Fixed segments (straight single-segment wires) are constraints from the
+    // start — movable segments route around them but they never move.
+    let mut placed: Vec<Seg> = segs.iter().copied().filter(|s| !s.movable).collect();
+
+    // Assign movable segments in sweep order (by interval start, then current
+    // track, then wire) so the colouring is deterministic.
+    let mut order: Vec<usize> = (0..segs.len()).filter(|&i| segs[i].movable).collect();
     order.sort_by(|&a, &b| {
         let (x, y) = (&segs[a], &segs[b]);
         x.lo.total_cmp(&y.lo)
@@ -113,7 +122,6 @@ fn assign_axis(
             .then(x.wire.cmp(&y.wire))
     });
 
-    let mut placed: Vec<Seg> = Vec::with_capacity(segs.len());
     for i in order {
         let s = segs[i];
         let chosen = choose_track(&s, &placed, paths, obstacles, axis);
@@ -164,6 +172,7 @@ fn collect(
                 gap: gaps[w],
                 clamp_lo,
                 clamp_hi,
+                movable: nseg > 1,
             });
         }
     }
@@ -351,30 +360,55 @@ mod tests {
         assert!((paths[0][1].0 - paths[1][1].0).abs() < EPS);
     }
 
-    /// An endpoint stays within its edge clamp when its segment slides.
+    /// Straight, single-segment wires are placed by endpoint allocation, not
+    /// here — track assignment leaves them untouched, so an evenly-spread
+    /// (even overflowing) bundle isn't re-crammed.
     #[test]
-    fn endpoint_respects_clamp() {
-        // Two straight horizontal wires on top of each other; both endpoints
-        // clamped to y in [0, 30]. They must separate but stay in range.
+    fn straight_wires_are_fixed() {
         let h = vec![(0.0, 10.0), (50.0, 10.0)];
-        let clamp = End {
-            horizontal: true,
-            lo: 0.0,
-            hi: 30.0,
-        };
-        let mut paths = vec![h.clone(), h];
+        let mut paths = vec![h.clone(), h.clone()];
         assign(
             &mut paths,
             &[span(0), span(1)],
             &[10.0, 10.0],
             &[vec![], vec![]],
-            &[(clamp, clamp), (clamp, clamp)],
+            &ends(2),
+        );
+        assert_eq!(paths[0], h);
+        assert_eq!(paths[1], h);
+    }
+
+    /// A multi-segment wire's endpoint segment slides along its edge to
+    /// separate, but stays within the edge clamp.
+    #[test]
+    fn endpoint_slides_within_clamp() {
+        // Two L-wires (horizontal then vertical) sharing the first segment at
+        // y=10; the source edge clamps y to [0, 30].
+        let l = vec![(0.0, 10.0), (30.0, 10.0), (30.0, 40.0)];
+        let src = End {
+            horizontal: true,
+            lo: 0.0,
+            hi: 30.0,
+        };
+        let tgt = End {
+            horizontal: false,
+            lo: 0.0,
+            hi: 100.0,
+        };
+        let mut paths = vec![l.clone(), l];
+        assign(
+            &mut paths,
+            &[span(0), span(1)],
+            &[10.0, 10.0],
+            &[vec![], vec![]],
+            &[(src, tgt), (src, tgt)],
         );
         for p in &paths {
-            for &(_, y) in p {
-                assert!((0.0..=30.0).contains(&y), "endpoint y {y} out of clamp");
-            }
+            assert!((0.0..=30.0).contains(&p[0].1), "endpoint y out of clamp");
         }
-        assert!((paths[0][0].1 - paths[1][0].1).abs() >= 10.0 - EPS);
+        assert!(
+            (paths[0][0].1 - paths[1][0].1).abs() >= 10.0 - EPS,
+            "first segments not separated"
+        );
     }
 }
