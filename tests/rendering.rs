@@ -128,6 +128,6 @@ fn full_spec_example_renders_in_both_modes() {
     assert!(!baked.contains("@layer plume.defaults"));
     assert!(live.starts_with("<svg"));
     assert!(baked.starts_with("<svg"));
-    assert!(live.contains(r#"<g class="plume-wires"/>"#));
-    assert!(baked.contains(r#"<g class="plume-wires"/>"#));
+    assert!(live.contains("plume-wire"));
+    assert!(baked.contains("plume-wire"));
 }

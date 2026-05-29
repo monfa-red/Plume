@@ -9,9 +9,40 @@ pub struct LaidOut {
     pub viewbox: ViewBox,
     pub scene_attrs: AttrMap,
     pub nodes: Vec<PlacedNode>,
+    pub wires: Vec<RoutedWire>,
     /// Resolved CSS variables — carried through to render so the `<style>`
     /// block and `--bake-vars` mode can both read them.
     pub vars: VarTable,
+}
+
+/// One routed wire segment: an orthogonal polyline plus what render needs.
+#[derive(Clone)]
+pub struct RoutedWire {
+    /// Orthogonal polyline through the scene, in scene coordinates.
+    pub path: Vec<(f64, f64)>,
+    pub markers: Markers,
+    pub attrs: AttrMap,
+    pub texts: Vec<RoutedText>,
+    /// First and last endpoints of the chain this segment belongs to — surfaced
+    /// as `data-from` / `data-to`.
+    pub data_from: String,
+    pub data_to: String,
+    /// This segment's own endpoints (the nodes it may touch — used by the
+    /// validator's attachment check).
+    pub seg_from: String,
+    pub seg_to: String,
+    /// Span of the wire declaration this segment came from; segments sharing it
+    /// are siblings of one statement (a chain or a fan).
+    pub decl_span: Span,
+}
+
+#[derive(Clone)]
+pub struct RoutedText {
+    pub content: String,
+    pub position: (f64, f64),
+    /// Unit tangent at the text position (for future rotation / offset frames).
+    pub tangent: (f64, f64),
+    pub attrs: AttrMap,
 }
 
 #[derive(Debug, Clone, Copy)]

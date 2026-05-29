@@ -19,5 +19,10 @@ input_file: samples/wires_basic.plume
       </g>
     </g>
   </g>
-  <g class="plume-wires"/>
+  <g class="plume-wires">
+    <g class="plume-wire" data-from="cat" data-to="dog">
+      <path d="M -10 0 L 6 0" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="9,0 3,3 3,-3" fill="#444"/>
+    </g>
+  </g>
 </svg>

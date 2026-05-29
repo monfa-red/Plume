@@ -5,8 +5,10 @@ mod ir;
 mod primitives;
 mod text;
 mod values;
+mod wires;
 
 pub use ir::*;
+pub use wires::{Rule, Severity, Violation};
 
 use crate::error::Error;
 use crate::resolve::{Program, ResolvedInst, ResolvedValue, ShapeKind, VarTable};
@@ -31,21 +33,40 @@ pub fn layout(program: &Program) -> Result<LaidOut, Error> {
         Span::empty(),
     )?;
 
-    // Compute viewbox = scene bbox + canvas-pad on every side.
+    // Route wires once the nodes are placed.
+    let routed = wires::route_wires(program, &top_nodes)?;
+
+    // Viewbox = scene bbox + wire paths + canvas-pad on every side.
     let pad = values::layout_var(&program.vars, "canvas-pad").unwrap_or(20.0);
+    let mut bbox = scene_bbox;
+    for w in &routed {
+        for &(x, y) in &w.path {
+            bbox.min_x = bbox.min_x.min(x);
+            bbox.min_y = bbox.min_y.min(y);
+            bbox.max_x = bbox.max_x.max(x);
+            bbox.max_y = bbox.max_y.max(y);
+        }
+    }
     let vb = ViewBox {
-        x: scene_bbox.min_x - pad,
-        y: scene_bbox.min_y - pad,
-        w: scene_bbox.w() + 2.0 * pad,
-        h: scene_bbox.h() + 2.0 * pad,
+        x: bbox.min_x - pad,
+        y: bbox.min_y - pad,
+        w: bbox.w() + 2.0 * pad,
+        h: bbox.h() + 2.0 * pad,
     };
 
     Ok(LaidOut {
         viewbox: vb,
         scene_attrs: program.scene.attrs.clone(),
         nodes: top_nodes,
+        wires: routed,
         vars: program.vars.clone(),
     })
+}
+
+/// Validate a laid-out scene's wires against the routing contract (WIRING.md).
+/// Used by `plume::validate_str`.
+pub fn validate_routing(laid: &LaidOut) -> Vec<Violation> {
+    wires::validate_routing(&laid.nodes, &laid.scene_attrs, &laid.wires, &laid.vars)
 }
 
 /// Recursively lay out a single instance into a PlacedNode.

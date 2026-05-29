@@ -25,5 +25,16 @@ input_file: samples/type_defaults.plume
       </g>
     </g>
   </g>
-  <g class="plume-wires"/>
+  <g class="plume-wires">
+    <g class="plume-wire" data-from="cat" data-to="dog">
+      <path d="M -49 0 L -23 0" fill="none" stroke="#666" stroke-width="1.5"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-20,0 -27.5,3.75 -27.5,-3.75" fill="#666"/>
+      <text x="-34" y="0" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">chases</text>
+    </g>
+    <g class="plume-wire" data-from="dog" data-to="mouse">
+      <path d="M 33.15 0 L 59.15 0" fill="none" stroke="#666" stroke-width="1.5"/>
+      <polygon class="plume-marker plume-marker-arrow" points="62.15,0 54.65,3.75 54.65,-3.75" fill="#666"/>
+      <text x="48.15" y="0" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">stalks</text>
+    </g>
+  </g>
 </svg>

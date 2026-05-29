@@ -13,6 +13,7 @@ mod theme;
 
 pub use error::{Diagnostic, Error, Level};
 pub use fmt::format as format_source;
+pub use layout::{Rule, Severity, Violation};
 pub use serve::serve;
 pub use theme::extract_plume_vars;
 
@@ -98,6 +99,15 @@ pub fn check(src: &str) -> Result<(), Error> {
 pub fn check_with(src: &str, opts: &Options) -> Result<(), Error> {
     let _ = resolve_pipeline(src, opts)?;
     Ok(())
+}
+
+/// Lex, parse, resolve, lay out, route, then validate the routing against the
+/// contract in WIRING.md. Returns the violations found (empty = clean). Parse
+/// and resolve errors surface as `Err`.
+pub fn validate_str(src: &str) -> Result<Vec<Violation>, Error> {
+    let program = resolve_pipeline(src, &Options::default())?;
+    let laid_out = layout::layout(&program)?;
+    Ok(layout::validate_routing(&laid_out))
 }
 
 fn resolve_pipeline(src: &str, opts: &Options) -> Result<resolve::Program, Error> {
