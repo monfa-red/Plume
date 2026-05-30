@@ -3,16 +3,16 @@ source: tests/conformance.rs
 expression: svg
 input_file: samples/wires_labels.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-85.45 -44.8 170.9 89.6" width="170.9" height="89.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-125.45 -44.8 250.9 89.6" width="250.9" height="89.6" class="plume">
   <defs/>
   <g class="plume-scene" color="black">
-    <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-37.725,0)">
+    <g class="plume-node plume-shape-rect" data-id="cat" transform="translate(-77.725,0)">
       <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Cat</text>
       </g>
     </g>
-    <g class="plume-node plume-shape-rect" data-id="dog" transform="translate(37.725,0)">
+    <g class="plume-node plume-shape-rect" data-id="dog" transform="translate(77.725,0)">
       <rect x="-27.225" y="-24.3" width="54.45" height="48.6" rx="0" ry="0" fill="white" stroke="#444" stroke-width="1"/>
       <g class="plume-node plume-shape-text" transform="translate(0,0)">
         <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Dog</text>
@@ -21,29 +21,29 @@ input_file: samples/wires_labels.plume
   </g>
   <g class="plume-wires">
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -10 -8.8 L 6 -8.8" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="10,-8.8 5,-6.3 5,-11.3" fill="#444"/>
-      <text x="0" y="-8.8" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">label</text>
+      <path d="M -50 -16.5333 L 46 -16.5333" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="50,-16.5333 45,-14.0333 45,-19.0333" fill="#444"/>
+      <text x="0" y="-16.5333" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">label</text>
     </g>
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -10 -4.4 L 6 -4.4" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="10,-4.4 5,-1.9 5,-6.9" fill="#444"/>
-      <text x="0" y="-4.4" text-anchor="middle" dominant-baseline="central" font-size="10" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4" stroke-linejoin="round">label</text>
-      <text x="5" y="-4.4" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">↓</text>
+      <path d="M -50 -8.2667 L 46 -8.2667" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="50,-8.2667 45,-5.7667 45,-10.7667" fill="#444"/>
+      <text x="0" y="-8.2667" text-anchor="middle" dominant-baseline="central" font-size="10" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4" stroke-linejoin="round">label</text>
+      <text x="25" y="-8.2667" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">↓</text>
     </g>
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -6 0 L 6 0" fill="none" stroke="#444" stroke-width="1"/>
-      <circle class="plume-marker plume-marker-dot" cx="-10" cy="0" r="1.6667" fill="#444"/>
-      <circle class="plume-marker plume-marker-dot" cx="10" cy="0" r="1.6667" fill="#444"/>
+      <path d="M -46.6667 0 L 46.6667 0" fill="none" stroke="#444" stroke-width="1"/>
+      <circle class="plume-marker plume-marker-dot" cx="-48.3333" cy="0" r="1.6667" fill="#444"/>
+      <circle class="plume-marker plume-marker-dot" cx="48.3333" cy="0" r="1.6667" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -10 4.4 L 6 4.4" fill="none" stroke="#444" stroke-width="1"/>
-      <circle class="plume-marker plume-marker-dot" cx="10" cy="4.4" r="1.6667" fill="#444"/>
+      <path d="M -50 8.2667 L 46.6667 8.2667" fill="none" stroke="#444" stroke-width="1"/>
+      <circle class="plume-marker plume-marker-dot" cx="48.3333" cy="8.2667" r="1.6667" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="cat" data-to="dog">
-      <path d="M -6 8.8 L 6 8.8" fill="none" stroke="#444" stroke-width="1"/>
-      <path class="plume-marker plume-marker-crow" d="M -10 8.8 L -5 8.8 M -10 8.8 L -5 6.3 M -10 8.8 L -5 11.3" stroke="#444" stroke-width="1" fill="none"/>
-      <polygon class="plume-marker plume-marker-arrow" points="10,8.8 5,11.3 5,6.3" fill="#444"/>
+      <path d="M -46 16.5333 L 46 16.5333" fill="none" stroke="#444" stroke-width="1"/>
+      <path class="plume-marker plume-marker-crow" d="M -50 16.5333 L -45 16.5333 M -50 16.5333 L -45 14.0333 M -50 16.5333 L -45 19.0333" stroke="#444" stroke-width="1" fill="none"/>
+      <polygon class="plume-marker plume-marker-arrow" points="50,16.5333 45,19.0333 45,14.0333" fill="#444"/>
     </g>
   </g>
 </svg>

@@ -76,20 +76,101 @@ pub fn route_wires(program: &Program, nodes: &[PlacedNode]) -> Result<Vec<Routed
     let plan_a = ports::plan(&reqs, &base);
     let a = finish(&reqs, &metas, &plan_a, nodes);
 
-    // Candidate B — crossing-aware convergence: bundles that share an endpoint
-    // node and cross in pass 1 are unified onto one side so they nest (B3). It is
-    // an *alternative* second pass, adopted only when it strictly betters the
-    // contract scorecard (`quality`); so X is monotone non-increasing and the
-    // output stays a deterministic function of the input — a no-op when it can't help.
-    let unify = converge_resides(&reqs, &chains, &provisional, &plan_a);
-    if unify.iter().any(|&(ra, rb)| ra.is_some() || rb.is_some()) {
-        let plan_b = ports::plan(&reqs, &overlay_resides(&base, &unify));
-        let b = finish(&reqs, &metas, &plan_b, nodes);
-        if quality(&b, nodes) < quality(&a, nodes) {
-            return Ok(b);
+    // Candidate B — crossing-aware convergence: bundles that share an endpoint node
+    // and cross in pass 1 are unified onto ONE side so they nest (B3). Each such
+    // group is tried on every side its members occupy, the best kept, greedily
+    // across groups; a trial is adopted only when it strictly betters the contract
+    // scorecard (`quality`). So crossings are monotone non-increasing and the output
+    // stays a deterministic function of the input — a no-op when nothing helps.
+    let groups = converge_groups(&reqs, &chains, &provisional);
+    if groups.is_empty() {
+        return Ok(a);
+    }
+    let mut best = a;
+    let mut best_q = quality(&best, nodes);
+    let mut overlay = vec![(None, None); reqs.len()];
+    for group in &groups {
+        if let Some((trial, wires, q)) = try_unify_group(
+            group, &plan_a, &overlay, &base, &reqs, &metas, nodes, best_q,
+        ) {
+            overlay = trial;
+            best = wires;
+            best_q = q;
         }
     }
-    Ok(a)
+    Ok(best)
+}
+
+/// Per-segment side overrides for the two ends — the convergence reside overlay.
+type Resides = Vec<(Option<Side>, Option<Side>)>;
+
+/// One convergence trial: the overlay that produced it, the resulting wires, and
+/// the scorecard they earned.
+type UnifyTrial = (Resides, Vec<RoutedWire>, Score);
+
+/// Try unifying one convergence group onto each side its members occupy (in
+/// candidate A's plan), layered on the accumulated `overlay`. Returns the trial of
+/// the side that best betters `best_q`, or `None` when none does — so the search is
+/// monotone and, sides tried in a fixed order, deterministic. Forced ends can't
+/// move and are left in place.
+#[allow(clippy::too_many_arguments)]
+fn try_unify_group(
+    group: &[(usize, bool)],
+    plan_a: &[Plan],
+    overlay: &[(Option<Side>, Option<Side>)],
+    base: &[PlanHint],
+    reqs: &[SegReq],
+    metas: &[SegMeta],
+    nodes: &[PlacedNode],
+    best_q: Score,
+) -> Option<UnifyTrial> {
+    let mut sides: Vec<Side> = group.iter().map(|&(r, e)| side_of(&plan_a[r], e)).collect();
+    sides.sort_by_key(|&s| side_rank(s));
+    sides.dedup();
+
+    let mut best: Option<UnifyTrial> = None;
+    let mut bar = best_q;
+    for side in sides {
+        let mut trial = overlay.to_vec();
+        for &(r, e) in group {
+            let forced = if e {
+                reqs[r].forced_a
+            } else {
+                reqs[r].forced_b
+            };
+            if forced.is_some() {
+                continue;
+            }
+            if e {
+                trial[r].0 = Some(side);
+            } else {
+                trial[r].1 = Some(side);
+            }
+        }
+        let wires = finish(
+            reqs,
+            metas,
+            &ports::plan(reqs, &overlay_resides(base, &trial)),
+            nodes,
+        );
+        let q = quality(&wires, nodes);
+        if q < bar {
+            bar = q;
+            best = Some((trial, wires, q));
+        }
+    }
+    best
+}
+
+/// WIRING C1 side order, as a sortable rank (right → bottom → left → top is the
+/// tie-break; here we only need a stable total order for determinism).
+fn side_rank(s: Side) -> u8 {
+    match s {
+        Side::Top => 0,
+        Side::Right => 1,
+        Side::Bottom => 2,
+        Side::Left => 3,
+    }
 }
 
 /// Flatten every chain `e0 -> … -> eN` into one segment-request per pair, in
@@ -206,28 +287,21 @@ fn overlay_resides(base: &[PlanHint], unify: &[(Option<Side>, Option<Side>)]) ->
         .collect()
 }
 
-/// Crossing-aware convergence (WIRING B3 / C1). Wires that **share an endpoint
-/// node** and whose provisional routes cross are converging bundles that picked
-/// *different* sides of that node, so they can't nest. Unify them onto one side:
-/// the earliest-declared member's (declaration order is stable → deterministic).
-/// Every other member's end on that node is re-elected there, unless it is forced
-/// or a fan sibling (E2 — a permitted coincident run, never split against itself).
-/// `chains[s]` is the source-wire index of segment `s`: two segments of one chain
-/// (`a -> b -> c`) share its interior node but are *that wire* passing through, not
-/// two bundles meeting — so a same-chain pair is never a convergence.
-/// Returns a per-segment `(reside_a, reside_b)` overlay for `overlay_resides`.
-fn converge_resides(
+/// Crossing-aware convergence (WIRING B3 / C1). Find the groups of wire-ends that
+/// **converge and cross**: wires that share an endpoint node and whose provisional
+/// routes perpendicular-cross there picked *different* sides of that node, so they
+/// can't nest. Each group is the set of `(segment, end)` meeting at one node;
+/// unifying them onto a single side lets them nest. Excluded: fan siblings (E2 — a
+/// permitted coincident run) and two segments of one chain (`chains[i]==chains[j]`,
+/// the wire passing through the node, not two bundles meeting). Groups are keyed by
+/// node and their members sorted, so the result is deterministic.
+fn converge_groups(
     reqs: &[SegReq],
     chains: &[usize],
     provisional: &[Vec<Pt>],
-    plan_a: &[Plan],
-) -> Vec<(Option<Side>, Option<Side>)> {
+) -> Vec<Vec<(usize, bool)>> {
     use std::collections::{BTreeMap, BTreeSet};
     let n = reqs.len();
-    let mut out = vec![(None, None); n];
-
-    // Group the ends that converge-and-cross by their shared node. An end is
-    // (segment index, is_a); the sorted set puts the earliest-declared first.
     let mut groups: BTreeMap<&str, BTreeSet<(usize, bool)>> = BTreeMap::new();
     for i in 0..n {
         if reqs[i].a_node == reqs[i].b_node {
@@ -252,28 +326,10 @@ fn converge_resides(
             }
         }
     }
-
-    for members in groups.values() {
-        let mut it = members.iter();
-        let &(anchor, anchor_end) = it.next().expect("a group has ≥ 2 members");
-        let target = side_of(&plan_a[anchor], anchor_end);
-        for &(idx, end) in it {
-            let forced = if end {
-                reqs[idx].forced_a
-            } else {
-                reqs[idx].forced_b
-            };
-            if forced.is_some() {
-                continue; // a forced side outranks unification
-            }
-            if end {
-                out[idx].0 = Some(target);
-            } else {
-                out[idx].1 = Some(target);
-            }
-        }
-    }
-    out
+    groups
+        .into_values()
+        .map(|s| s.into_iter().collect())
+        .collect()
 }
 
 /// Two segment-requests are fan siblings when they share a fan-trunk id on any end.
@@ -551,40 +607,38 @@ mod tests {
         }
     }
 
-    fn plan(side_b: Side) -> Plan {
-        Plan {
-            side_a: Side::Right,
-            side_b,
-            port_a: (10.0, 5.0),
-            port_b: (120.0, 40.0),
-        }
-    }
-
-    // Two independent wires (distinct chains 0 and 1) both ending at `r`: w0 enters
-    // r's bottom, w1 enters r's left, and their provisional routes perpendicular-cross.
-    fn crossing_pair() -> (Vec<SegReq>, Vec<usize>, Vec<Vec<Pt>>, Vec<Plan>) {
+    // Two crossing routes whose ends both land on `r`: w0 enters r's bottom, w1
+    // enters r's left; distinct chains (0, 1), so they're independent bundles.
+    fn crossing_pair() -> (Vec<SegReq>, Vec<usize>, Vec<Vec<Pt>>) {
         let reqs = vec![seg_req("aa", "r"), seg_req("bb", "r")];
         let chains = vec![0, 1];
         let provisional = vec![
             vec![(0.0, 100.0), (120.0, 100.0), (120.0, 40.0)], // aa→r, into bottom
             vec![(200.0, 200.0), (50.0, 200.0), (50.0, 20.0), (100.0, 20.0)], // bb→r, into left
         ];
-        let plan_a = vec![plan(Side::Bottom), plan(Side::Left)];
-        (reqs, chains, provisional, plan_a)
+        (reqs, chains, provisional)
     }
 
     #[test]
-    fn converging_wires_that_cross_unify_onto_the_earliest_side() {
-        // They share target `r` and aren't fan siblings, so the later wire's end is
-        // re-elected onto the earlier wire's side (Bottom) — they will nest, not cross.
-        let (reqs, chains, provisional, plan_a) = crossing_pair();
-        let unify = converge_resides(&reqs, &chains, &provisional, &plan_a);
-        assert_eq!(unify[0], (None, None), "the earliest wire anchors, unmoved");
-        assert_eq!(
-            unify[1],
-            (None, Some(Side::Bottom)),
-            "the later wire's target end moves onto the earliest side"
-        );
+    fn converging_wires_that_cross_form_one_group() {
+        // They share target `r` and aren't fan siblings, so both target-ends are
+        // grouped for unification onto a single side.
+        let (reqs, chains, provisional) = crossing_pair();
+        let groups = converge_groups(&reqs, &chains, &provisional);
+        assert_eq!(groups, vec![vec![(0, false), (1, false)]]);
+    }
+
+    #[test]
+    fn three_wires_converging_on_one_node_form_a_single_group() {
+        // w0, w1, w2 all end at `r` and pairwise-cross → one group of three ends, so
+        // all three unify onto one side rather than only the first pair.
+        let reqs = vec![seg_req("aa", "r"), seg_req("bb", "r"), seg_req("cc", "r")];
+        let chains = vec![0, 1, 2];
+        let into_bottom = |x: f64| vec![(0.0, 100.0), (x, 100.0), (x, 40.0)];
+        let into_left = |y: f64| vec![(200.0, y), (50.0, y), (50.0, 20.0), (100.0, 20.0)];
+        let provisional = vec![into_bottom(120.0), into_left(200.0), into_left(180.0)];
+        let groups = converge_groups(&reqs, &chains, &provisional);
+        assert_eq!(groups, vec![vec![(0, false), (1, false), (2, false)]]);
     }
 
     #[test]
@@ -595,63 +649,53 @@ mod tests {
             vec![(0.0, 100.0), (110.0, 100.0), (110.0, 40.0)],
             vec![(0.0, 140.0), (120.0, 140.0), (120.0, 40.0)],
         ];
-        let plan_a = vec![plan(Side::Bottom), plan(Side::Bottom)];
-        let unify = converge_resides(&reqs, &chains, &provisional, &plan_a);
         assert!(
-            unify.iter().all(|&(a, b)| a.is_none() && b.is_none()),
-            "no crossing → no unification: {unify:?}"
+            converge_groups(&reqs, &chains, &provisional).is_empty(),
+            "no crossing → no convergence group"
         );
     }
 
     #[test]
-    fn fan_siblings_that_cross_are_not_unified() {
-        // A fan trunk is a permitted coincident run (E2) — never unified against
-        // itself even when the siblings' split legs cross.
-        let (mut reqs, chains, provisional, plan_a) = crossing_pair();
+    fn fan_siblings_that_cross_form_no_group() {
+        // A fan trunk is a permitted coincident run (E2) — never unified against itself.
+        let (mut reqs, chains, provisional) = crossing_pair();
         reqs[0].fan_b = Some(1);
         reqs[1].fan_b = Some(1);
-        let unify = converge_resides(&reqs, &chains, &provisional, &plan_a);
         assert!(
-            unify.iter().all(|&(a, b)| a.is_none() && b.is_none()),
-            "fan siblings are exempt from unification: {unify:?}"
+            converge_groups(&reqs, &chains, &provisional).is_empty(),
+            "fan siblings are exempt"
         );
     }
 
     #[test]
-    fn non_converging_crossing_wires_are_left_alone() {
+    fn non_converging_crossing_wires_form_no_group() {
         // Two wires that cross but share NO endpoint node are an ordinary B3
-        // crossing, not a convergence — unification doesn't apply.
+        // crossing, not a convergence.
         let reqs = vec![seg_req("aa", "p"), seg_req("bb", "q")];
         let chains = vec![0, 1];
         let provisional = vec![
             vec![(0.0, 100.0), (120.0, 100.0), (120.0, 40.0)],
             vec![(200.0, 200.0), (50.0, 200.0), (50.0, 20.0), (100.0, 20.0)],
         ];
-        let plan_a = vec![plan(Side::Bottom), plan(Side::Left)];
-        let unify = converge_resides(&reqs, &chains, &provisional, &plan_a);
         assert!(
-            unify.iter().all(|&(a, b)| a.is_none() && b.is_none()),
-            "no shared endpoint → not a convergence: {unify:?}"
+            converge_groups(&reqs, &chains, &provisional).is_empty(),
+            "no shared endpoint → not a convergence"
         );
     }
 
     #[test]
-    fn adjacent_segments_of_one_chain_are_not_a_convergence() {
+    fn adjacent_segments_of_one_chain_form_no_group() {
         // A chain `aa -> bb -> cc` is ONE wire; its two segments share the interior
-        // node `bb` but are not converging bundles. Even if their provisional routes
-        // cross, the two halves of a single wire must never be unified against each
-        // other (that's the wire passing through bb, not two bundles meeting there).
+        // node `bb` but are the wire passing through, not two bundles meeting there.
         let reqs = vec![seg_req("aa", "bb"), seg_req("bb", "cc")];
         let chains = vec![0, 0]; // both segments belong to the same chain wire
         let provisional = vec![
             vec![(0.0, 100.0), (120.0, 100.0), (120.0, 40.0)],
             vec![(200.0, 200.0), (50.0, 200.0), (50.0, 20.0), (100.0, 20.0)],
         ];
-        let plan_a = vec![plan(Side::Bottom), plan(Side::Left)];
-        let unify = converge_resides(&reqs, &chains, &provisional, &plan_a);
         assert!(
-            unify.iter().all(|&(a, b)| a.is_none() && b.is_none()),
-            "one chain's own segments are not a convergence: {unify:?}"
+            converge_groups(&reqs, &chains, &provisional).is_empty(),
+            "one chain's own segments are not a convergence"
         );
     }
 }

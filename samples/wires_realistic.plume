@@ -35,6 +35,7 @@ roof |treat| "Roof"
 
 // Top-level → group-interior
 cat -> bowl & water .loud
+cat -> roof .loud
 
 // Parallel feeds (e.g. two paths to the same target)
 bowl -> dog .loud

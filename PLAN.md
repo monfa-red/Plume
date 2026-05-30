@@ -339,40 +339,58 @@ The router now routes **two candidates** and keeps the better:
 
 - **Candidate A** is the established informed second pass (lead/reside hints from the
   pass-1 provisional routes).
-- **Candidate B** adds *crossing-aware convergence*: `converge_resides` finds pairs
-  of wires that **share an endpoint node** and whose pass-1 routes
-  perpendicular-cross, groups their ends by that shared node, and unifies every
-  non-anchor member's end onto the **earliest-declared** member's side (`BTreeSet`
-  order = declaration order → deterministic; forced sides outrank it). Excluded:
-  fan siblings (E2 — a permitted coincident run) and two segments of *one* chain
-  (`chains[i]==chains[j]` — that's the wire passing through the node, not two
-  bundles meeting). `overlay_resides` lays these as `reside` hints over the base;
-  the existing `lead`-based C4 order then nests them.
+- **Candidate B** adds *crossing-aware convergence*: `converge_groups` finds the
+  sets of wire-ends that **share an endpoint node** and whose pass-1 routes
+  perpendicular-cross there (one group per node). Excluded: fan siblings (E2 — a
+  permitted coincident run) and two segments of *one* chain (`chains[i]==chains[j]`
+  — the wire passing through the node, not two bundles meeting). For each group,
+  `try_unify_group` tries pinning **all** its members (anchor included) onto each
+  side the group occupies and keeps the side that best betters the scorecard;
+  groups are processed greedily, each pin layered on the last. `overlay_resides`
+  lays the pins as `reside` hints over the base; the `lead`-based C4 order nests them.
+  Trying every occupied side (not just one anchor's) and pinning *all* members is
+  what makes 3-way convergence (e.g. cat+bird+water → roof) collapse to X:0.
 
-`route_wires` adopts B **only when `quality(B) < quality(A)`** — `quality` is the
+`route_wires` adopts a trial **only when `quality < best`** — `quality` is the
 lexicographic scorecard tuple `(invariants, B1, B2n, B2w, crossings, bends, length)`,
 the first five read straight from the independent `validate_routing` and the last two
 (B4/B5, which the validator doesn't flag) summed from the polylines (length in whole
-px, a determinism-safe B6 tidiness proxy). Crossings rank above bends, so B may still
-spend a bend to dodge a crossing (WIRING B3 ≈ a few bends) but can **never** add a
+px, a determinism-safe B6 tidiness proxy). Crossings rank above bends, so a trial may
+still spend a bend to dodge a crossing (WIRING B3 ≈ a few bends) but can **never** add a
 bend/length at equal crossings. So the convergence pass is **monotone over the whole
-tracked contract**: it only keeps A or adopts a strictly-better B — no sample regresses
-on any tracked metric — and the output stays a **deterministic function of the input**
-(tie → A, a guaranteed no-op when it can't help). No new iteration, no oscillation, no
-per-wire greedy penalty.
+tracked contract**: it only keeps the prior best or adopts a strictly-better trial — no
+sample regresses on any tracked metric — and the output stays a **deterministic
+function of the input** (tie → prior, a guaranteed no-op when nothing helps). No new
+iteration, no oscillation, no per-wire greedy penalty.
 
-**Result:** `wires_realistic` X **4 → 0** (the bird/water→roof convergence is gone,
-the bundles nest into `roof`); every other sample byte-identical (only candidate A
-runs, or B isn't better); B2n 0 and all hard guarantees 0 suite-wide; `wires_chain`
-X:1 unchanged (geometry-forced); `wires_labels` B2w:9 unchanged (C5 overflow).
-Byte-identical across two compiles; clippy/fmt clean. Tests: `converge_resides`
-unit tests in `mod.rs` (unify-on-cross; left-alone for no-cross, fan-sibling,
-non-converging, and same-chain segments) +
+**Result:** `wires_realistic` (now incl. `cat -> roof`, three bundles converging) X
+**→ 0** — all five wires nest onto one side of `roof`; every other sample's contract
+metrics unchanged; B2n 0 and all hard guarantees 0 suite-wide; `wires_chain` X:1
+(geometry-forced). Byte-identical across two compiles; clippy/fmt clean. Tests:
+`converge_groups` unit tests in `mod.rs` (group-on-cross incl. 3-way; left-alone for
+no-cross, fan-sibling, non-converging, same-chain) +
 `tests/wiring.rs::realistic_convergence_crossings_are_minimised`.
 
 Adversarially reviewed (5 independent lenses + verification): determinism, panic
 safety, and router interaction came back clean; the bends/length guard and the
 same-chain exclusion above closed the two findings worth acting on.
+
+### Follow-up routing fixes (same contract, sharper geometry)
+
+- **Even-spacing overflow (C2/C5):** `ports::assign_slots` spacing was
+  `(span-2·sep)/(k-1)` — the corner inset stayed at `clearance` while the *spacing*
+  collapsed, so cranking `clearance` bunched wires to a point. Now
+  `spacing = sep.min(span/(k+1))`: under overflow the inset shrinks in lockstep with
+  the spacing (both → `span/(k+1)`), so wires split the side evenly and never reach
+  the corners. WIRING C2/C5/R13 updated to match.
+- **C3 straight-shot guard:** the single-wire port slide fired on any facing side
+  pair, so `dog.b -> bird.t` (opposite sides, boxes side-by-side) slid both ports to
+  the corners chasing an impossible straight. Now it slides only when the boxes
+  overlap on the slid axis (a real straight shot); else the port stays centred.
+- **Dot marker (render):** the dot was centred on the endpoint, so it poked past the
+  shape edge while the line stopped short (a gap). `markers::dot_center` now seats it
+  tangent to the edge on the wire side, and `markers::line_inset` stops the line at
+  the dot's back edge — no overshoot, no gap. Pointed markers keep the 4 px stub.
 
 **Residual / possible next steps (none blocking):**
 - `wires_labels` B2w:9 is the only flagged relaxation left — a genuine C5 overflow

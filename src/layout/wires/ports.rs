@@ -83,6 +83,18 @@ pub fn plan(reqs: &[SegReq], hints: &[PlanHint]) -> Vec<Plan> {
         if !facing(sa, sb) {
             continue;
         }
+        // A straight shot only exists when the two boxes overlap on the axis the
+        // ports slide along; otherwise aligning is impossible and sliding just
+        // shoves the ports to the corners for no bend saved. C3 is "kill a bend",
+        // not "chase an unreachable straight" (e.g. `dog.b -> bird.t` side by side).
+        let aligned_axis_overlaps = if varies_in_y(sa) {
+            r.a.min_y < r.b.max_y && r.b.min_y < r.a.max_y
+        } else {
+            r.a.min_x < r.b.max_x && r.b.min_x < r.a.max_x
+        };
+        if !aligned_axis_overlaps {
+            continue;
+        }
         if count(&r.a_node, sa) == 1 {
             plans[s].port_a = slide(r.a, sa, axis_coord(plans[s].port_b, sa), r.clearance);
         }
@@ -249,14 +261,18 @@ fn assign_slots(reqs: &[SegReq], ends: &[End], hints: &[PlanHint], plans: &mut [
             .then(first_seg(x).cmp(&first_seg(y)))
     });
 
-    // Uniform spacing = the largest separation that fits; corner inset = sep.
+    // Uniform spacing: the target `separation` when it fits, else the largest that
+    // lets the k wires AND the two corner insets split the side evenly (C2/C5). The
+    // wires are centred and `spacing` apart, so the inset is `(span-(k-1)·spacing)/2`;
+    // with `spacing = span/(k+1)` that inset equals the spacing, so under overflow the
+    // corner inset shrinks in lockstep — wires never bunch to a point nor crowd the
+    // corners (the even split the user expects when `clearance` is cranked up).
     let k = order.len();
     let sep = ends
         .iter()
         .map(|e| reqs[e.seg].clearance)
         .fold(0.0_f64, f64::max);
-    let room = (hi - lo - 2.0 * sep).max(0.0);
-    let spacing = sep.min(room / (k as f64 - 1.0));
+    let spacing = sep.min((hi - lo) / (k as f64 + 1.0));
 
     for (rank, occ) in order.iter().enumerate() {
         let offset = (rank as f64 - (k as f64 - 1.0) / 2.0) * spacing;
@@ -479,6 +495,40 @@ mod tests {
     }
 
     #[test]
+    fn overflow_splits_the_side_evenly_including_the_margins() {
+        // A side too short to fit 9 wires at separation 20 (it's only 50 tall) packs
+        // them evenly: the corner inset shrinks in lockstep with the spacing so the
+        // wires AND the two margins split the span equally — inset == spacing ==
+        // span/(k+1) = 50/10 = 5. They never bunch to a point nor reach the corners.
+        let src = rect(0.0, 0.0, 40.0, 50.0);
+        let t = |i: usize| rect(200.0, i as f64 * 12.0, 240.0, i as f64 * 12.0 + 6.0);
+        let reqs: Vec<SegReq> = (0..9)
+            .map(|i| {
+                let mut s = seg("src", src, "t", t(i));
+                s.clearance = 20.0;
+                s.forced_a = Some(Side::Right); // pin all 9 to the one 50px side
+                s
+            })
+            .collect();
+        let plans = plan(&reqs, &[]);
+        let mut ys: Vec<f64> = plans.iter().map(|p| p.port_a.1).collect();
+        ys.sort_by(f64::total_cmp);
+        assert!((ys[0] - 5.0).abs() < 1e-9, "top inset == 5, got {}", ys[0]);
+        assert!(
+            (ys[8] - 45.0).abs() < 1e-9,
+            "bottom inset == 5 (port at 45 on a 50 side), got {}",
+            ys[8]
+        );
+        for w in ys.windows(2) {
+            assert!(
+                ((w[1] - w[0]) - 5.0).abs() < 1e-9,
+                "uniform 5px spacing, got {}",
+                w[1] - w[0]
+            );
+        }
+    }
+
+    #[test]
     fn fan_siblings_share_one_slot() {
         // Two wires leave src's right side as a fan group (same fan id) for two
         // stacked targets. C2: a fan group's shared end is ONE slot — both ports
@@ -595,6 +645,50 @@ mod tests {
         assert!(
             (plans[0].port_a.1 - plans[0].port_b.1).abs() < 1e-9,
             "ports aligned to one y → straight, got {:?} / {:?}",
+            plans[0].port_a,
+            plans[0].port_b
+        );
+    }
+
+    #[test]
+    fn forced_opposite_but_offset_sides_keep_centred_ports() {
+        // dog.b -> bird.t: forced Bottom→Top, but the boxes sit side by side (their
+        // x-spans don't overlap), so no straight vertical shot exists. C3 must NOT
+        // slide the ports toward the corners chasing an impossible straight — they
+        // stay at the side midpoints (the wire takes its Z either way).
+        let dog = rect(0.0, 0.0, 40.0, 40.0);
+        let bird = rect(120.0, 0.0, 160.0, 40.0);
+        let mut req = seg("dog", dog, "bird", bird);
+        req.forced_a = Some(Side::Bottom);
+        req.forced_b = Some(Side::Top);
+        let plans = plan(&[req], &[]);
+        assert_eq!(plans[0].side_a, Side::Bottom);
+        assert_eq!(plans[0].side_b, Side::Top);
+        assert_eq!(
+            plans[0].port_a,
+            (20.0, 40.0),
+            "dog's bottom port stays centred"
+        );
+        assert_eq!(
+            plans[0].port_b,
+            (140.0, 0.0),
+            "bird's top port stays centred"
+        );
+    }
+
+    #[test]
+    fn lone_facing_wire_with_overlapping_span_still_slides_straight() {
+        // a stacked above b, a.bottom -> b.top: their x-spans overlap, so a common x
+        // gives a straight vertical wire — C3 should still slide to it.
+        let a = rect(40.0, 0.0, 120.0, 40.0);
+        let b = rect(0.0, 120.0, 80.0, 160.0); // x-spans [40,120] / [0,80] overlap
+        let mut req = seg("a", a, "b", b);
+        req.forced_a = Some(Side::Bottom);
+        req.forced_b = Some(Side::Top);
+        let plans = plan(&[req], &[]);
+        assert!(
+            (plans[0].port_a.0 - plans[0].port_b.0).abs() < 1e-9,
+            "ports aligned to one x → straight vertical, got {:?} / {:?}",
             plans[0].port_a,
             plans[0].port_b
         );

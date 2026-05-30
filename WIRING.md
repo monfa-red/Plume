@@ -43,7 +43,8 @@ so **"perfect" means "obeys every rule and looks clean,"** not "provably minimal
   property — not to be confused with a container's `gap`, which spaces its
   children.)*
 - **corner inset** — ports and passing wires stay ≥ `clearance` from a node's
-  corners. (R13)
+  corners, except that on a crowded side the port inset shrinks in lockstep with
+  the slot spacing (C5) — never below that spacing, so ports never reach a corner. (R13)
 - **bundle** — wires sharing the same ordered (source side, target side); drawn as
   parallel rails `separation` apart.
 - **fan group** — wires from one declaration sharing an endpoint: fan-out
@@ -111,20 +112,26 @@ and never overlaps a node (B1) unless trapped. Only B1/B2 relaxations are flagge
   side crowds (C5) only when geometry truly forces it (many targets the same way). (R10)
 - **C2 Even spacing** — port **slots** on a side are uniform, fixed by the side and
   wire *count* only (never per-wire from targets). Slots sit symmetric about the
-  centre, `separation` apart when they fit, else the largest uniform spacing that
-  does (C5); outermost ≥ corner inset. *Which* wire takes *which* slot is the C4
-  order. One wire → centre. A fan group's shared end is one slot. Every wire on a
-  side shares one spacing, so you never get mixed compacted/uncompacted wires. (R11)
+  centre, `separation` apart when they fit (the corner inset takes up the slack),
+  else `span/(count+1)` so the wires *and* the two corner insets split the side
+  evenly (C5) — the inset shrinks with the spacing, never below it. *Which* wire
+  takes *which* slot is the C4 order. One wire → centre. A fan group's shared end is
+  one slot. Every wire on a side shares one spacing, so you never get mixed
+  compacted/uncompacted wires. (R11)
 - **C3 Bend-avoidance (single-wire side)** — a side with one wire may slide its
-  port off-centre to kill a bend (avoiding a turn beats centring). Multi-wire sides
-  keep C2. (E1)
+  port off-centre to kill a bend (avoiding a turn beats centring), but only when a
+  straight shot is reachable — the two boxes must overlap on the slid axis;
+  otherwise sliding saves no bend and the port stays centred. Multi-wire sides keep
+  C2. (E1)
 - **C4 Ordering** — order the wires sharing a side/channel so they don't needlessly
   cross (removes avoidable crossings for free); any crossing left is one B3 judged
   cheaper than detouring. Deterministic (section D).
 - **C5 Overflow** — if a side *still* can't fit its wires at `separation` + inset,
-  space them evenly across the span (inset to inset); spacing drops below
-  `separation` — flagged (B2). No floor and no spilling to other sides — density is
-  the user's lever (`clearance`, node spacing). Even spacing never overlaps at any
+  space them evenly across the span: the corner inset shrinks in lockstep with the
+  spacing (both → `span/(count+1)`), so wires never bunch to a point nor crowd the
+  corners; spacing drops below `separation` — flagged (B2). No floor and no spilling
+  to other sides — density is the user's lever (`clearance`, node spacing). Even
+  spacing never overlaps at any
   real side length.
 
 ---

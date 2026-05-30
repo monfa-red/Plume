@@ -45,8 +45,8 @@ input_file: samples/internal_wires.plume
   </g>
   <g class="plume-wires">
     <g class="plume-wire" data-from="garden.outlet" data-to="kitchen.inlet">
-      <path d="M -22.5 7.7 L 6.5 7.7 L 6.5 -34.3 L 22.075 -34.3" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="26.075,-34.3 21.075,-31.8 21.075,-36.8" fill="#444"/>
+      <path d="M -22.5 16.5 L 6.5 16.5 L 6.5 -43.1 L 22.075 -43.1" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="26.075,-43.1 21.075,-40.6 21.075,-45.6" fill="#444"/>
       <text x="6.5" y="-8.5875" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">carries</text>
     </g>
     <g class="plume-wire" data-from="garden.inlet" data-to="garden.outlet">

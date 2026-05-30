@@ -1,6 +1,6 @@
 //! Wire emission — the orthogonal path, optional markers, optional labels.
 
-use super::markers::{emit_marker, marker_anchor};
+use super::markers::{emit_marker, line_inset, marker_anchor};
 use super::values::{attr_num, attr_or_var, escape_xml, format_value, num};
 use crate::layout::{RoutedText, RoutedWire};
 use crate::resolve::{MarkerKind, ResolvedValue, VarTable};
@@ -23,9 +23,9 @@ pub fn render_wire(out: &mut String, w: &RoutedWire, vars: &VarTable, opts: &Opt
     )
     .unwrap();
 
-    // Stop the drawn line where the marker tip will sit so the stroke never
-    // pokes past the arrowhead.
-    let drawn = shorten_for_markers(&w.path, &w.markers);
+    // Stop the drawn line where the marker body will sit so the stroke never
+    // pokes past it (and never leaves a gap before a dot).
+    let drawn = shorten_for_markers(&w.path, &w.markers, thickness);
     let mut d = format!("M {} {}", num(drawn[0].0), num(drawn[0].1));
     for p in &drawn[1..] {
         write!(d, " L {} {}", num(p.0), num(p.1)).unwrap();
@@ -61,23 +61,25 @@ pub fn render_wire(out: &mut String, w: &RoutedWire, vars: &VarTable, opts: &Opt
     out.push_str("    </g>\n");
 }
 
-/// Pull each marker-bearing endpoint back along its segment so the line stops at
-/// the marker tip. Mirrors `markers::marker_anchor`'s inset.
-const MARKER_INSET: f64 = 4.0;
-
-fn shorten_for_markers(path: &[(f64, f64)], markers: &crate::resolve::Markers) -> Vec<(f64, f64)> {
+/// Pull each marker-bearing endpoint back along its segment so the line stops where
+/// that marker's body begins (per-marker, [`line_inset`]).
+fn shorten_for_markers(
+    path: &[(f64, f64)],
+    markers: &crate::resolve::Markers,
+    thickness: f64,
+) -> Vec<(f64, f64)> {
     let mut p = path.to_vec();
     if p.len() < 2 {
         return p;
     }
     if markers.end != MarkerKind::None {
         let n = p.len();
-        if let Some(q) = pulled_back(p[n - 2], p[n - 1], MARKER_INSET) {
+        if let Some(q) = pulled_back(p[n - 2], p[n - 1], line_inset(markers.end, thickness)) {
             p[n - 1] = q;
         }
     }
     if markers.start != MarkerKind::None {
-        if let Some(q) = pulled_back(p[1], p[0], MARKER_INSET) {
+        if let Some(q) = pulled_back(p[1], p[0], line_inset(markers.start, thickness)) {
             p[0] = q;
         }
     }

@@ -170,15 +170,14 @@ fn baseline_contract_report() {
 
 #[test]
 fn realistic_convergence_crossings_are_minimised() {
-    // The two independent bundles converging on `roof` (bird→roof, water→roof) used
-    // to pick different sides and cross (X:4). Crossing-aware convergence unifies
-    // them onto one side so they nest — strictly fewer crossings, no regression to a
-    // hard guarantee or wire-node clearance.
+    // Three independent bundles converge on `roof` (cat→roof, bird→roof, water→roof).
+    // Crossing-aware convergence unifies all of them onto one side so they nest with
+    // zero crossings — no regression to a hard guarantee or wire-node clearance.
     let src = std::fs::read_to_string("samples/wires_realistic.plume").unwrap();
     let crossings = count_rule(&src, plume::Rule::Crossing);
-    assert!(
-        crossings < 4,
-        "convergence crossings must drop below the pre-fix 4, got {crossings}"
+    assert_eq!(
+        crossings, 0,
+        "the roof convergence must be crossing-free, got {crossings}"
     );
     let v = plume::validate_str(&src).expect("validate");
     let hard = v

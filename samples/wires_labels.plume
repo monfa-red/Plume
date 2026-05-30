@@ -1,3 +1,8 @@
+{
+  |scene| gap:100 layout:row
+  |wire| clearance:10
+}
+
 cat |rect| "Cat"
 dog |rect| "Dog"
 
