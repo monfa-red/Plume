@@ -173,7 +173,7 @@ fn realistic_convergence_crossings_are_minimised() {
     // Three independent bundles converge on `roof` (cat→roof, bird→roof, water→roof).
     // Crossing-aware convergence unifies all of them onto one side so they nest with
     // zero crossings — no regression to a hard guarantee or wire-node clearance.
-    let src = std::fs::read_to_string("samples/wires_realistic.plume").unwrap();
+    let src = std::fs::read_to_string("samples/wires_realistic_row.plume").unwrap();
     let crossings = count_rule(&src, plume::Rule::Crossing);
     assert_eq!(
         crossings, 0,

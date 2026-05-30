@@ -1,0 +1,27 @@
+// A hub wired to neighbours in every direction — exercises side selection across
+// all four sides at once (the search must spread spokes, not crowd one side).
+
+{
+  |scene|
+  |treat:rect| radius:4 fill:#eee
+}
+
+hub |treat| "Hub" size:(70,70) at:(220,220)
+
+north |treat| "N" size:(46,46) at:(232,30)
+south |treat| "S" size:(46,46) at:(232,430)
+east  |treat| "E" size:(46,46) at:(430,232)
+west  |treat| "W" size:(46,46) at:(30,232)
+nw    |treat| "NW" size:(46,46) at:(40,40)
+ne    |treat| "NE" size:(46,46) at:(420,40)
+sw    |treat| "SW" size:(46,46) at:(40,420)
+se    |treat| "SE" size:(46,46) at:(420,420)
+
+hub -> north
+hub -> south
+hub -> east
+hub -> west
+hub -> nw
+hub -> ne
+hub -> sw
+hub -> se

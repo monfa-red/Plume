@@ -1,0 +1,25 @@
+// Groups within groups — wires must treat their endpoints' ancestor containers as
+// passable (cross their boundaries) while other groups stay solid obstacles (E4/R3).
+
+{
+  |scene| layout:row gap:80
+  |group| stroke:#aaa
+  |treat:rect| radius:4 fill:#eee padding:14
+}
+
+outer |group| "Outer" layout:column padding:22 gap:36 {
+  inner |group| "Inner" layout:row padding:18 gap:24 {
+    src |treat| "Src"
+    via |treat| "Via"
+  }
+  sink |treat| "Sink"
+}
+
+dst |treat| "Dst"
+
+// out of two levels of nesting to a top-level node
+src -> dst
+// within the nesting, crossing one group boundary
+via -> sink
+// top-level into a nested node (must enter the groups)
+dst -> via

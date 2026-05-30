@@ -1,0 +1,26 @@
+// A grid of nodes wired along rows and columns — many parallel runs that the
+// search and nudge must keep clean (even slots, minimal crossings).
+
+{
+  |scene| layout:(3,3) gap:70
+  |treat:rect| radius:4 fill:#eee size:(60,40)
+}
+
+aa |treat| "A1"
+bb |treat| "B1"
+cc |treat| "C1"
+dd |treat| "A2"
+ee |treat| "B2"
+ff |treat| "C2"
+gg |treat| "A3"
+hh |treat| "B3"
+ii |treat| "C3"
+
+// rows
+aa -> bb -> cc
+dd -> ee -> ff
+gg -> hh -> ii
+
+// columns
+aa -> dd -> gg
+cc -> ff -> ii

@@ -1,7 +1,7 @@
 ---
 source: tests/conformance.rs
 expression: svg
-input_file: samples/wires_realistic.plume
+input_file: samples/wires_realistic_row.plume
 ---
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-251.2 -166.4 502.4 341.1125" width="502.4" height="341.1125" class="plume">
   <defs/>

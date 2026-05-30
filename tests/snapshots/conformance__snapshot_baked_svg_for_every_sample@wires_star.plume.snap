@@ -1,0 +1,98 @@
+---
+source: tests/conformance.rs
+expression: svg
+input_file: samples/wires_star.plume
+---
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-13.5 -13.5 487 487" width="487" height="487" class="plume">
+  <defs/>
+  <g class="plume-scene" color="black">
+    <g class="plume-node plume-shape-treat plume-shape-rect" data-id="hub" transform="translate(220,220)">
+      <rect x="-35" y="-35" width="70" height="70" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Hub</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-treat plume-shape-rect" data-id="north" transform="translate(232,30)">
+      <rect x="-23" y="-23" width="46" height="46" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">N</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-treat plume-shape-rect" data-id="south" transform="translate(232,430)">
+      <rect x="-23" y="-23" width="46" height="46" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">S</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-treat plume-shape-rect" data-id="east" transform="translate(430,232)">
+      <rect x="-23" y="-23" width="46" height="46" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">E</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-treat plume-shape-rect" data-id="west" transform="translate(30,232)">
+      <rect x="-23" y="-23" width="46" height="46" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">W</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-treat plume-shape-rect" data-id="nw" transform="translate(40,40)">
+      <rect x="-23" y="-23" width="46" height="46" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">NW</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-treat plume-shape-rect" data-id="ne" transform="translate(420,40)">
+      <rect x="-23" y="-23" width="46" height="46" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">NE</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-treat plume-shape-rect" data-id="sw" transform="translate(40,420)">
+      <rect x="-23" y="-23" width="46" height="46" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">SW</text>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-treat plume-shape-rect" data-id="se" transform="translate(420,420)">
+      <rect x="-23" y="-23" width="46" height="46" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">SE</text>
+      </g>
+    </g>
+  </g>
+  <g class="plume-wires">
+    <g class="plume-wire" data-from="hub" data-to="north">
+      <path d="M 232 184.5 L 232 57.5" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="232,53.5 234.5,58.5 229.5,58.5" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="hub" data-to="south">
+      <path d="M 228 255.5 L 228 402.5" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="228,406.5 225.5,401.5 230.5,401.5" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="hub" data-to="east">
+      <path d="M 255.5 220 L 380.5 220 L 380.5 232 L 402.5 232" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="406.5,232 401.5,234.5 401.5,229.5" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="hub" data-to="west">
+      <path d="M 184.5 228 L 57.5 228" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="53.5,228 58.5,225.5 58.5,230.5" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="hub" data-to="nw">
+      <path d="M 184.5 212 L 168.5 212 L 168.5 40 L 67.5 40" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="63.5,40 68.5,37.5 68.5,42.5" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="hub" data-to="ne">
+      <path d="M 255.5 204 L 271.5 204 L 271.5 40 L 392.5 40" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="396.5,40 391.5,42.5 391.5,37.5" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="hub" data-to="sw">
+      <path d="M 212 255.5 L 212 271.5 L 40 271.5 L 40 392.5" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="40,396.5 37.5,391.5 42.5,391.5" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="hub" data-to="se">
+      <path d="M 255.5 236 L 271.5 236 L 271.5 420 L 392.5 420" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="396.5,420 391.5,422.5 391.5,417.5" fill="#444"/>
+    </g>
+  </g>
+</svg>

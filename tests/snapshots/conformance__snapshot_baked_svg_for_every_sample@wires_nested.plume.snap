@@ -1,0 +1,60 @@
+---
+source: tests/conformance.rs
+expression: svg
+input_file: samples/wires_nested.plume
+---
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-220.55 -150.9 441.1 301.8" width="441.1" height="301.8" class="plume">
+  <defs/>
+  <g class="plume-scene" color="black">
+    <g class="plume-node plume-shape-group plume-shape-rect" data-id="outer" transform="translate(-65.725,0)">
+      <rect x="-134.325" y="-130.4" width="268.65" height="260.8" rx="0" ry="0" fill="white" stroke="#aaa" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,-100.1)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Outer</text>
+      </g>
+      <g class="plume-node plume-shape-group plume-shape-rect" data-id="inner" transform="translate(0,-14.5)">
+        <rect x="-111.825" y="-40.8" width="223.65" height="81.6" rx="0" ry="0" fill="white" stroke="#aaa" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(-75.45,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Inner</text>
+        </g>
+        <g class="plume-node plume-shape-treat plume-shape-rect" data-id="src" transform="translate(-7.35,0)">
+          <rect x="-25.225" y="-22.3" width="50.45" height="44.6" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
+          <g class="plume-node plume-shape-text" transform="translate(0,0)">
+            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Src</text>
+          </g>
+        </g>
+        <g class="plume-node plume-shape-treat plume-shape-rect" data-id="via" transform="translate(68.1,0)">
+          <rect x="-25.225" y="-22.3" width="50.45" height="44.6" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
+          <g class="plume-node plume-shape-text" transform="translate(0,0)">
+            <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Via</text>
+          </g>
+        </g>
+      </g>
+      <g class="plume-node plume-shape-treat plume-shape-rect" data-id="sink" transform="translate(0,85.6)">
+        <rect x="-28.8" y="-22.3" width="57.6" height="44.6" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
+        <g class="plume-node plume-shape-text" transform="translate(0,0)">
+          <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Sink</text>
+        </g>
+      </g>
+    </g>
+    <g class="plume-node plume-shape-treat plume-shape-rect" data-id="dst" transform="translate(174.825,0)">
+      <rect x="-25.225" y="-22.3" width="50.45" height="44.6" rx="4" ry="4" fill="#eee" stroke="#444" stroke-width="1"/>
+      <g class="plume-node plume-shape-text" transform="translate(0,0)">
+        <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-size="13" font-family="sans-serif" fill="currentColor">Dst</text>
+      </g>
+    </g>
+  </g>
+  <g class="plume-wires">
+    <g class="plume-wire" data-from="outer.inner.src" data-to="dst">
+      <path d="M -73.075 -37.3 L -73.075 -53.3 L 174.825 -53.3 L 174.825 -26.8" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="174.825,-22.8 172.325,-27.8 177.325,-27.8" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="outer.inner.via" data-to="outer.sink">
+      <path d="M 2.375 8.3 L 2.375 85.6 L -32.425 85.6" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-36.425,85.6 -31.425,83.1 -31.425,88.1" fill="#444"/>
+    </g>
+    <g class="plume-wire" data-from="dst" data-to="outer.inner.via">
+      <path d="M 149.1 0 L 88.6 0 L 88.6 -14.5 L 32.1 -14.5" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="28.1,-14.5 33.1,-17 33.1,-12" fill="#444"/>
+    </g>
+  </g>
+</svg>
