@@ -6,7 +6,7 @@
 //! side with a single wire may slide its port to kill a bend (C3). Side choice is
 //! the forced side, else geometry, with a least-loaded tie-break (C1).
 
-use super::geometry::{pick_edges, Pt, Rect};
+use super::geometry::{pick_edges, Pt, Rect, EPS};
 use crate::ast::Side;
 use std::collections::BTreeMap;
 
@@ -74,32 +74,46 @@ pub fn plan(reqs: &[SegReq], hints: &[PlanHint]) -> Vec<Plan> {
         assign_slots(reqs, ends, hints, &mut plans);
     }
 
-    // C3 — a lone wire on a facing pair of sides slides its port(s) to line up
-    // with the far end, trading a two-bend jog for a straight shot. Multi-wire
-    // sides keep their slots untouched.
+    // C3 — a lone wire on a facing pair of sides may slide its port to line up with
+    // the far end, trading a two-bend jog for a straight shot. But only when that
+    // straight shot is actually *reachable*: the ports must meet at one coordinate
+    // inside their usable spans `[lo+clearance, hi-clearance]`. Otherwise sliding
+    // just drags a port to a corner with the jog still there, so it stays centred.
     let count = |node: &str, side: Side| groups.get(&(node, side_ord(side))).map_or(0, Vec::len);
+    let usable = |r: Rect, side: Side, c: f64| {
+        let (lo, hi) = side_span(r, side);
+        (lo + c, hi - c)
+    };
     for (s, r) in reqs.iter().enumerate() {
         let (sa, sb) = sides[s];
         if !facing(sa, sb) {
             continue;
         }
-        // A straight shot only exists when the two boxes overlap on the axis the
-        // ports slide along; otherwise aligning is impossible and sliding just
-        // shoves the ports to the corners for no bend saved. C3 is "kill a bend",
-        // not "chase an unreachable straight" (e.g. `dog.b -> bird.t` side by side).
-        let aligned_axis_overlaps = if varies_in_y(sa) {
-            r.a.min_y < r.b.max_y && r.b.min_y < r.a.max_y
-        } else {
-            r.a.min_x < r.b.max_x && r.b.min_x < r.a.max_x
-        };
-        if !aligned_axis_overlaps {
-            continue;
-        }
-        if count(&r.a_node, sa) == 1 {
-            plans[s].port_a = slide(r.a, sa, axis_coord(plans[s].port_b, sa), r.clearance);
-        }
-        if count(&r.b_node, sb) == 1 {
-            plans[s].port_b = slide(r.b, sb, axis_coord(plans[s].port_a, sb), r.clearance);
+        let a_lone = count(&r.a_node, sa) == 1;
+        let b_lone = count(&r.b_node, sb) == 1;
+        let (a_lo, a_hi) = usable(r.a, sa, r.clearance);
+        let (b_lo, b_hi) = usable(r.b, sb, r.clearance);
+        if a_lone && b_lone {
+            // Both free: align on a shared coordinate, but only if their usable spans
+            // overlap (a common straight coordinate exists) — else keep both centred.
+            let (ov_lo, ov_hi) = (a_lo.max(b_lo), a_hi.min(b_hi));
+            if ov_lo <= ov_hi + EPS {
+                let t = (ov_lo + ov_hi) / 2.0;
+                plans[s].port_a = port_at(r.a, sa, t);
+                plans[s].port_b = port_at(r.b, sb, t);
+            }
+        } else if a_lone {
+            // Partner fixed (a multi-wire slot / fan hub): slide only to its
+            // coordinate, and only if that coordinate is reachable on this side.
+            let t = axis_coord(plans[s].port_b, sa);
+            if a_lo - EPS <= t && t <= a_hi + EPS {
+                plans[s].port_a = port_at(r.a, sa, t);
+            }
+        } else if b_lone {
+            let t = axis_coord(plans[s].port_a, sb);
+            if b_lo - EPS <= t && t <= b_hi + EPS {
+                plans[s].port_b = port_at(r.b, sb, t);
+            }
         }
     }
     plans
@@ -122,18 +136,6 @@ fn axis_coord(p: Pt, side: Side) -> f64 {
     } else {
         p.0
     }
-}
-
-/// Slide a lone port toward `target`, clamped to the side's usable span (≥ corner
-/// inset from each corner); degenerate spans collapse to the centre.
-fn slide(r: Rect, side: Side, target: f64, clearance: f64) -> Pt {
-    let (lo, hi) = side_span(r, side);
-    let c = if lo + clearance <= hi - clearance {
-        target.clamp(lo + clearance, hi - clearance)
-    } else {
-        (lo + hi) / 2.0
-    };
-    port_at(r, side, c)
 }
 
 /// One wire-end attached to some side: which segment, and which of its two ends.
@@ -673,6 +675,24 @@ mod tests {
             plans[0].port_b,
             (140.0, 0.0),
             "bird's top port stays centred"
+        );
+    }
+
+    #[test]
+    fn lone_target_stays_centred_when_a_fixed_source_is_out_of_its_span() {
+        // The cat->bowl pattern: `src`'s side is fixed (two wires share it), and the
+        // lone lower target's usable span can't reach src's slot. A straight shot is
+        // unreachable, so the target keeps its side midpoint instead of sliding to a
+        // corner with a residual jog.
+        let src = rect(0.0, 0.0, 40.0, 240.0); // tall — slots sit near its centre
+        let hi = rect(160.0, 0.0, 200.0, 40.0); // upper target
+        let lo = rect(160.0, 180.0, 200.0, 220.0); // lower target (lone), centre y = 200
+        let reqs = vec![seg("src", src, "hi", hi), seg("src", src, "lo", lo)];
+        let plans = plan(&reqs, &[]);
+        assert!(
+            (plans[1].port_b.1 - 200.0).abs() < 1e-9,
+            "lo's left port stays at its midpoint 200, got {}",
+            plans[1].port_b.1
         );
     }
 
