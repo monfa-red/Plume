@@ -3,7 +3,7 @@ source: tests/conformance.rs
 expression: svg
 input_file: samples/wires_fan.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-70.875 -243.8 141.75 487.6" width="141.75" height="487.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-70.875 -259.8 141.75 503.6" width="141.75" height="503.6" class="plume">
   <defs/>
   <g class="plume-scene" color="black">
     <g class="plume-node plume-shape-rect" data-id="mouse" transform="translate(0,-199)">
@@ -50,16 +50,16 @@ input_file: samples/wires_fan.plume
       <text x="0" y="-159.2" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">hunts</text>
     </g>
     <g class="plume-wire" data-from="owl" data-to="mouse">
-      <path d="M -27.725 -39.8 L -50.875 -39.8 L -50.875 -199 L -38.875 -199" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-34.875,-199 -39.875,-196.5 -39.875,-201.5" fill="#444"/>
+      <path d="M -27.725 -39.8 L -50.875 -39.8 L -50.875 -239.8 L 0 -239.8 L 0 -227.8" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="0,-223.8 -2.5,-228.8 2.5,-228.8" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="bowl" data-to="apple">
       <path d="M 0 64.6 L 0 90.6" fill="none" stroke="#444" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="0,94.6 -2.5,89.6 2.5,89.6" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="bowl" data-to="mug">
-      <path d="M -31.3 39.8 L -50.875 39.8 L -50.875 199 L -31.725 199" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-27.725,199 -32.725,201.5 -32.725,196.5" fill="#444"/>
+      <path d="M 31.3 39.8 L 50.875 39.8 L 50.875 199 L 31.725 199" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="27.725,199 32.725,196.5 32.725,201.5" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="bowl" data-to="mouse">
       <path d="M 31.3 39.8 L 50.875 39.8 L 50.875 -199 L 38.875 -199" fill="none" stroke="#444" stroke-width="1"/>

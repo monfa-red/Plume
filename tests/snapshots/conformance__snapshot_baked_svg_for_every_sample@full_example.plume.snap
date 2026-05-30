@@ -87,17 +87,17 @@ input_file: samples/full_example.plume
       <polygon class="plume-marker plume-marker-arrow" points="66.525,20 64.025,15 69.025,15" fill="#666"/>
     </g>
     <g class="plume-wire" data-from="services.api" data-to="data.cache">
-      <path d="M -12.925 69.6 L -12.925 106.6" fill="none" stroke="#666" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="-12.925,110.6 -15.425,105.6 -10.425,105.6" fill="#666"/>
-      <text x="-12.925" y="90.1" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">cache</text>
+      <path d="M -7.2 69.6 L -7.2 106.6" fill="none" stroke="#666" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-7.2,110.6 -9.7,105.6 -4.7,105.6" fill="#666"/>
+      <text x="-7.2" y="90.1" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">cache</text>
     </g>
     <g class="plume-wire" data-from="services.api" data-to="data.db">
-      <path d="M 25.525 44.8 L 35.525 44.8 L 35.525 100.6 L 18.075 100.6 L 18.075 135.4 L 24.075 135.4" fill="none" stroke="#666" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="28.075,135.4 23.075,137.9 23.075,132.9" fill="#666"/>
+      <path d="M 2.8 69.6 L 2.8 100.6 L 68.675 100.6 L 68.675 106.6" fill="none" stroke="#666" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="68.675,110.6 66.175,105.6 71.175,105.6" fill="#666"/>
     </g>
     <g class="plume-wire" data-from="services.auth" data-to="data.db">
-      <path d="M 80.825 69.6 L 80.825 106.6" fill="none" stroke="#666" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="80.825,110.6 78.325,105.6 83.325,105.6" fill="#666"/>
+      <path d="M 78.675 69.6 L 78.675 106.6" fill="none" stroke="#666" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="78.675,110.6 76.175,105.6 81.175,105.6" fill="#666"/>
     </g>
   </g>
 </svg>

@@ -1,12 +1,12 @@
-//! Port planning — which side of each endpoint a wire leaves/enters, and *where*
-//! on that side it attaches (WIRING section C).
+//! Port placement — *where* on each chosen side a wire attaches (WIRING section C).
 //!
-//! A wire no longer just meets the side midpoint: wires sharing a side are spread
-//! across uniform **slots** (C2), ordered so they don't needlessly cross (C4); a
-//! side with a single wire may slide its port to kill a bend (C3). Side choice is
-//! the forced side, else geometry, with a least-loaded tie-break (C1).
+//! The side each end attaches to is decided upstream by the `select` search; this
+//! module takes those sides and places the ports. Wires sharing a side spread across
+//! uniform **slots** (C2), ordered by their lead hints so they don't needlessly
+//! cross (C4), compacting evenly when a side overflows (C5); a lone wire on a facing
+//! pair may slide its port to a reachable straight shot (C3).
 
-use super::geometry::{pick_edges, Pt, Rect, EPS};
+use super::geometry::{Pt, Rect, EPS};
 use crate::ast::Side;
 use std::collections::BTreeMap;
 
@@ -36,31 +36,25 @@ pub struct Plan {
     pub port_b: Pt,
 }
 
-/// Feedback from a provisional routing pass (the second pass of the router's
-/// two-pass, WIRING appendix). Side selection and slot ordering otherwise run
-/// blind — guessing from straight lines to target centres — which mis-orders a
-/// wire that detours around an obstacle and picks a side that forces it through a
-/// sub-clearance gap. These hints replace the guess with where each end's wire
-/// *actually* went: `lead_*` is the point the wire heads to just past its stub
-/// (the crossing-free C4 order), and `reside_*` is the side an end should move to
-/// when its provisional route skimmed its own node (obstacle-aware C1).
+/// The crossing-free C4 ordering signal for a provisional pass: `lead_*` is the
+/// point a wire heads to just past its attaching stub. Slots on a shared side are
+/// ordered by where their wires actually go, so a wire that detours around an
+/// obstacle sorts by its real exit heading rather than a straight-line guess.
 #[derive(Clone, Copy, Default)]
 pub struct PlanHint {
     pub lead_a: Option<Pt>,
     pub lead_b: Option<Pt>,
-    pub reside_a: Option<Side>,
-    pub reside_b: Option<Side>,
 }
 
-/// Plan every segment's ports together, so wires sharing a side can be spread
-/// into uniform slots. `reqs` is in routing order (declaration, then chain); that
-/// order is the deterministic tie-break for slot ordering. `hints` is empty on the
-/// first pass and carries the provisional-route feedback on the second.
-pub fn plan(reqs: &[SegReq], hints: &[PlanHint]) -> Vec<Plan> {
-    let sides = pick_all_sides(reqs, hints);
+/// Assign every segment's ports, given the side each end attaches to (chosen by the
+/// `select` search). Wires sharing a side spread into uniform slots (C2/C5), ordered
+/// by `hints` so they don't needlessly cross (C4); a lone wire may slide for a
+/// straight shot (C3). `reqs` order is the deterministic slot tie-break; `hints` is
+/// empty on the provisional pass and carries lead points on the informed one.
+pub fn assign(reqs: &[SegReq], sides: &[(Side, Side)], hints: &[PlanHint]) -> Vec<Plan> {
     let mut plans: Vec<Plan> = reqs
         .iter()
-        .zip(&sides)
+        .zip(sides)
         .map(|(r, &(sa, sb))| Plan {
             side_a: sa,
             side_b: sb,
@@ -69,7 +63,7 @@ pub fn plan(reqs: &[SegReq], hints: &[PlanHint]) -> Vec<Plan> {
         })
         .collect();
 
-    let groups = group_by_side(reqs, &sides);
+    let groups = group_by_side(reqs, sides);
     for ends in groups.values() {
         assign_slots(reqs, ends, hints, &mut plans);
     }
@@ -323,102 +317,6 @@ fn side_ord(side: Side) -> u8 {
     }
 }
 
-/// WIRING C1 tie-break order when sides are equally good: right → bottom → left → top.
-fn side_pref(side: Side) -> u8 {
-    match side {
-        Side::Right => 0,
-        Side::Bottom => 1,
-        Side::Left => 2,
-        Side::Top => 3,
-    }
-}
-
-/// C1 — the side each end attaches to: a forced side wins; else the geometric
-/// pick, with a least-loaded tie-break for diagonal hops that could leave off
-/// either of two sides.
-fn pick_all_sides(reqs: &[SegReq], hints: &[PlanHint]) -> Vec<(Side, Side)> {
-    // The side each end attaches to, most-authoritative first: a forced side, then
-    // a re-elected side (an end whose provisional route skimmed its own node moves
-    // to the side it actually headed toward — obstacle-aware C1), then the
-    // geometric pick. A self-loop has no geometry: it defaults to right→top (E3).
-    let pick = |r: &SegReq, s: usize| -> (Side, Side) {
-        let h = hints.get(s).copied().unwrap_or_default();
-        if r.a_node == r.b_node {
-            return (
-                r.forced_a.unwrap_or(Side::Right),
-                r.forced_b.unwrap_or(Side::Top),
-            );
-        }
-        let (ga, gb) = pick_edges(r.a, r.b);
-        (
-            r.forced_a.or(h.reside_a).unwrap_or(ga),
-            r.forced_b.or(h.reside_b).unwrap_or(gb),
-        )
-    };
-    let mut sides: Vec<(Side, Side)> = reqs.iter().enumerate().map(|(s, r)| pick(r, s)).collect();
-
-    let mut load: BTreeMap<(&str, u8), usize> = BTreeMap::new();
-    for (r, &(sa, sb)) in reqs.iter().zip(&sides) {
-        *load.entry((&r.a_node, side_ord(sa))).or_default() += 1;
-        *load.entry((&r.b_node, side_ord(sb))).or_default() += 1;
-    }
-
-    // Rebalance only the genuinely ambiguous (diagonal) ends — never a forced or
-    // re-elected one, whose side is already decided.
-    for (s, r) in reqs.iter().enumerate() {
-        let h = hints.get(s).copied().unwrap_or_default();
-        if r.forced_a.is_none() && h.reside_a.is_none() {
-            sides[s].0 = least_loaded(&r.a_node, r.a, r.b, sides[s].0, &mut load);
-        }
-        if r.forced_b.is_none() && h.reside_b.is_none() {
-            sides[s].1 = least_loaded(&r.b_node, r.b, r.a, sides[s].1, &mut load);
-        }
-    }
-    sides
-}
-
-/// A diagonal hop (boxes sharing neither an x- nor a y-overlap) can leave off
-/// either the horizontal or the vertical side for one bend; pick the less-loaded
-/// (ties: right→bottom→left→top), updating `load`. Non-diagonal ends keep their
-/// clear facing side.
-fn least_loaded<'a>(
-    node: &'a str,
-    from: Rect,
-    to: Rect,
-    current: Side,
-    load: &mut BTreeMap<(&'a str, u8), usize>,
-) -> Side {
-    let (fc, tc) = (from.center(), to.center());
-    let y_overlap = from.min_y < to.max_y && to.min_y < from.max_y;
-    let x_overlap = from.min_x < to.max_x && to.min_x < from.max_x;
-    if y_overlap || x_overlap {
-        return current; // a clear facing side, not a corner choice
-    }
-    let horizontal = if tc.0 >= fc.0 {
-        Side::Right
-    } else {
-        Side::Left
-    };
-    let vertical = if tc.1 >= fc.1 {
-        Side::Bottom
-    } else {
-        Side::Top
-    };
-    let load_of = |s: Side| {
-        let base = load.get(&(node, side_ord(s))).copied().unwrap_or(0);
-        base - usize::from(s == current) // discount this end from its own side
-    };
-    let pick = [horizontal, vertical]
-        .into_iter()
-        .min_by_key(|&s| (load_of(s), side_pref(s)))
-        .unwrap();
-    if pick != current {
-        *load.get_mut(&(node, side_ord(current))).unwrap() -= 1;
-        *load.entry((node, side_ord(pick))).or_default() += 1;
-    }
-    pick
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -444,6 +342,21 @@ mod tests {
             fan_a: None,
             fan_b: None,
         }
+    }
+
+    /// The geometric facing sides these reqs seed onto (honouring forced `.side`) —
+    /// the input `assign` now takes. Slot/C3 tests drive `assign` through this.
+    fn sides(reqs: &[SegReq]) -> Vec<(Side, Side)> {
+        reqs.iter()
+            .map(|r| {
+                let (ga, gb) = super::super::geometry::pick_edges(r.a, r.b);
+                (r.forced_a.unwrap_or(ga), r.forced_b.unwrap_or(gb))
+            })
+            .collect()
+    }
+
+    fn plan(reqs: &[SegReq], hints: &[PlanHint]) -> Vec<Plan> {
+        assign(reqs, &sides(reqs), hints)
     }
 
     #[test]
@@ -585,31 +498,6 @@ mod tests {
     }
 
     #[test]
-    fn a_reside_hint_re_elects_the_side() {
-        // A level a→b wire takes b's facing side by geometry; a reside hint (its
-        // provisional route skimmed an endpoint) moves it to the named side (C1
-        // obstacle-aware re-election). Forced sides still win over a hint.
-        let a = rect(0.0, 0.0, 40.0, 40.0);
-        let b = rect(160.0, 0.0, 200.0, 40.0);
-        let reqs = [seg("a", a, "bb", b)];
-        assert_eq!(
-            plan(&reqs, &[])[0].side_a,
-            Side::Right,
-            "geometry picks right"
-        );
-
-        let hints = [PlanHint {
-            reside_a: Some(Side::Bottom),
-            ..Default::default()
-        }];
-        assert_eq!(
-            plan(&reqs, &hints)[0].side_a,
-            Side::Bottom,
-            "a reside hint re-elects the side"
-        );
-    }
-
-    #[test]
     fn a_fan_trunk_and_a_plain_wire_take_separate_slots() {
         // src's right hosts a 2-sibling fan (one slot) plus an unrelated wire.
         // That's two occupants → two distinct slots; the siblings still coincide.
@@ -711,31 +599,6 @@ mod tests {
             "ports aligned to one x → straight vertical, got {:?} / {:?}",
             plans[0].port_a,
             plans[0].port_b
-        );
-    }
-
-    #[test]
-    fn diagonal_wire_leaves_the_least_loaded_side() {
-        // hub feeds a node straight right (loads its Right side) and a second node
-        // diagonally down-right. The diagonal one is reachable off Right or Bottom
-        // equally well (C1), so it should pick the less-loaded Bottom.
-        let hub = rect(0.0, 0.0, 40.0, 40.0);
-        let east = rect(200.0, 10.0, 240.0, 30.0); // level → straight off Right
-        let down_right = rect(200.0, 200.0, 240.0, 240.0); // diagonal
-        let reqs = vec![
-            seg("hub", hub, "east", east),
-            seg("hub", hub, "dr", down_right),
-        ];
-        let plans = plan(&reqs, &[]);
-        assert_eq!(
-            plans[0].side_a,
-            Side::Right,
-            "level target → straight right"
-        );
-        assert_eq!(
-            plans[1].side_a,
-            Side::Bottom,
-            "diagonal target dodges the loaded Right side"
         );
     }
 }

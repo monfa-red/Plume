@@ -15,20 +15,6 @@ fn sample_paths() -> Vec<PathBuf> {
     paths
 }
 
-/// Samples that are an in-flight routing TARGET, not yet expected to meet the hard
-/// guarantees. The turn-aware side-search (see
-/// `docs/superpowers/plans/2026-05-29-turn-aware-side-search.md`) exists to bring
-/// `wires_realistic_column` up to clean; until it lands, that scene is exempt from
-/// the hard-guarantee gate (its bad numbers are still recorded in the scorecard).
-/// REMOVE entries here as the search makes them pass.
-const WIP_SAMPLES: &[&str] = &["wires_realistic_column.plume"];
-
-fn is_wip(path: &std::path::Path) -> bool {
-    path.file_name()
-        .and_then(|n| n.to_str())
-        .is_some_and(|n| WIP_SAMPLES.contains(&n))
-}
-
 #[test]
 fn routing_relaxations_are_surfaced_as_diagnostics() {
     // wires_labels packs 5 wires onto one short edge — a genuine C5 overflow whose
@@ -84,9 +70,6 @@ fn no_sample_breaks_a_hard_guarantee() {
     // endpoint-clearance work (and any future routing change) from ever shipping a
     // pierced node or a broken invariant.
     for path in sample_paths() {
-        if is_wip(&path) {
-            continue; // an in-flight routing target — see WIP_SAMPLES
-        }
         let src = std::fs::read_to_string(&path).unwrap();
         let hard: Vec<plume::Violation> = plume::validate_str(&src)
             .expect("validate")
