@@ -65,12 +65,14 @@ resolve (ResolvedWire — exists) → layout (PlacedNode tree — exists)
 
 | File | Concern |
 |---|---|
-| `mod.rs` | orchestration: route every wire in deterministic order → `Vec<RoutedWire>` |
+| `mod.rs` | orchestration: seed → `select` → `ports` → `route` → `nudge` → `Vec<RoutedWire>` |
+| `select.rs` | **side selection** — the turn-aware monotone hill-climb (which side each end leaves) |
+| `score.rs` | the scorecard tuple the search minimises (validator counts + turns + length) |
 | `oracle.rs` | `clearance(node)` / `separation(w1,w2)` — the only place distances are computed |
 | `scene.rs` | per-wire obstacle set + a scene index (passable ancestors, solid non-endpoint groups, text ignored) |
 | `graph.rs` | orthogonal visibility graph (candidate lines at obstacle edges ± clearance and at ports) |
 | `route.rs` | per-wire A\* over the graph, cost per WIRING section B |
-| `ports.rs` | side selection + uniform slot assignment + ordering (WIRING section C) |
+| `ports.rs` | uniform slot assignment + ordering + the C3 slide, **given** the chosen sides (WIRING C2–C5) |
 | `nudge.rs` | channels / track assignment / separation / snap-to-shared-lane (WIRING B6, E1) |
 | `validate.rs` | the contract checker (WIRING sections A–B) — independent of the router |
 | `geometry.rs` | shared point/segment math (intersection, perpendicular distance, …) |
@@ -308,72 +310,45 @@ container).
 
 Result: `wires_realistic` bird→roof is clean (B2n:0); the systemic skim is closed.
 
-## Obstacle-aware ports — the libavoid two-pass (`mod::route_wires`)
+## Turn-aware global side-search — CURRENT (`select.rs`)
 
-Side and slot choice were the deeper root: chosen *before* routing from
-straight-line guesses, so a wire that must detour around an obstacle got the wrong
-slot order (avoidable crossings) or left a side that forced it through a
-sub-`2·clearance` gap (avoidable skims). Now `route_wires` routes **twice**: a
-provisional pass, then `derive_hints` reads each route's real geometry back into a
-`ports::PlanHint` — `lead_*` (where the wire actually heads, so C4 orders slots by
-real exit heading) and `reside_*` (when an end skimmed its own node, the
-perpendicular side it turned toward, so C1 re-elects it). The second pass re-plans
-and re-routes with those hints. The adversarial review's warning held: the key
-must come from the **real obstacle-aware route**, not a blind dumb-route probe.
+Side selection was the deeper root of every remaining issue (off-centre ports,
+extra turns, the scene-direction bias, the column-layout tangle). The old approach —
+geometric facing pick, then a chain of patches (least-loaded, skim-`reside`,
+all-or-nothing convergence-unify) — was replaced by **one monotone hill-climb**
+([design](docs/superpowers/specs/2026-05-29-turn-aware-side-search-design.md)).
 
-Result suite-wide: **B2n = 0 and B2w = `wires_labels` only** (the C5 overflow);
-`wires_chain`/`mermaid_fast`/`wires_fan` route cleanly (wires re-elect to the
-bottom and run under the row); `wires_realistic` crossings **6 → 4** (the
-`water↔bird`×green ones gone).
+`select::search` seeds with the geometric facing pick and repeatedly proposes a
+move — flip a single wire-end, or move a whole node group / fan trunk as a unit —
+onto a candidate side (the facing side + its two perpendiculars; forced `.side`
+pinned). It keeps any move that **strictly** lowers `score`'s tuple
+`(invariants, B1, B2n, B2w, crossings, turns, length)`, evaluated by a fast
+route-only **proxy**. The same lead hints feed the proxy and the final build, the
+winner is built + nudged, and kept only if it betters the seed baseline — so the
+result is **monotone** (never worse than geometric), **can't oscillate** (strict
+improvement only), and is a **deterministic function of input**. Convergence
+nesting, partitioning, turn-minimisation, and perpendicular-side exits all *emerge*
+from this one mechanism; `ports` lost side *choice* (`plan` → `assign`, taking sides
+as input) and `mod` became orchestration-only.
 
----
+**Result vs the old heuristics:**
 
-## Crossing-aware convergence — DONE (`mod::converge_resides`)
+- `wires_realistic_column` (the column "disaster"): **A3 1→0, B2w 8→1, X 10→5** — the
+  shared-run overlaps are gone; it passes every hard guarantee.
+- `wires_chain` X 1→0; `wires_realistic_row` clean (`cat→bowl` to the midpoint,
+  `bird/water→roof` minimal turns, X:0); `wires_fan` clean (fan-trunk re-election).
+- New gated scenes `wires_star` / `wires_grid` / `wires_nested` all validate 0/0/0/0.
+- Only residual: `mermaid_fast` B2n:1 — a 4px **flagged** skim on a tight fan-in,
+  where keeping the fan unified (E2) beats the old split-the-fan trick.
 
-**Done.** The remaining 4 crossings on `wires_realistic` were all
-`bird→roof`×`water→roof` — two *independent* bundles (different sources, same target
-`roof`) that picked *different sides* of the shared target (`bird→roof` into the
-bottom, `water→roof` rising on the left) and so couldn't nest.
+All hard guarantees + B2n 0 suite-wide (bar that one flagged skim); byte-identical
+compiles; clippy/fmt clean. Tests: `select`/`score` unit tests; the slot/C3 tests in
+`ports`; `realistic_convergence_crossings_are_minimised`; the hard-guarantee gate +
+scorecard over the broadened sample suite.
 
-The router now routes **two candidates** and keeps the better:
-
-- **Candidate A** is the established informed second pass (lead/reside hints from the
-  pass-1 provisional routes).
-- **Candidate B** adds *crossing-aware convergence*: `converge_groups` finds the
-  sets of wire-ends that **share an endpoint node** and whose pass-1 routes
-  perpendicular-cross there (one group per node). Excluded: fan siblings (E2 — a
-  permitted coincident run) and two segments of *one* chain (`chains[i]==chains[j]`
-  — the wire passing through the node, not two bundles meeting). For each group,
-  `try_unify_group` tries pinning **all** its members (anchor included) onto each
-  side the group occupies and keeps the side that best betters the scorecard;
-  groups are processed greedily, each pin layered on the last. `overlay_resides`
-  lays the pins as `reside` hints over the base; the `lead`-based C4 order nests them.
-  Trying every occupied side (not just one anchor's) and pinning *all* members is
-  what makes 3-way convergence (e.g. cat+bird+water → roof) collapse to X:0.
-
-`route_wires` adopts a trial **only when `quality < best`** — `quality` is the
-lexicographic scorecard tuple `(invariants, B1, B2n, B2w, crossings, bends, length)`,
-the first five read straight from the independent `validate_routing` and the last two
-(B4/B5, which the validator doesn't flag) summed from the polylines (length in whole
-px, a determinism-safe B6 tidiness proxy). Crossings rank above bends, so a trial may
-still spend a bend to dodge a crossing (WIRING B3 ≈ a few bends) but can **never** add a
-bend/length at equal crossings. So the convergence pass is **monotone over the whole
-tracked contract**: it only keeps the prior best or adopts a strictly-better trial — no
-sample regresses on any tracked metric — and the output stays a **deterministic
-function of the input** (tie → prior, a guaranteed no-op when nothing helps). No new
-iteration, no oscillation, no per-wire greedy penalty.
-
-**Result:** `wires_realistic` (now incl. `cat -> roof`, three bundles converging) X
-**→ 0** — all five wires nest onto one side of `roof`; every other sample's contract
-metrics unchanged; B2n 0 and all hard guarantees 0 suite-wide; `wires_chain` X:1
-(geometry-forced). Byte-identical across two compiles; clippy/fmt clean. Tests:
-`converge_groups` unit tests in `mod.rs` (group-on-cross incl. 3-way; left-alone for
-no-cross, fan-sibling, non-converging, same-chain) +
-`tests/wiring.rs::realistic_convergence_crossings_are_minimised`.
-
-Adversarially reviewed (5 independent lenses + verification): determinism, panic
-safety, and router interaction came back clean; the bends/length guard and the
-same-chain exclusion above closed the two findings worth acting on.
+**Locked:** side selection is a monotone search over a turn-aware objective — never a
+per-wire greedy A\* penalty (raises crossings / self-crosses, proven), never an
+oscillating re-route loop (the strict-improvement guard is what makes it safe).
 
 ### Follow-up routing fixes (same contract, sharper geometry)
 

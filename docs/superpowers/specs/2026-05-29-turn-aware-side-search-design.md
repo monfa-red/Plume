@@ -1,6 +1,8 @@
 # Turn-aware global side-search for wire routing
 
-Status: approved design, ready to plan.
+Status: **IMPLEMENTED** (`select.rs` + `score.rs`; see PLAN.md "Turn-aware global
+side-search"). Column disaster fixed (A3 1→0), `wires_chain` X 1→0, row clean; one
+residual flagged skim on `mermaid_fast`. Original design below.
 Source of truth for routing rules stays [`WIRING.md`](../../../WIRING.md); this spec
 describes a router change that better *satisfies* those rules. Implementation
 phases land in [`PLAN.md`](../../../PLAN.md).
