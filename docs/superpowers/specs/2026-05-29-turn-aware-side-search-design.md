@@ -109,9 +109,12 @@ Re-routing every wire for every move is the cost. The search scores moves with a
 **route-only proxy** — re-plan slots, route each wire, count crossings/turns/length
 on the raw routes (skip the nudge, which separates rails but rarely changes
 crossings or bend count). Only the **final** winning assignment pays for nudge +
-full validation. Caps: ≤3 candidate sides/end, a bounded number of full scans, and a
-total eval cap; when a cap truncates the search it is `log()`-ed, never silent. The
-existing keep-better guarantee means the result is **never worse than today's**.
+full validation. Caps: a bounded number of full scans (`MAX_SCANS`) and a total proxy
+budget (`MAX_EVALS`); past the budget the search stops best-effort. (Truncation is
+*silent* — a library has no log sink — but safe: the keep-better-vs-seed guarantee
+means a truncated search is still **never worse than the geometric seed**.) Candidate
+sides are facing + the two perpendiculars; the back side is opened only in a gated
+second round when round 1 left a B1/B2n a back-side exit could rescue.
 
 ### 5. C3 usable-span fix (issue 1)
 

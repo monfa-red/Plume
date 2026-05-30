@@ -57,11 +57,25 @@ pub fn compile_str(src: &str) -> Result<String, Error> {
 pub fn compile_str_with(src: &str, opts: &Options) -> Result<String, Error> {
     let program = resolve_pipeline(src, opts)?;
     let laid_out = layout::layout(&program)?;
-    let svg = render::render(&laid_out, opts);
-    Ok(match opts.format {
+    Ok(finish_svg(&laid_out, opts))
+}
+
+/// Compile to SVG **and** collect the routing-relaxation diagnostics in a single
+/// layout pass. The CLI's default path needs both (the SVG to emit, the diagnostics
+/// to warn); routing through here runs the wire router once instead of twice.
+pub fn compile_str_checked(src: &str, opts: &Options) -> Result<(String, Vec<Diagnostic>), Error> {
+    let program = resolve_pipeline(src, opts)?;
+    let laid_out = layout::layout(&program)?;
+    let diags = routing_diagnostics_of(layout::validate_routing(&laid_out));
+    Ok((finish_svg(&laid_out, opts), diags))
+}
+
+fn finish_svg(laid_out: &layout::LaidOut, opts: &Options) -> String {
+    let svg = render::render(laid_out, opts);
+    match opts.format {
         OutputFormat::Svg => svg,
         OutputFormat::Html => wrap_html(&svg),
-    })
+    }
 }
 
 pub fn compile_file(path: &Path) -> Result<String, Error> {
@@ -116,8 +130,14 @@ pub fn validate_str(src: &str) -> Result<Vec<Violation>, Error> {
 /// crossings are normal output, so neither appears here. The CLI prints these as
 /// warnings; `--strict` makes them fail the build.
 pub fn routing_diagnostics(src: &str) -> Result<Vec<Diagnostic>, Error> {
+    Ok(routing_diagnostics_of(validate_str(src)?))
+}
+
+/// Map routing violations to the user-facing B1/B2 relaxation warnings (hard
+/// invariants are guaranteed and B3 crossings are normal output, so neither shows).
+fn routing_diagnostics_of(violations: Vec<Violation>) -> Vec<Diagnostic> {
     let relaxed = |r: Rule| matches!(r, Rule::NodeOverlap | Rule::Clearance | Rule::Separation);
-    Ok(validate_str(src)?
+    violations
         .into_iter()
         .filter(|v| relaxed(v.rule))
         .map(|v| {
@@ -131,7 +151,7 @@ pub fn routing_diagnostics(src: &str) -> Result<Vec<Diagnostic>, Error> {
                 ),
             )
         })
-        .collect())
+        .collect()
 }
 
 fn resolve_pipeline(src: &str, opts: &Options) -> Result<resolve::Program, Error> {

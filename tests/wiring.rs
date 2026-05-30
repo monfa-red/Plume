@@ -195,6 +195,31 @@ fn realistic_convergence_crossings_are_minimised() {
 }
 
 #[test]
+fn a_boxed_in_wire_rescues_its_back_side() {
+    // `aa` sits inside a C-shaped wall open only to the left, while `bb` is far to
+    // the right. The facing (right) and both perpendicular exits skim `aa`; only the
+    // back (left) side routes cleanly. The side-search's round-2 back-side rescue
+    // must find it → no endpoint-clearance (B2n) relaxation.
+    let src = "{ |scene| }\n\
+               aa     |rect| size:(30,30) at:(200,200)\n\
+               wtop   |rect| size:(90,12) at:(190,170)\n\
+               wbot   |rect| size:(90,12) at:(190,248)\n\
+               wright |rect| size:(12,90) at:(268,170)\n\
+               bb     |rect| size:(30,30) at:(420,205)\n\
+               aa -> bb\n";
+    assert_eq!(
+        count_rule(src, plume::Rule::Clearance),
+        0,
+        "the back-side exit must be found so the wire doesn't skim its own node"
+    );
+    assert_eq!(
+        count_rule(src, plume::Rule::NodeOverlap),
+        0,
+        "and pierce nothing"
+    );
+}
+
+#[test]
 fn router_threads_around_a_blocking_box() {
     // via sits between src and dst; with gap (48) > 2·clearance (32) there is room
     // to detour around it AND keep clearance from src/dst, so the route is fully

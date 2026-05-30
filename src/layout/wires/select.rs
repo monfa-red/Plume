@@ -24,6 +24,33 @@ use std::collections::BTreeMap;
 /// the cap just bounds pathological inputs — truncation only forgoes improvement).
 const MAX_SCANS: usize = 6;
 
+/// Total route-only proxy evaluations before the search stops, best-effort. Each
+/// proxy routes every wire, so cost grows with scene size; this bounds the wall time
+/// on pathological inputs (e.g. one hub with dozens of spokes). Real scenes converge
+/// (no improving move) in a few hundred evals, far under this; truncation is safe —
+/// the result is still the monotone best-so-far, never worse than the seed.
+const MAX_EVALS: usize = 4000;
+
+/// The search's working context: the inputs plus the spent-evaluation budget, so
+/// every candidate scoring goes through one place that counts and can cut off.
+struct Search<'a> {
+    reqs: &'a [SegReq],
+    hints: &'a [PlanHint],
+    nodes: &'a [PlacedNode],
+    evals: usize,
+}
+
+impl Search<'_> {
+    fn proxy(&mut self, sides: &[(Side, Side)]) -> Score {
+        self.evals += 1;
+        proxy(self.reqs, sides, self.hints, self.nodes)
+    }
+
+    fn exhausted(&self) -> bool {
+        self.evals >= MAX_EVALS
+    }
+}
+
 /// The geometric seed: every end on the facing side `pick_edges` gives, honouring a
 /// forced `.side`. A self-loop has no facing geometry → right→top (E3); the search
 /// leaves self-loops alone.
@@ -51,30 +78,63 @@ pub fn search(
     hints: &[PlanHint],
     nodes: &[PlacedNode],
 ) -> Vec<(Side, Side)> {
+    let mut cx = Search {
+        reqs,
+        hints,
+        nodes,
+        evals: 0,
+    };
     let mut sides = seed.to_vec();
-    let mut best = proxy(reqs, &sides, hints, nodes);
+    let mut best = cx.proxy(&sides);
 
-    for _ in 0..MAX_SCANS {
+    // Round 1 hill-climbs with facing + perpendicular candidates only — the back
+    // side usually just adds a U-turn, and admitting it into the main greedy climb
+    // can steer it into a worse local optimum. Round 2 re-opens the back side, but
+    // only when round 1 left a node overlap (B1) or an endpoint skim (B2n) that a
+    // back-side exit could rescue — a wire boxed in on its other three sides. It
+    // climbs from round 1's state, so it only ever improves; gating it keeps the
+    // common (already-clean) scene to a single round.
+    hill_climb(&mut cx, &mut sides, &mut best, seed, false);
+    if best.1 > 0 || best.2 > 0 {
+        hill_climb(&mut cx, &mut sides, &mut best, seed, true);
+    }
+    sides
+}
+
+/// One hill-climb pass: scan the move set until no move strictly improves, or the
+/// eval budget runs out. `allow_back` opens the fourth (back) side for single-end
+/// flips. Every accepted move lowers the proxy scorecard, so this is monotone.
+fn hill_climb(
+    cx: &mut Search,
+    sides: &mut Vec<(Side, Side)>,
+    best: &mut Score,
+    seed: &[(Side, Side)],
+    allow_back: bool,
+) {
+    'scans: for _ in 0..MAX_SCANS {
         let mut improved = false;
 
         // Single-end flips — the workhorse. Yields convergence (flip onto a
         // neighbour's side), partitioning (each end finds its own best side),
         // turn-min and perpendicular exits.
-        for s in 0..reqs.len() {
-            if reqs[s].a_node == reqs[s].b_node {
+        for s in 0..cx.reqs.len() {
+            if cx.reqs[s].a_node == cx.reqs[s].b_node {
                 continue; // self-loop: no side search
             }
             for is_a in [true, false] {
-                for cand in candidates(&reqs[s], is_a, side_at(seed, s, is_a)) {
-                    if cand == side_at(&sides, s, is_a) {
+                for cand in candidates(&cx.reqs[s], is_a, side_at(seed, s, is_a), allow_back) {
+                    if cand == side_at(sides, s, is_a) {
                         continue;
+                    }
+                    if cx.exhausted() {
+                        break 'scans;
                     }
                     let mut trial = sides.clone();
                     set_side(&mut trial, s, is_a, cand);
-                    let q = proxy(reqs, &trial, hints, nodes);
-                    if q < best {
-                        sides = trial;
-                        best = q;
+                    let q = cx.proxy(&trial);
+                    if q < *best {
+                        *sides = trial;
+                        *best = q;
                         improved = true;
                     }
                 }
@@ -84,38 +144,29 @@ pub fn search(
         // Group-unify escape — pin all of a node's movable ends onto one side at
         // once, reaching layouts no single flip can (two wires that must move
         // together to stop crossing).
-        for group in node_groups(reqs) {
-            improved |= try_unit(
-                reqs,
-                &mut sides,
-                &mut best,
-                &group,
-                &group_sides(seed, &group),
-                hints,
-                nodes,
-            );
+        for group in node_groups(cx.reqs) {
+            let g_sides = group_sides(seed, &group);
+            improved |= try_unit(cx, sides, best, &group, &g_sides);
         }
 
         // Fan-trunk re-election — a fan's siblings share one slot at their hub, so a
         // single flip can't move them (they're pinned). Move the whole trunk as a
         // unit instead, trying each side, so a hub side that skims can re-elect.
-        for trunk in fan_trunks(reqs) {
-            improved |= try_unit(
-                reqs, &mut sides, &mut best, &trunk, &ALL_SIDES, hints, nodes,
-            );
+        for trunk in fan_trunks(cx.reqs) {
+            improved |= try_unit(cx, sides, best, &trunk, &ALL_SIDES);
         }
 
-        if !improved {
+        if !improved || cx.exhausted() {
             break;
         }
     }
-    sides
 }
 
-/// Candidate sides for one end: the facing side plus its two perpendiculars — never
-/// the back side (that always adds a U-turn). A forced `.side` or a fan-trunk end is
-/// pinned to its single side (a fan's siblings must share one slot, E2).
-fn candidates(req: &SegReq, is_a: bool, seed_side: Side) -> Vec<Side> {
+/// Candidate sides for one end: the facing side and its two perpendiculars, plus the
+/// back side when `allow_back` (it usually adds a U-turn, but with obstacles it can
+/// be the only clean exit). A forced `.side` or a fan-trunk end is pinned to its
+/// single side (a fan's siblings must share one slot, E2).
+fn candidates(req: &SegReq, is_a: bool, seed_side: Side, allow_back: bool) -> Vec<Side> {
     let forced = if is_a { req.forced_a } else { req.forced_b };
     if let Some(f) = forced {
         return vec![f];
@@ -123,11 +174,21 @@ fn candidates(req: &SegReq, is_a: bool, seed_side: Side) -> Vec<Side> {
     if (if is_a { req.fan_a } else { req.fan_b }).is_some() {
         return vec![seed_side];
     }
-    let back = opposite(seed_side);
-    [Side::Top, Side::Right, Side::Bottom, Side::Left]
+    let back = back_side(seed_side);
+    ALL_SIDES
         .into_iter()
-        .filter(|&s| s != back)
+        .filter(|&s| allow_back || s != back)
         .collect()
+}
+
+/// The opposite side — a flip to here from `s` is a U-turn.
+fn back_side(s: Side) -> Side {
+    match s {
+        Side::Top => Side::Bottom,
+        Side::Bottom => Side::Top,
+        Side::Left => Side::Right,
+        Side::Right => Side::Left,
+    }
 }
 
 /// The score of a side assignment, by a fast **route-only** proxy: assign ports,
@@ -175,23 +236,24 @@ const ALL_SIDES: [Side; 4] = [Side::Top, Side::Right, Side::Bottom, Side::Left];
 /// keeping any strict improvement; returns whether it improved. A forced end can't
 /// leave its side, so a unit is skipped for any side that would violate one.
 fn try_unit(
-    reqs: &[SegReq],
+    cx: &mut Search,
     sides: &mut Vec<(Side, Side)>,
     best: &mut Score,
     unit: &[(usize, bool)],
     candidate_sides: &[Side],
-    hints: &[PlanHint],
-    nodes: &[PlacedNode],
 ) -> bool {
     let mut improved = false;
     for &side in candidate_sides {
+        if cx.exhausted() {
+            break;
+        }
         let mut trial = sides.clone();
         let mut ok = true;
         for &(s, is_a) in unit {
             let forced = if is_a {
-                reqs[s].forced_a
+                cx.reqs[s].forced_a
             } else {
-                reqs[s].forced_b
+                cx.reqs[s].forced_b
             };
             if forced.is_some_and(|f| f != side) {
                 ok = false;
@@ -200,7 +262,7 @@ fn try_unit(
             set_side(&mut trial, s, is_a, side);
         }
         if ok {
-            let q = proxy(reqs, &trial, hints, nodes);
+            let q = cx.proxy(&trial);
             if q < *best {
                 *sides = trial;
                 *best = q;
@@ -271,15 +333,6 @@ fn set_side(sides: &mut [(Side, Side)], s: usize, is_a: bool, side: Side) {
     }
 }
 
-fn opposite(s: Side) -> Side {
-    match s {
-        Side::Top => Side::Bottom,
-        Side::Bottom => Side::Top,
-        Side::Left => Side::Right,
-        Side::Right => Side::Left,
-    }
-}
-
 /// A stable total order over sides for deterministic candidate iteration.
 fn side_rank(s: Side) -> u8 {
     match s {
@@ -345,21 +398,23 @@ mod tests {
                 max_y: 10.0,
             },
         );
-        // Facing Right → candidates are {Top, Right, Bottom}, never Left (the back).
-        let c = candidates(&r, true, Side::Right);
+        // Facing Right, back closed → {Top, Right, Bottom}, never Left (the back).
+        let c = candidates(&r, true, Side::Right, false);
         assert!(!c.contains(&Side::Left), "back side excluded: {c:?}");
         assert_eq!(c.len(), 3);
+        // Back open (round 2) → all four sides are candidates.
+        assert_eq!(candidates(&r, true, Side::Right, true).len(), 4);
 
         r.forced_a = Some(Side::Top);
         assert_eq!(
-            candidates(&r, true, Side::Right),
+            candidates(&r, true, Side::Right, true),
             vec![Side::Top],
             "forced pins"
         );
         r.forced_a = None;
         r.fan_a = Some(1);
         assert_eq!(
-            candidates(&r, true, Side::Right),
+            candidates(&r, true, Side::Right, true),
             vec![Side::Right],
             "a fan trunk pins to its seed side"
         );

@@ -172,18 +172,20 @@ fn main() -> ExitCode {
             }
             warnings_were_emitted |= !diags.is_empty();
         }
-        // Flag any last-resort routing relaxation (B1/B2) — WIRING requires these
-        // never be silent.
-        if let Ok(diags) = plume::routing_diagnostics(&source) {
-            for d in &diags {
-                eprintln!("{}", d.display_with_source(&source, &filename));
-            }
-            warnings_were_emitted |= !diags.is_empty();
-        }
     }
 
-    match plume::compile_str_with(&source, &opts) {
-        Ok(svg) => {
+    // Compile and collect the routing relaxations in one layout pass — the wire
+    // router is expensive, so we don't route once for the SVG and again for warnings.
+    match plume::compile_str_checked(&source, &opts) {
+        Ok((svg, route_diags)) => {
+            if !cli.no_warn {
+                // Flag any last-resort routing relaxation (B1/B2) — WIRING requires
+                // these never be silent.
+                for d in &route_diags {
+                    eprintln!("{}", d.display_with_source(&source, &filename));
+                }
+                warnings_were_emitted |= !route_diags.is_empty();
+            }
             if let Some(out_path) = cli.output {
                 if let Err(e) = std::fs::write(&out_path, svg.as_bytes()) {
                     eprintln!("error: write {}: {}", out_path.display(), e);

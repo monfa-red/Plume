@@ -350,6 +350,23 @@ scorecard over the broadened sample suite.
 per-wire greedy A\* penalty (raises crossings / self-crosses, proven), never an
 oscillating re-route loop (the strict-improvement guard is what makes it safe).
 
+**Post-review hardening** (independent adversarial review of the rewrite — determinism,
+monotonicity, panic-safety came back clean; three real perf/quality findings fixed):
+
+- **Back-side rescue (correctness).** `candidates` excluded the back side, so a wire
+  boxed in on its other three sides got stranded on a flagged endpoint-skim (B2n). The
+  search now runs in **two rounds**: round 1 climbs with facing + perpendiculars (the
+  back side in the main greedy climb steers it to worse local optima); round 2 re-opens
+  the back side from round 1's converged state — but **only when round 1 left a B1/B2n**
+  it could rescue — so it only ever improves and the common clean scene stays one round.
+- **Eval cap (the missing safety net).** Each proxy routes every wire, so cost grows
+  with scene size; `MAX_EVALS` bounds the total proxies (best-effort beyond — still the
+  monotone best-so-far, never worse than the seed). A pathological 40-spoke hub now
+  completes in ~1 s instead of growing unbounded.
+- **Single layout pass.** The CLI routed twice — `routing_diagnostics` then
+  `compile_str_with`. New `plume::compile_str_checked` lays out once and returns both the
+  SVG and the relaxation diagnostics, halving the default compile cost.
+
 ### Follow-up routing fixes (same contract, sharper geometry)
 
 - **Even-spacing overflow (C2/C5):** `ports::assign_slots` spacing was
