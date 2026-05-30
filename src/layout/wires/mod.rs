@@ -16,6 +16,7 @@ mod oracle;
 mod ports;
 mod route;
 mod scene;
+mod score;
 mod text;
 mod validate;
 
@@ -24,12 +25,11 @@ pub use validate::{validate_routing, Rule, Severity, Violation};
 use crate::ast::Side;
 use crate::error::Error;
 use crate::layout::ir::{PlacedNode, RoutedWire};
-use crate::resolve::{
-    AttrMap, MarkerKind, Markers, Program, ResolvedEndpoint, ResolvedWire, VarTable,
-};
+use crate::resolve::{MarkerKind, Markers, Program, ResolvedEndpoint, ResolvedWire};
 use geometry::{dumb_route, perp_crossing, rect_penetrated_by, seg_rect_distance, Pt, Rect, EPS};
 use ports::{Plan, PlanHint, SegReq};
 use scene::SceneIndex;
+use score::{score, Score};
 use text::place_texts;
 
 /// Where one routed segment belongs in its source wire — so markers land on the
@@ -87,7 +87,7 @@ pub fn route_wires(program: &Program, nodes: &[PlacedNode]) -> Result<Vec<Routed
         return Ok(a);
     }
     let mut best = a;
-    let mut best_q = quality(&best, nodes);
+    let mut best_q = score(&best, nodes);
     let mut overlay = vec![(None, None); reqs.len()];
     for group in &groups {
         if let Some((trial, wires, q)) = try_unify_group(
@@ -153,7 +153,7 @@ fn try_unify_group(
             &ports::plan(reqs, &overlay_resides(base, &trial)),
             nodes,
         );
-        let q = quality(&wires, nodes);
+        let q = score(&wires, nodes);
         if q < bar {
             bar = q;
             best = Some((trial, wires, q));
@@ -235,42 +235,6 @@ fn finish(
     }
     nudge::nudge(&mut out, nodes);
     out
-}
-
-/// A candidate routing's contract scorecard, ordered so a smaller tuple is
-/// strictly better. The fields follow WIRING's own priority: the constraints first
-/// (invariants A1–A5, then B1 node overlap, then B2 wire-node and wire-wire
-/// clearance), then the objective (B3 crossings, B4 bends, B5 length — length in
-/// whole px as a coarse, determinism-safe tidiness proxy for B6). Comparing these
-/// lexicographically keeps the convergence pass **monotone over the whole tracked
-/// contract**: it adopts an alternative only when it lowers crossings (or, at equal
-/// crossings, bends then length) without regressing any higher-priority guarantee.
-type Score = (usize, usize, usize, usize, usize, usize, usize);
-
-fn quality(wires: &[RoutedWire], nodes: &[PlacedNode]) -> Score {
-    let vs = validate_routing(nodes, &AttrMap::new(), wires, &VarTable::new());
-    let (mut inv, mut b1, mut b2n, mut b2w, mut crossings) = (0, 0, 0, 0, 0);
-    for v in &vs {
-        match v.rule {
-            Rule::NodeOverlap => b1 += 1,
-            Rule::Clearance => b2n += 1,
-            Rule::Separation => b2w += 1,
-            Rule::Crossing => crossings += 1,
-            r if r.severity() == Severity::Invariant => inv += 1,
-            _ => {}
-        }
-    }
-    // B4 / B5 — the objective metrics the validator doesn't flag. A polyline of
-    // `len` points has `len - 2` interior bends; length is summed in whole px. With
-    // crossings ranked above them, B may still spend a bend to dodge a crossing
-    // (WIRING B3 ≈ a few bends), but at equal crossings it can never add a bend or
-    // length — closing the only gap in the no-regression guarantee.
-    let bends: usize = wires.iter().map(|w| w.path.len().saturating_sub(2)).sum();
-    let length: usize = wires
-        .iter()
-        .map(|w| geometry::length(&w.path).round() as usize)
-        .sum();
-    (inv, b1, b2n, b2w, crossings, bends, length)
 }
 
 /// Lay the convergence reside-overlay onto the base hints: a unification side wins
