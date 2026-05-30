@@ -18,7 +18,7 @@
 //! sub-separation is genuine overflow for `nudge` to leave flagged, not a route to
 //! force into a node.
 
-use super::geometry::{clean, range_overlap, rect_penetrated_by, seg_rect_distance, Pt, EPS};
+use super::geometry::{clean, range_overlap, rect_penetrated_by, seg_rect_distance, Pt, Rect, EPS};
 use super::oracle;
 use super::scene::{obstacles_for, SceneIndex};
 use crate::layout::ir::{PlacedNode, RoutedWire};
@@ -27,12 +27,72 @@ use std::collections::BTreeMap;
 /// One candidate track placement: where each `(wire, segment)` should sit.
 type Placement = Vec<((usize, usize), f64)>;
 
+/// The scene data a wire's nudge-safety check needs that is constant across the
+/// side-search — its solid obstacles and its own endpoint rects. Built once per
+/// scene (each is a scene-tree walk) and reused for every candidate the search
+/// nudges, instead of rebuilt on every call.
+pub struct WireScene {
+    obstacles: Vec<Rect>, // the solid nodes this wire must clear
+    endpoints: Vec<Rect>, // its own endpoint rects (empty for a self-loop)
+}
+
+/// Build the per-wire scene data, in wire order. The wires' endpoints don't change
+/// during the search, so the caller computes this once and threads it into every
+/// [`nudge_with`].
+pub fn build_scenes(wires: &[RoutedWire], nodes: &[PlacedNode]) -> Vec<WireScene> {
+    let index = SceneIndex::build(nodes);
+    wires
+        .iter()
+        .map(|w| WireScene {
+            obstacles: obstacles_for(nodes, [&w.seg_from, &w.seg_to]),
+            endpoints: if w.seg_from == w.seg_to {
+                Vec::new() // a self-loop hugs its node at clearance — exempt
+            } else {
+                [&w.seg_from, &w.seg_to]
+                    .iter()
+                    .filter_map(|id| index.rect(id))
+                    .collect()
+            },
+        })
+        .collect()
+}
+
+/// Per-wire safety inputs for one nudge pass: the scene data (borrowed, constant) plus
+/// this route's clearance and original endpoint gap (which the trial must not deepen).
+struct Safety<'a> {
+    obstacles: &'a [Rect],
+    endpoints: &'a [Rect],
+    clearance: f64,
+    orig_gap: f64,
+}
+
 /// Spread shared / near-parallel runs onto clean tracks, committing only the
 /// separations that keep every wire clear of nodes. Mutates each wire's polyline.
 pub fn nudge(wires: &mut [RoutedWire], nodes: &[PlacedNode]) {
-    let index = SceneIndex::build(nodes);
+    let scenes = build_scenes(wires, nodes);
+    nudge_with(wires, &scenes, true);
+}
+
+/// Nudge with precomputed [`WireScene`]s — the side-search reuses one set across all
+/// the candidates it evaluates, so the scene index / obstacle sets aren't rebuilt per
+/// call. `scenes` is indexed like `wires`. `thorough` sweeps the full band of track
+/// centres for the best node-safe placement; the search passes `false` for a coarser,
+/// much cheaper sweep — the crossing count it optimises is set by the track *order*,
+/// not the exact centre, so the cheaper sweep ranks candidates just as well.
+pub fn nudge_with(wires: &mut [RoutedWire], scenes: &[WireScene], thorough: bool) {
     let segs = collect_interior(wires);
     let originals: Vec<Vec<Pt>> = wires.iter().map(|w| w.path.clone()).collect();
+    let safety: Vec<Safety> = wires
+        .iter()
+        .zip(&originals)
+        .zip(scenes)
+        .map(|((w, orig), sc)| Safety {
+            obstacles: &sc.obstacles,
+            endpoints: &sc.endpoints,
+            clearance: oracle::clearance(&w.attrs),
+            orig_gap: endpoint_gap(orig, &sc.endpoints),
+        })
+        .collect();
     let mut moved: BTreeMap<(usize, usize), f64> = BTreeMap::new();
 
     for group in cluster(&segs) {
@@ -47,22 +107,29 @@ pub fn nudge(wires: &mut [RoutedWire], nodes: &[PlacedNode]) {
         // narrower (C5 overflow). A run with no safe placement is left as it was.
         let mut best: Option<(usize, Placement)> = None;
         'search: for order in track_orders(&segs, &group) {
-            for trial in candidate_placements(&segs, &order) {
-                let mut merged = moved.clone();
-                merged.extend(trial.iter().copied());
-                let safe = affected.iter().all(|&wi| {
-                    is_safe(
-                        &rebuild(&originals[wi], wi, &merged),
-                        &originals[wi],
-                        &wires[wi],
-                        nodes,
-                        &index,
-                    )
-                });
+            for trial in candidate_placements(&segs, &order, thorough) {
+                // Apply the trial onto `moved` in place (a cluster's segments are
+                // disjoint from already-moved ones, so its keys aren't present yet),
+                // rebuild each affected wire ONCE, score, then revert — far cheaper
+                // than cloning the whole map and rebuilding twice per candidate.
+                for &(k, v) in &trial {
+                    moved.insert(k, v);
+                }
+                let rebuilt: Vec<Vec<Pt>> = affected
+                    .iter()
+                    .map(|&wi| rebuild(&originals[wi], wi, &moved))
+                    .collect();
+                for (k, _) in &trial {
+                    moved.remove(k);
+                }
+                let safe = affected
+                    .iter()
+                    .zip(&rebuilt)
+                    .all(|(&wi, path)| is_safe(path, &originals[wi], &safety[wi]));
                 if !safe {
                     continue;
                 }
-                let crossings = crossings_among(&affected, &originals, &merged);
+                let crossings = count_crossings(&rebuilt);
                 if best.as_ref().map_or(true, |(b, _)| crossings < *b) {
                     best = Some((crossings, trial));
                 }
@@ -168,7 +235,7 @@ fn cluster(segs: &[Segment]) -> Vec<Vec<usize>> {
 /// caller commits the first one that proves node-safe; a single line over a clear
 /// channel separates fully, a crowded one compacts (C5 overflow), and one boxed in
 /// finds nothing and is left alone.
-fn candidate_placements(segs: &[Segment], order: &[usize]) -> Vec<Placement> {
+fn candidate_placements(segs: &[Segment], order: &[usize], thorough: bool) -> Vec<Placement> {
     let k = order.len();
     if k < 2 {
         return Vec::new();
@@ -208,10 +275,10 @@ fn candidate_placements(segs: &[Segment], order: &[usize]) -> Vec<Placement> {
         if c_hi < c_lo {
             continue; // this spacing won't fit between the stub bounds
         }
-        const STEPS: usize = 16;
+        let steps: usize = if thorough { 16 } else { 4 };
         let anchor = mean.clamp(c_lo, c_hi);
-        let mut centres: Vec<f64> = (0..=STEPS)
-            .map(|i| c_lo + (c_hi - c_lo) * i as f64 / STEPS as f64)
+        let mut centres: Vec<f64> = (0..=steps)
+            .map(|i| c_lo + (c_hi - c_lo) * i as f64 / steps as f64)
             .collect();
         centres.sort_by(|a, b| (a - anchor).abs().total_cmp(&(b - anchor).abs()));
         for centre in centres {
@@ -264,18 +331,10 @@ fn heap_permute(k: usize, a: &mut [usize], out: &mut Vec<Vec<usize>>) {
     }
 }
 
-/// Count perpendicular crossings between the affected wires once rebuilt with
-/// `moved` — the score the nudge minimises when choosing a track order (B3).
-fn crossings_among(
-    affected: &[usize],
-    originals: &[Vec<Pt>],
-    moved: &BTreeMap<(usize, usize), f64>,
-) -> usize {
+/// Count perpendicular crossings between the (already rebuilt) affected wires — the
+/// score the nudge minimises when choosing a track order (B3).
+fn count_crossings(paths: &[Vec<Pt>]) -> usize {
     use super::geometry::perp_crossing;
-    let paths: Vec<Vec<Pt>> = affected
-        .iter()
-        .map(|&wi| rebuild(&originals[wi], wi, moved))
-        .collect();
     let segs = |p: &[Pt]| -> Vec<(Pt, Pt)> { p.windows(2).map(|s| (s[0], s[1])).collect() };
     let mut count = 0;
     for i in 0..paths.len() {
@@ -336,58 +395,49 @@ fn rebuild(original: &[Pt], wire: usize, moved: &BTreeMap<(usize, usize), f64>) 
 /// cross itself (A5). The endpoint check is *relative*: some skims are
 /// geometrically forced (a node within `clearance` of a port), so the nudge may
 /// preserve one but must never deepen it or create a new one.
-fn is_safe(
-    path: &[Pt],
-    original: &[Pt],
-    w: &RoutedWire,
-    nodes: &[PlacedNode],
-    index: &SceneIndex,
-) -> bool {
+fn is_safe(path: &[Pt], original: &[Pt], safety: &Safety) -> bool {
     if !is_orthogonal(path) || !attachment_preserved(path, original) {
         return false;
     }
-    let clearance = oracle::clearance(&w.attrs);
     let segs: Vec<(Pt, Pt)> = path.windows(2).map(|s| (s[0], s[1])).collect();
 
-    for obs in &obstacles_for(nodes, [&w.seg_from, &w.seg_to]) {
+    for obs in safety.obstacles {
         let bad = |s: &(Pt, Pt)| {
-            rect_penetrated_by(*obs, *s) || seg_rect_distance(*obs, *s) + EPS < clearance
+            rect_penetrated_by(*obs, *s) || seg_rect_distance(*obs, *s) + EPS < safety.clearance
         };
         if segs.iter().any(bad) {
             return false;
         }
     }
 
-    if w.seg_from != w.seg_to {
-        let after = endpoint_gap(path, w, index);
+    if !safety.endpoints.is_empty() {
+        let after = endpoint_gap(path, safety.endpoints);
         if after < 0.0 {
             return false; // pierced its own endpoint
         }
-        let floor = clearance.min(endpoint_gap(original, w, index));
-        if after + EPS < floor {
+        if after + EPS < safety.clearance.min(safety.orig_gap) {
             return false; // would deepen / create an endpoint skim
         }
     }
     !self_crosses(&segs)
 }
 
-/// Smallest distance from a wire's non-stub (interior) segments to either of its
-/// endpoint rects — `∞` when there are no interior segments, negative when one
-/// pierces an endpoint's interior. The attaching stubs (first/last) are exempt.
-fn endpoint_gap(path: &[Pt], w: &RoutedWire, index: &SceneIndex) -> f64 {
+/// Smallest distance from a wire's non-stub (interior) segments to its own endpoint
+/// rects — `∞` when there are no interior segments, negative when one pierces an
+/// endpoint's interior. The attaching stubs (first/last) are exempt.
+fn endpoint_gap(path: &[Pt], endpoints: &[Rect]) -> f64 {
     let segs: Vec<(Pt, Pt)> = path.windows(2).map(|s| (s[0], s[1])).collect();
     if segs.len() < 3 {
         return f64::INFINITY;
     }
     let interior = &segs[1..segs.len() - 1];
     let mut gap = f64::INFINITY;
-    for id in [&w.seg_from, &w.seg_to] {
-        let Some(r) = index.rect(id) else { continue };
+    for r in endpoints {
         for s in interior {
-            if rect_penetrated_by(r, *s) {
+            if rect_penetrated_by(*r, *s) {
                 return f64::NEG_INFINITY;
             }
-            gap = gap.min(seg_rect_distance(r, *s));
+            gap = gap.min(seg_rect_distance(*r, *s));
         }
     }
     gap

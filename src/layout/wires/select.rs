@@ -33,19 +33,21 @@ const MAX_SCANS: usize = 6;
 /// the result is still the monotone best-so-far, never worse than the seed.
 const MAX_EVALS: usize = 4000;
 
-/// The search's working context: the inputs plus the spent-evaluation budget, so
-/// every candidate scoring goes through one place that counts and can cut off.
+/// The search's working context: the inputs, the per-wire scene cache the nudge
+/// reuses across every candidate, and the spent-evaluation budget — so every
+/// candidate scoring goes through one place that counts and can cut off.
 struct Search<'a> {
     reqs: &'a [SegReq],
     hints: &'a [PlanHint],
     nodes: &'a [PlacedNode],
+    scenes: Vec<super::nudge::WireScene>,
     evals: usize,
 }
 
 impl Search<'_> {
     fn proxy(&mut self, sides: &[(Side, Side)]) -> Score {
         self.evals += 1;
-        proxy(self.reqs, sides, self.hints, self.nodes)
+        proxy(self.reqs, sides, self.hints, self.nodes, &self.scenes)
     }
 
     fn exhausted(&self) -> bool {
@@ -80,10 +82,14 @@ pub fn search(
     hints: &[PlanHint],
     nodes: &[PlacedNode],
 ) -> Vec<(Side, Side)> {
+    // The per-wire scene cache (obstacles + endpoint rects) is constant across the
+    // search — build it once from a template and reuse it for every candidate nudge.
+    let template: Vec<RoutedWire> = reqs.iter().map(|r| proxy_wire(r, Vec::new())).collect();
     let mut cx = Search {
         reqs,
         hints,
         nodes,
+        scenes: super::nudge::build_scenes(&template, nodes),
         evals: 0,
     };
     let mut sides = seed.to_vec();
@@ -198,13 +204,15 @@ fn back_side(s: Side) -> Side {
 /// the nudge mispredicts both ways — it over-counts the shared runs / sub-separation
 /// the nudge fixes, yet misses the crossings the nudge introduces when it separates a
 /// bundle. Nudging here makes the proxy match the real geometry the search is choosing
-/// between, so it optimises what actually ships. (This is the search's cost driver;
-/// `MAX_EVALS` bounds it.)
+/// between, so it optimises what actually ships. The nudge runs in its cheap
+/// (`thorough = false`) mode with the precomputed scene cache, so this hot-loop
+/// scoring stays fast; the final build re-nudges thoroughly. `MAX_EVALS` bounds it.
 fn proxy(
     reqs: &[SegReq],
     sides: &[(Side, Side)],
     hints: &[PlanHint],
     nodes: &[PlacedNode],
+    scenes: &[super::nudge::WireScene],
 ) -> Score {
     let plans = ports::assign(reqs, sides, hints);
     let mut wires: Vec<RoutedWire> = reqs
@@ -212,7 +220,7 @@ fn proxy(
         .zip(&plans)
         .map(|(req, plan)| proxy_wire(req, super::route_one(req, plan, nodes)))
         .collect();
-    super::nudge::nudge(&mut wires, nodes);
+    super::nudge::nudge_with(&mut wires, scenes, false);
     score(&wires, nodes)
 }
 
@@ -369,7 +377,9 @@ mod tests {
         let (reqs, ns) = scene(src);
         let seed = seed_sides(&reqs);
         let sides = search(&reqs, &seed, &[], &ns);
-        let q = proxy(&reqs, &sides, &[], &ns);
+        let template: Vec<RoutedWire> = reqs.iter().map(|r| proxy_wire(r, Vec::new())).collect();
+        let scenes = super::super::nudge::build_scenes(&template, &ns);
+        let q = proxy(&reqs, &sides, &[], &ns, &scenes);
         (sides, q)
     }
 
