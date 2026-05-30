@@ -150,7 +150,7 @@ fn finish(
     for (req, (plan, meta)) in reqs.iter().zip(plans.iter().zip(metas)) {
         out.push(build_wire(meta, req, route_one(req, plan, nodes)));
     }
-    nudge::nudge(&mut out, nodes);
+    nudge::nudge(&mut out, nodes, true);
     out
 }
 

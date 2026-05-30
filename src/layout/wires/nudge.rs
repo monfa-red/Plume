@@ -27,70 +27,44 @@ use std::collections::BTreeMap;
 /// One candidate track placement: where each `(wire, segment)` should sit.
 type Placement = Vec<((usize, usize), f64)>;
 
-/// The scene data a wire's nudge-safety check needs that is constant across the
-/// side-search — its solid obstacles and its own endpoint rects. Built once per
-/// scene (each is a scene-tree walk) and reused for every candidate the search
-/// nudges, instead of rebuilt on every call.
-pub struct WireScene {
-    obstacles: Vec<Rect>, // the solid nodes this wire must clear
+/// Per-wire safety inputs for one nudge pass: the wire's solid obstacles and own
+/// endpoint rects — computed once here, not re-derived per trial (the obstacle set is
+/// a scene-tree walk) — plus this route's clearance and original endpoint gap.
+struct Safety {
+    obstacles: Vec<Rect>,
     endpoints: Vec<Rect>, // its own endpoint rects (empty for a self-loop)
-}
-
-/// Build the per-wire scene data, in wire order. The wires' endpoints don't change
-/// during the search, so the caller computes this once and threads it into every
-/// [`nudge_with`].
-pub fn build_scenes(wires: &[RoutedWire], nodes: &[PlacedNode]) -> Vec<WireScene> {
-    let index = SceneIndex::build(nodes);
-    wires
-        .iter()
-        .map(|w| WireScene {
-            obstacles: obstacles_for(nodes, [&w.seg_from, &w.seg_to]),
-            endpoints: if w.seg_from == w.seg_to {
-                Vec::new() // a self-loop hugs its node at clearance — exempt
-            } else {
-                [&w.seg_from, &w.seg_to]
-                    .iter()
-                    .filter_map(|id| index.rect(id))
-                    .collect()
-            },
-        })
-        .collect()
-}
-
-/// Per-wire safety inputs for one nudge pass: the scene data (borrowed, constant) plus
-/// this route's clearance and original endpoint gap (which the trial must not deepen).
-struct Safety<'a> {
-    obstacles: &'a [Rect],
-    endpoints: &'a [Rect],
     clearance: f64,
     orig_gap: f64,
 }
 
 /// Spread shared / near-parallel runs onto clean tracks, committing only the
 /// separations that keep every wire clear of nodes. Mutates each wire's polyline.
-pub fn nudge(wires: &mut [RoutedWire], nodes: &[PlacedNode]) {
-    let scenes = build_scenes(wires, nodes);
-    nudge_with(wires, &scenes, true);
-}
-
-/// Nudge with precomputed [`WireScene`]s — the side-search reuses one set across all
-/// the candidates it evaluates, so the scene index / obstacle sets aren't rebuilt per
-/// call. `scenes` is indexed like `wires`. `thorough` sweeps the full band of track
-/// centres for the best node-safe placement; the search passes `false` for a coarser,
-/// much cheaper sweep — the crossing count it optimises is set by the track *order*,
-/// not the exact centre, so the cheaper sweep ranks candidates just as well.
-pub fn nudge_with(wires: &mut [RoutedWire], scenes: &[WireScene], thorough: bool) {
+/// `thorough` sweeps the full band of track centres for the best node-safe placement;
+/// the side-search passes `false` for a coarser, much cheaper sweep — the crossing
+/// count it compares is set by the track *order*, not the exact centre, so the cheaper
+/// sweep ranks candidates just as well, while the final build re-nudges thoroughly.
+pub fn nudge(wires: &mut [RoutedWire], nodes: &[PlacedNode], thorough: bool) {
+    let index = SceneIndex::build(nodes);
     let segs = collect_interior(wires);
     let originals: Vec<Vec<Pt>> = wires.iter().map(|w| w.path.clone()).collect();
     let safety: Vec<Safety> = wires
         .iter()
         .zip(&originals)
-        .zip(scenes)
-        .map(|((w, orig), sc)| Safety {
-            obstacles: &sc.obstacles,
-            endpoints: &sc.endpoints,
-            clearance: oracle::clearance(&w.attrs),
-            orig_gap: endpoint_gap(orig, &sc.endpoints),
+        .map(|(w, orig)| {
+            let endpoints: Vec<Rect> = if w.seg_from == w.seg_to {
+                Vec::new() // a self-loop hugs its node at clearance — exempt
+            } else {
+                [&w.seg_from, &w.seg_to]
+                    .iter()
+                    .filter_map(|id| index.rect(id))
+                    .collect()
+            };
+            Safety {
+                obstacles: obstacles_for(nodes, [&w.seg_from, &w.seg_to]),
+                orig_gap: endpoint_gap(orig, &endpoints),
+                endpoints,
+                clearance: oracle::clearance(&w.attrs),
+            }
         })
         .collect();
     let mut moved: BTreeMap<(usize, usize), f64> = BTreeMap::new();
@@ -401,7 +375,7 @@ fn is_safe(path: &[Pt], original: &[Pt], safety: &Safety) -> bool {
     }
     let segs: Vec<(Pt, Pt)> = path.windows(2).map(|s| (s[0], s[1])).collect();
 
-    for obs in safety.obstacles {
+    for obs in &safety.obstacles {
         let bad = |s: &(Pt, Pt)| {
             rect_penetrated_by(*obs, *s) || seg_rect_distance(*obs, *s) + EPS < safety.clearance
         };
@@ -411,7 +385,7 @@ fn is_safe(path: &[Pt], original: &[Pt], safety: &Safety) -> bool {
     }
 
     if !safety.endpoints.is_empty() {
-        let after = endpoint_gap(path, safety.endpoints);
+        let after = endpoint_gap(path, &safety.endpoints);
         if after < 0.0 {
             return false; // pierced its own endpoint
         }
@@ -580,7 +554,7 @@ mod tests {
                 "bb",
             ),
         ];
-        nudge(&mut wires, &ns);
+        nudge(&mut wires, &ns, true);
         let gap = (wires[0].path[1].0 - wires[1].path[1].0).abs();
         assert!((gap - 16.0).abs() < 1e-6, "tracks 16 apart, got {gap}");
     }
@@ -604,7 +578,7 @@ mod tests {
                 "bb",
             ),
         ];
-        nudge(&mut wires, &ns);
+        nudge(&mut wires, &ns, true);
         let count = perp_crossings(&wires[0], &wires[1]);
         assert_eq!(
             count, 0,
@@ -632,7 +606,7 @@ mod tests {
             "bb",
         )];
         let before = wires[0].path.clone();
-        nudge(&mut wires, &ns);
+        nudge(&mut wires, &ns, true);
         assert_eq!(wires[0].path, before);
     }
 }
