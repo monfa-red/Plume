@@ -3,7 +3,7 @@ source: tests/conformance.rs
 expression: svg
 input_file: samples/wires_fan.plume
 ---
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-70.875 -259.8 141.75 503.6" width="141.75" height="503.6" class="plume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-70.875 -279.675 158.4969 523.475" width="158.4969" height="523.475" class="plume">
   <defs/>
   <g class="plume-scene" color="black">
     <g class="plume-node plume-shape-rect" data-id="mouse" transform="translate(0,-199)">
@@ -50,7 +50,7 @@ input_file: samples/wires_fan.plume
       <text x="0" y="-159.2" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="sans-serif" fill="currentColor" paint-order="stroke" stroke="white" stroke-width="4.4" stroke-linejoin="round">hunts</text>
     </g>
     <g class="plume-wire" data-from="owl" data-to="mouse">
-      <path d="M -27.725 -39.8 L -50.875 -39.8 L -50.875 -239.8 L 0 -239.8 L 0 -227.8" fill="none" stroke="#444" stroke-width="1"/>
+      <path d="M 27.725 -39.8 L 51.6219 -39.8 L 51.6219 -243.675 L 0 -243.675 L 0 -227.8" fill="none" stroke="#444" stroke-width="1"/>
       <polygon class="plume-marker plume-marker-arrow" points="0,-223.8 -2.5,-228.8 2.5,-228.8" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="bowl" data-to="apple">
@@ -62,8 +62,8 @@ input_file: samples/wires_fan.plume
       <polygon class="plume-marker plume-marker-arrow" points="27.725,199 32.725,196.5 32.725,201.5" fill="#444"/>
     </g>
     <g class="plume-wire" data-from="bowl" data-to="mouse">
-      <path d="M 31.3 39.8 L 50.875 39.8 L 50.875 -199 L 38.875 -199" fill="none" stroke="#444" stroke-width="1"/>
-      <polygon class="plume-marker plume-marker-arrow" points="34.875,-199 39.875,-201.5 39.875,-196.5" fill="#444"/>
+      <path d="M 31.3 39.8 L 67.6219 39.8 L 67.6219 -259.675 L -50.875 -259.675 L -50.875 -199 L -38.875 -199" fill="none" stroke="#444" stroke-width="1"/>
+      <polygon class="plume-marker plume-marker-arrow" points="-34.875,-199 -39.875,-196.5 -39.875,-201.5" fill="#444"/>
     </g>
   </g>
 </svg>

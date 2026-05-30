@@ -27,10 +27,10 @@ wires_dense.plume      A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 wires_fan.plume        A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 wires_grid.plume       A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 wires_labels.plume     A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:4  X:0
-wires_nested.plume     A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
-wires_realistic_column.plume A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:1  X:5
+wires_nested.plume     A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:1
+wires_realistic_column.plume A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:3  X:0
 wires_realistic_row.plume A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 wires_selfloop.plume   A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 wires_star.plume       A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:0 B2w:0  X:0
 
-TOTAL                  A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:1 B2w:5  X:5
+TOTAL                  A1:0 A2:0 A3:0 A4:0 A5:0  B1:0 B2n:1 B2w:7  X:1

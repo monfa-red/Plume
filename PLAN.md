@@ -367,6 +367,27 @@ monotonicity, panic-safety came back clean; three real perf/quality findings fix
   `compile_str_with`. New `plume::compile_str_checked` lays out once and returns both the
   SVG and the relaxation diagnostics, halving the default compile cost.
 
+**Column-quality fix — the proxy must nudge, and crossings outrank flagged B2w/A3.**
+A column-layout `wires_realistic` exposed two coupled flaws (`wires_realistic_column`
+went from X:5 to **X:0**):
+
+- **Route-only proxy mispredicts the nudge.** The search scored candidates *without*
+  the nudge, which both over-counts the shared runs / sub-separation the nudge fixes
+  *and* misses the crossings the nudge *adds* when it separates a bundle. So the
+  proxy chose side-sets that looked clean unrouted but crossed once shipped. The
+  proxy now **runs the nudge before scoring** (`select::proxy`), so it optimises the
+  real geometry. (Costlier per eval — the `MAX_EVALS` cap bounds it; a release-build
+  column compile is ~0.2 s.)
+- **Ranking.** `score` now ranks `(invariants, B1, B2n, crossings, turns, A3+B2w,
+  length)` — crossings/turns **above** A3 (shared runs) and B2w (sub-separation),
+  because those are the *nudge's* job and only flagged relaxations. Ranking B2 above
+  B3 (the literal WIRING constraint order) made the search split clean bundles to
+  spare a sub-separation, manufacturing crossings; this puts the user-visible
+  crossings first and lets a bundle ride a flagged 4 px sub-separation instead.
+  Net suite-wide: column X 5→0 and the row re-routes cleaner; the only cost is a
+  couple of flagged B2w on the crowded column bundles and a 1-crossing `wires_nested`
+  (a greedy local optimum on a contrived nest — not a hard/B2n issue).
+
 ### Follow-up routing fixes (same contract, sharper geometry)
 
 - **Even-spacing overflow (C2/C5):** `ports::assign_slots` spacing was

@@ -5,11 +5,13 @@
 //! a chain of geometric special cases (facing pick, least-loaded, re-elect-on-skim,
 //! convergence-unify), we run **one monotone hill-climb**. Seeded with the geometric
 //! facing pick, it repeatedly flips a single wire-end — or unifies a node's wires —
-//! onto a candidate side and keeps any change that **strictly** lowers the scorecard
-//! (`score`), evaluated by a fast route-only proxy. Strict improvement ⇒ it
-//! terminates, never oscillates, and is a deterministic function of its input.
-//! Convergence nesting, partitioning, turn-minimisation, and perpendicular exits all
-//! emerge from the same mechanism.
+//! onto a candidate side and keeps any change that **strictly** lowers the `score`
+//! scorecard. Each candidate is scored by routing it *and running the nudge* (so the
+//! proxy matches the shipped geometry — a route-only score mispredicts the crossings
+//! the nudge adds when it separates a bundle). Strict improvement ⇒ it terminates,
+//! never oscillates, and is a deterministic function of its input. Convergence
+//! nesting, partitioning, turn-minimisation, and perpendicular exits all emerge from
+//! the same mechanism.
 
 use super::geometry::{pick_edges, Pt};
 use super::ports::{self, PlanHint, SegReq};
@@ -191,9 +193,13 @@ fn back_side(s: Side) -> Side {
     }
 }
 
-/// The score of a side assignment, by a fast **route-only** proxy: assign ports,
-/// route each wire (no nudge — it separates rails but barely changes crossings or
-/// bends), and score the raw polylines. Only the final winner pays for the nudge.
+/// The score of a side assignment, by routing it the way the final build will:
+/// assign ports, route each wire, **and run the nudge**, then score. Routing without
+/// the nudge mispredicts both ways — it over-counts the shared runs / sub-separation
+/// the nudge fixes, yet misses the crossings the nudge introduces when it separates a
+/// bundle. Nudging here makes the proxy match the real geometry the search is choosing
+/// between, so it optimises what actually ships. (This is the search's cost driver;
+/// `MAX_EVALS` bounds it.)
 fn proxy(
     reqs: &[SegReq],
     sides: &[(Side, Side)],
@@ -201,11 +207,12 @@ fn proxy(
     nodes: &[PlacedNode],
 ) -> Score {
     let plans = ports::assign(reqs, sides, hints);
-    let wires: Vec<RoutedWire> = reqs
+    let mut wires: Vec<RoutedWire> = reqs
         .iter()
         .zip(&plans)
         .map(|(req, plan)| proxy_wire(req, super::route_one(req, plan, nodes)))
         .collect();
+    super::nudge::nudge(&mut wires, nodes);
     score(&wires, nodes)
 }
 

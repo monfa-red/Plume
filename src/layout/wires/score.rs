@@ -12,24 +12,71 @@ use super::validate::{validate_routing, Rule, Severity};
 use crate::layout::ir::{PlacedNode, RoutedWire};
 use crate::resolve::{AttrMap, VarTable};
 
-/// `(invariants, B1, B2n, B2w, crossings, turns, length_px)` — compare with `<`.
+/// A comparison tuple, smaller strictly better (see [`score`] for the field order).
 pub type Score = (usize, usize, usize, usize, usize, usize, usize);
 
-/// Score a candidate routing: the validator's contract counts, then turns + length.
-pub fn score(wires: &[RoutedWire], nodes: &[PlacedNode]) -> Score {
+/// The validator's raw contract counts for a routing, before they're arranged into a
+/// comparison tuple. `a3` (shared parallel runs) is kept apart from the per-wire
+/// invariants because the nudge pass resolves it, while A1/A2/A4/A5 it cannot.
+struct Counts {
+    inv: usize, // A1/A2/A4/A5 — per-wire invariants the nudge can't repair
+    a3: usize,  // A3 shared parallel runs — the nudge separates these
+    b1: usize,
+    b2n: usize,
+    b2w: usize, // wire-wire separation — the nudge separates these too
+    crossings: usize,
+}
+
+fn counts(wires: &[RoutedWire], nodes: &[PlacedNode]) -> Counts {
     let vs = validate_routing(nodes, &AttrMap::new(), wires, &VarTable::new());
-    let (mut inv, mut b1, mut b2n, mut b2w, mut crossings) = (0, 0, 0, 0, 0);
+    let mut c = Counts {
+        inv: 0,
+        a3: 0,
+        b1: 0,
+        b2n: 0,
+        b2w: 0,
+        crossings: 0,
+    };
     for v in &vs {
         match v.rule {
-            Rule::NodeOverlap => b1 += 1,
-            Rule::Clearance => b2n += 1,
-            Rule::Separation => b2w += 1,
-            Rule::Crossing => crossings += 1,
-            r if r.severity() == Severity::Invariant => inv += 1,
+            Rule::NodeOverlap => c.b1 += 1,
+            Rule::Clearance => c.b2n += 1,
+            Rule::Separation => c.b2w += 1,
+            Rule::Crossing => c.crossings += 1,
+            Rule::PerpCrossing => c.a3 += 1,
+            r if r.severity() == Severity::Invariant => c.inv += 1,
             _ => {}
         }
     }
-    (inv, b1, b2n, b2w, crossings, turns(wires), length_px(wires))
+    c
+}
+
+/// The routing objective the side-search and the keep-better both minimise, ordered
+/// most-important first:
+///
+/// 1. **hard per-wire invariants** (A1/A2/A4/A5) and **B1** node overlap — absolute;
+/// 2. **B2n** endpoint skim — side-selection's to avoid, the nudge can't;
+/// 3. **B3 crossings** then **B4 turns** — the visible quality the user cares about;
+/// 4. **A3 shared runs + B2w sub-separation** — these the *nudge* resolves (and are
+///    flagged, not hard), so they sit **below** crossings: the search must not split
+///    a clean bundle (raising crossings) just to spare a sub-separation the nudge
+///    would clear or, at worst, flag;
+/// 5. **B5 length** — the final tie-break.
+///
+/// Ranking crossings above A3/B2w is the key: a route-only score over-weights the
+/// shared runs the nudge fixes, so the proxy [`super::select`] nudges before scoring,
+/// making this the real shipped geometry.
+pub fn score(wires: &[RoutedWire], nodes: &[PlacedNode]) -> Score {
+    let c = counts(wires, nodes);
+    (
+        c.inv,
+        c.b1,
+        c.b2n,
+        c.crossings,
+        turns(wires),
+        c.a3 + c.b2w,
+        length_px(wires),
+    )
 }
 
 /// Total 90° bends across all wires (B4): a polyline of `n` points has `n - 2`.
